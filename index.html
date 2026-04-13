@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Stadsspel Rotterdam - Jorik's Bachelor Party</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body,#root{width:100%;height:100%;overflow:hidden}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0e27;color:#fff}
+    .leaflet-div-icon{background:none!important;border:none!important}
+
+    /* Glass morphism */
+    .glass{backdrop-filter:blur(14px);background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:16px}
+    .glass-strong{backdrop-filter:blur(20px);background:rgba(10,14,39,0.85);border:1px solid rgba(255,255,255,0.15);border-radius:16px}
+
+    /* Buttons */
+    .btn{padding:12px 24px;border:none;border-radius:12px;font-weight:700;cursor:pointer;transition:all .2s;font-size:14px}
+    .btn:active{transform:scale(0.96)}
+    .btn-cyan{background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a0e27}
+    .btn-gold{background:linear-gradient(135deg,#ffd700,#ffaa00);color:#0a0e27}
+    .btn-ghost{background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+    .btn-danger{background:linear-gradient(135deg,#ff4444,#cc0000);color:#fff}
+    .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+
+    /* Animations */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+    @keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,212,255,0.6)}50%{box-shadow:0 0 0 12px rgba(0,212,255,0)}}
+    @keyframes glow{0%,100%{filter:drop-shadow(0 0 6px rgba(0,212,255,0.8))}50%{filter:drop-shadow(0 0 16px rgba(0,212,255,0.4))}}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-20px)}}
+    @keyframes scoreFloat{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-60px) scale(1.3)}}
+    @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    .animate-in{animation:fadeInUp .4s ease both}
+    .animate-in-1{animation-delay:.05s}.animate-in-2{animation-delay:.1s}.animate-in-3{animation-delay:.15s}.animate-in-4{animation-delay:.2s}
+
+    /* Toast */
+    .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10002;animation:slideDown .3s ease}
+    .toast-inner{padding:14px 24px;border-radius:14px;backdrop-filter:blur(20px);background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.4);font-weight:600;font-size:14px;white-space:nowrap;text-align:center}
+
+    /* Score popup */
+    .score-popup{position:fixed;top:40%;left:50%;transform:translateX(-50%);z-index:10003;font-size:42px;font-weight:900;color:#ffd700;animation:scoreFloat 1.2s ease forwards;pointer-events:none;text-shadow:0 2px 20px rgba(255,215,0,0.6)}
+
+    /* Offline banner */
+    .offline-banner{position:fixed;top:0;left:0;right:0;padding:6px;text-align:center;font-size:11px;font-weight:600;color:#ff6b35;background:rgba(255,107,53,0.15);border-bottom:1px solid rgba(255,107,53,0.3);z-index:10001}
+
+    /* Bottom tab bar */
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;z-index:10000;backdrop-filter:blur(20px);background:rgba(10,14,39,0.9);border-top:1px solid rgba(255,255,255,0.1);display:flex;padding:8px 0 max(8px,env(safe-area-inset-bottom))}
+    .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;background:none;border:none;color:#555;font-size:10px;font-weight:600;cursor:pointer;transition:color .2s}
+    .tab-btn.active{color:#00d4ff}
+    .tab-btn .tab-icon{font-size:22px;transition:transform .2s}
+    .tab-btn.active .tab-icon{transform:scale(1.15)}
+
+    /* Bottom sheet */
+    .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;animation:fadeInUp .2s ease}
+    .sheet{position:fixed;bottom:0;left:0;right:0;max-height:85vh;overflow-y:auto;z-index:10001;background:#0f1335;border-top:1px solid rgba(255,255,255,0.15);border-radius:24px 24px 0 0;padding:20px 20px 100px;animation:slideUp .3s ease}
+    .sheet-handle{width:40px;height:4px;background:rgba(255,255,255,0.3);border-radius:2px;margin:0 auto 16px}
+
+    /* Challenge card */
+    .ch-card{padding:16px;margin-bottom:12px;border-radius:14px;backdrop-filter:blur(10px);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);transition:border-color .2s}
+    .ch-card.completed{border-color:rgba(0,255,136,0.4);background:rgba(0,255,136,0.05)}
+    .ch-card.locked{opacity:0.5;filter:blur(1px);pointer-events:none;position:relative}
+    .ch-type{display:inline-block;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+    .ch-type-photo{background:rgba(0,212,255,0.2);color:#00d4ff}
+    .ch-type-video{background:rgba(255,107,53,0.2);color:#ff6b35}
+    .ch-type-creative{background:rgba(168,85,247,0.2);color:#a855f7}
+    .ch-type-quiz{background:rgba(255,215,0,0.2);color:#ffd700}
+    .difficulty{color:#666;font-size:11px}.difficulty .star{color:#ffd700}
+    .points-badge{font-size:13px;font-weight:800;color:#ffd700}
+
+    /* Quiz */
+    .quiz-option{display:block;width:100%;padding:12px;margin-bottom:8px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:14px;cursor:pointer;text-align:left;transition:all .2s}
+    .quiz-option:hover{background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.3)}
+    .quiz-option.correct{background:rgba(0,255,136,0.2);border-color:#00ff88;color:#00ff88}
+    .quiz-option.wrong{background:rgba(255,68,68,0.2);border-color:#ff4444;color:#ff4444}
+
+    /* Leaderboard */
+    .lb-card{padding:16px;margin-bottom:12px;border-radius:16px;display:flex;align-items:center;gap:14px;transition:all .3s;position:relative;overflow:hidden}
+    .lb-rank{font-size:22px;font-weight:900;min-width:36px;text-align:center}
+    .lb-rank-1{color:#ffd700;text-shadow:0 0 20px rgba(255,215,0,0.5)}.lb-rank-2{color:#c0c0c0}.lb-rank-3{color:#cd7f32}.lb-rank-other{color:#555}
+    .lb-emoji{font-size:32px}
+    .lb-info{flex:1}
+    .lb-name{font-weight:700;font-size:15px;margin-bottom:2px}
+    .lb-stats{font-size:11px;color:#888}
+    .lb-score{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}
+    .lb-first{background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.25)}
+
+    /* Nearby challenges */
+    .nearby-panel{position:absolute;bottom:80px;left:10px;right:10px;z-index:1000}
+    .nearby-card{padding:12px;margin-bottom:8px;border-radius:12px;display:flex;align-items:center;gap:12px;cursor:pointer;backdrop-filter:blur(12px);background:rgba(10,14,39,0.85);border:1px solid rgba(255,255,255,0.12)}
+    .nearby-card:active{background:rgba(0,212,255,0.1)}
+    .nearby-emoji{font-size:28px}.nearby-dist{font-size:12px;color:#00d4ff;font-weight:700}
+
+    /* Secret mission */
+    .secret-banner{margin:12px 0;padding:16px;border-radius:14px;background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(255,107,53,0.1));border:1px solid rgba(168,85,247,0.3);cursor:pointer}
+    .secret-badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;background:rgba(168,85,247,0.3);color:#a855f7;margin-bottom:8px}
+
+    /* Bar break overlay */
+    .barbreak-overlay{position:fixed;inset:0;z-index:10005;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);background:rgba(10,14,39,0.9)}
+    .barbreak-card{max-width:360px;padding:32px;text-align:center;border-radius:24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,215,0,0.3)}
+
+    /* Team setup */
+    .emoji-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+    .emoji-btn{padding:10px;font-size:24px;border-radius:12px;background:rgba(255,255,255,0.06);border:2px solid transparent;cursor:pointer;transition:all .15s}
+    .emoji-btn:hover{background:rgba(0,212,255,0.1)}
+    .emoji-btn.selected{border-color:#00d4ff;background:rgba(0,212,255,0.15)}
+    .emoji-btn.taken{opacity:0.25;cursor:not-allowed}
+    .color-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+    .color-btn{width:100%;aspect-ratio:1;border-radius:12px;border:3px solid transparent;cursor:pointer;transition:all .15s}
+    .color-btn.selected{border-color:#fff;transform:scale(1.1)}
+
+    /* Phase indicator */
+    .phase-bar{display:flex;gap:4px;margin:12px 0}
+    .phase-dot{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,0.1)}
+    .phase-dot.active{background:#00d4ff}
+    .phase-dot.done{background:#00ff88}
+
+    /* Photo preview */
+    .photo-preview{width:100%;max-height:150px;object-fit:cover;border-radius:10px;margin-top:10px}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+// ═══════════════════════════════════════════
+// CONFIGURATION — Fill in your Supabase creds
+// ═══════════════════════════════════════════
+const SUPABASE_URL='https://kybcndicweuxjxkfzxud.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5YmNuZGljd2V1eGp4a2Z6eHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDM3ODYsImV4cCI6MjA5MTY3OTc4Nn0.utTzURErYUiGgOpvlq1goKToUl8i4CavVicEFp-MrDk';
+const OFFLINE=SUPABASE_URL==='YOUR_SUPABASE_URL';
+const sb=!OFFLINE?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
+
+// ═══════════════════════════════════════════
+// GAME CONFIG
+// ═══════════════════════════════════════════
+const START_POS={lat:51.9179,lng:4.4822}; // Maritiem Museum, Leuvehaven
+const DINNER_ZONE={lat:51.9206,lng:4.4868,r:400}; // Markthal/Bokaal area
+const GHOST_DURATION=300; // 5 min in seconds
+const GHOST_MAX_USES=3;
+const FIRST_BONUS=10;
+const BAR_BREAK_BONUS=25;
+const WEDDING_VIDEO_BONUS=50;
+const NEARBY_RADIUS=500; // meters
+const GPS_INTERVAL=10000; // 10s
+
+const TEAM_EMOJIS=['🦁','🐋','🦊','🐊','🦅','🐺','🦈','🐙','🦄','🐉','🦇','🐧','🦉','🐬','🦀','🐯'];
+const TEAM_COLORS=[
+  {name:'Cyan',hex:'#00d4ff'},{name:'Gold',hex:'#ffd700'},{name:'Orange',hex:'#ff6b35'},{name:'Purple',hex:'#a855f7'},
+  {name:'Pink',hex:'#ec4899'},{name:'Green',hex:'#00ff88'},{name:'Blue',hex:'#3b82f6'},{name:'Red',hex:'#ef4444'}
+];
+
+// ═══════════════════════════════════════════
+// 102 VERIFIED LOCATIONS
+// ═══════════════════════════════════════════
+const L_DATA=[
+{id:1,n:"Erasmusbrug",la:51.9055,lo:4.4853,e:"🌉",c:"bridge",r:25,ch:[
+  {t:"photo",ti:"Erasmusbrug Pose",d:"Maak de meest epische foto op de brug. Filmaffiche waardig!",p:25,df:"medium"},
+  {t:"video",ti:"Brug Catwalk",d:"Loop als een model over de Erasmusbrug. Hele team, min. 10 sec.",p:35,df:"hard"},
+  {t:"quiz",ti:"Brug Kennis",d:"Wat is de bijnaam van de Erasmusbrug?",a:"De Zwaan",o:["De Zwaan","De Harp","De Naald","Het Zeil"],p:15,df:"easy"}]},
+{id:2,n:"Markthal",la:51.9200,lo:4.4875,e:"🏗️",c:"landmark",r:25,ch:[
+  {t:"photo",ti:"Plafond Selfie",d:"Spectaculaire foto van het beschilderde plafond.",p:20,df:"easy"},
+  {t:"creative",ti:"Proeverij Challenge",d:"Koop het raarste ding, laat iemand het blind proeven op video.",p:35,df:"hard"},
+  {t:"quiz",ti:"Markthal Trivia",d:"Hoeveel m² is het kunstwerk op het plafond?",a:"11.000 m²",o:["11.000 m²","5.000 m²","8.500 m²","15.000 m²"],p:25,df:"medium"}]},
+{id:3,n:"Kubuswoningen",la:51.9200,lo:4.4903,e:"🎲",c:"architecture",r:15,ch:[
+  {t:"photo",ti:"Schuine Pose",d:"Hele team schuin, net als de kubussen.",p:20,df:"easy"},
+  {t:"quiz",ti:"Kubus Quiz",d:"Wie ontwierp de kubuswoningen?",a:"Piet Blom",o:["Piet Blom","Rem Koolhaas","Berlage","Rietveld"],p:25,df:"medium"}]},
+{id:4,n:"Euromast",la:51.9061,lo:4.4658,e:"🗼",c:"landmark",r:25,ch:[
+  {t:"photo",ti:"Toren Perspectief",d:"Perspectieffoto: iemand 'houdt' de Euromast vast of 'eet' hem op.",p:25,df:"medium"},
+  {t:"quiz",ti:"Euromast Hoogte",d:"Hoe hoog is de Euromast?",a:"185 meter",o:["185 meter","165 meter","200 meter","150 meter"],p:20,df:"easy"}]},
+{id:5,n:"Hotel New York",la:51.9042,lo:4.4842,e:"🏨",c:"historic",r:15,ch:[
+  {t:"creative",ti:"Emigranten Scene",d:"Speel afscheidsscène na alsof jullie naar Amerika vertrekken!",p:35,df:"hard"},
+  {t:"photo",ti:"New York Stijl",d:"Foto in 'Roaring Twenties' stijl bij de ingang.",p:25,df:"medium"}]},
+{id:6,n:"SS Rotterdam",la:51.8920,lo:4.4712,e:"🚢",c:"landmark",r:25,ch:[
+  {t:"photo",ti:"Titanic Pose",d:"Titanic-pose bij het schip. 'I'm the king of the world!'",p:25,df:"medium"},
+  {t:"quiz",ti:"Schip Kennis",d:"In welk jaar maakte de SS Rotterdam haar laatste reis?",a:"2000",o:["2000","1997","2005","1990"],p:25,df:"medium"}]},
+{id:7,n:"Rotterdam Centraal",la:51.9247,lo:4.4688,e:"🚂",c:"landmark",r:20,ch:[
+  {t:"photo",ti:"Station Selfie",d:"Groepsfoto voor het iconische puntdak.",p:15,df:"easy"},
+  {t:"quiz",ti:"Station Kennis",d:"Wanneer werd het huidige Rotterdam Centraal geopend?",a:"2014",o:["2014","2010","2018","2012"],p:20,df:"easy"}]},
+{id:8,n:"De Hef",la:51.9133,lo:4.4986,e:"🏗️",c:"bridge",r:15,ch:[
+  {t:"photo",ti:"Hef Silhouet",d:"Silhouetfoto met De Hef op de achtergrond.",p:25,df:"medium"},
+  {t:"quiz",ti:"Hef Quiz",d:"Jeff Bezos wilde De Hef demonteren. Hoe reageerde Rotterdam?",a:"Dreigde met eieren gooien",o:["Dreigde met eieren gooien","Ging akkoord","Eiste 10 miljoen","Negeerde het"],p:30,df:"hard"}]},
+{id:9,n:"Willemsbrug",la:51.9170,lo:4.4907,e:"🔴",c:"bridge",r:15,ch:[{t:"photo",ti:"Rode Brug Foto",d:"Groepsfoto op de rode brug met skyline.",p:20,df:"easy"}]},
+{id:10,n:"Laurenskerk",la:51.9213,lo:4.4841,e:"⛪",c:"historic",r:20,ch:[
+  {t:"photo",ti:"Kerktoren Shot",d:"Creatieve foto: iemand 'houdt' de kerktoren vast.",p:25,df:"medium"},
+  {t:"quiz",ti:"Kerk Kennis",d:"De Laurenskerk overleefde 1940. Wanneer begon de bouw?",a:"1449",o:["1449","1352","1510","1601"],p:25,df:"medium"}]},
+{id:11,n:"POST Rotterdam",la:51.9221,lo:4.4782,e:"📮",c:"landmark",r:20,ch:[
+  {t:"photo",ti:"Postkantoor Pose",d:"Groepsfoto alsof jullie een pakketje ophalen.",p:20,df:"easy"},
+  {t:"quiz",ti:"POST Kennis",d:"Wat was dit gebouw oorspronkelijk?",a:"Hoofdpostkantoor",o:["Hoofdpostkantoor","Stadhuis","Bibliotheek","Rechtbank"],p:15,df:"easy"}]},
+{id:12,n:"Stadhuis Rotterdam",la:51.9231,lo:4.4784,e:"🏛️",c:"landmark",r:25,ch:[
+  {t:"photo",ti:"Burgemeester Pose",d:"Eén teamlid houdt toespraak als burgemeester.",p:25,df:"medium"},
+  {t:"video",ti:"Raadsvergadering",d:"15-sec nep-raadsvergadering over belachelijk onderwerp.",p:30,df:"medium"}]},
+{id:13,n:"Koopgoot",la:51.9201,lo:4.4795,e:"🛍️",c:"landmark",r:30,ch:[
+  {t:"creative",ti:"Mannequin Challenge",d:"Hele team bevriest als mannequins. Foto!",p:30,df:"medium"},
+  {t:"quiz",ti:"Koopgoot Trivia",d:"Hoe heet de Koopgoot officieel?",a:"Beurstraverse",o:["Beurstraverse","Cooltraverse","Winkeltraverse","Lijnbaanpassage"],p:15,df:"easy"}]},
+{id:14,n:"Hofplein",la:51.9245,lo:4.4777,e:"⛲",c:"square",r:35,ch:[{t:"photo",ti:"Fontein Foto",d:"Groepsfoto bij de fontein!",p:20,df:"easy"}]},
+{id:15,n:"Standbeeld Erasmus",la:51.9221,lo:4.4859,e:"📚",c:"art",r:10,ch:[
+  {t:"photo",ti:"Erasmus Imitatie",d:"Imiteer de pose van Erasmus. Heel team doet mee.",p:20,df:"easy"},
+  {t:"quiz",ti:"Erasmus Quiz",d:"Waarvoor is Erasmus het meest bekend?",a:"Lof der Zotheid",o:["Lof der Zotheid","Het Achterhuis","Max Havelaar","De Ontdekking van de Hemel"],p:20,df:"easy"}]},
+{id:16,n:"Grotekerkplein",la:51.9224,lo:4.4851,e:"🏛️",c:"square",r:20,ch:[{t:"creative",ti:"Plein Performance",d:"15-sec sketch: 'Jorik's eerste date'.",p:35,df:"hard"}]},
+{id:17,n:"Zadkine Monument",la:51.9180,lo:4.4815,e:"🗿",c:"art",r:15,ch:[
+  {t:"photo",ti:"Verwoeste Stad Pose",d:"Recreëer de pose: armen omhoog, mond open!",p:25,df:"medium"},
+  {t:"quiz",ti:"Monument Quiz",d:"Aan welke gebeurtenis herinnert dit beeld?",a:"Bombardement Rotterdam 1940",o:["Bombardement Rotterdam 1940","Watersnoodramp 1953","Bevrijding 1945","Havenarbeidersstaking 1970"],p:25,df:"medium"}]},
+{id:18,n:"Het Schielandshuis",la:51.9179,lo:4.4812,e:"🏰",c:"historic",r:20,ch:[{t:"photo",ti:"Historisch Portret",d:"'Schilderachtig' portret voor het oudste gebouw.",p:20,df:"easy"}]},
+{id:19,n:"Binnenrotte",la:51.9205,lo:4.4865,e:"🎪",c:"square",r:25,ch:[{t:"creative",ti:"Markt Bingo",d:"Vind: iets roods, een buitenlander, een straatmuzikant, iets gratis, een hond.",p:35,df:"hard"}]},
+{id:20,n:"Oude Haven",la:51.9192,lo:4.4909,e:"⛵",c:"landmark",r:15,ch:[
+  {t:"video",ti:"Shanty Zingen",d:"Zing een piraten-lied bij de schepen. Min. 15 sec!",p:30,df:"medium"},
+  {t:"photo",ti:"Zeeman Pose",d:"Poseer als stoere zeeman.",p:15,df:"easy"}]},
+{id:21,n:"Luchtsingel",la:51.9254,lo:4.4764,e:"🌉",c:"landmark",r:15,ch:[
+  {t:"photo",ti:"Gele Brug Groep",d:"Groepsfoto op de gele brug!",p:20,df:"easy"},
+  {t:"quiz",ti:"Luchtsingel Feit",d:"Hoe is de Luchtsingel gefinancierd?",a:"Crowdfunding",o:["Crowdfunding","Gemeente Rotterdam","EU subsidie","Loterij"],p:25,df:"medium"}]},
+{id:22,n:"Marten Toonder",la:51.9197,lo:4.4883,e:"🐻",c:"art",r:15,ch:[{t:"photo",ti:"Bommel & Tom Poes",d:"Poseer met Heer Bommel en Tom Poes!",p:20,df:"easy"}]},
+{id:23,n:"Kabouter Buttplug",la:51.9157,lo:4.4755,e:"🎅",c:"art",r:15,ch:[
+  {t:"photo",ti:"Kerstman Pose",d:"Creatieve foto met het kunstwerk van Paul McCarthy.",p:25,df:"medium"},
+  {t:"quiz",ti:"Buttplug Quiz",d:"Hoe heet dit kunstwerk officieel?",a:"Santa Claus",o:["Santa Claus","Gnome","Kabouter","Christmas Tree"],p:20,df:"easy"}]},
+{id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"photo",ti:"Baasje Pose",d:"Poseer alsof Fikkie jouw hond is.",p:15,df:"easy"}]},
+{id:25,n:"L'Homme qui Marche",la:51.9165,lo:4.4741,e:"🚶",c:"art",r:15,ch:[{t:"photo",ti:"Wandelende Man",d:"Imiteer het beeld. Heel team dezelfde pose!",p:20,df:"easy"}]},
+{id:26,n:"Sylvette (Picasso)",la:51.9149,lo:4.4735,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Picasso Pose",d:"Kubistische foto geïnspireerd door Picasso.",p:25,df:"medium"}]},
+{id:27,n:"Cascade (Van Lieshout)",la:51.9178,lo:4.4800,e:"🎪",c:"art",r:20,ch:[{t:"photo",ti:"Cascade Climb",d:"Beklim het kunstwerk en maak een epische foto.",p:25,df:"medium"}]},
+{id:28,n:"Make It Happen Mural",la:51.9149,lo:4.4789,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Mural Foto",d:"Foto waarbij jullie het muurschildering 'aanvullen'.",p:20,df:"easy"}]},
+{id:29,n:"ZOHO Letters",la:51.9290,lo:4.4765,e:"🔤",c:"art",r:20,ch:[{t:"photo",ti:"Letter Pose",d:"Spel 'JORIK' met jullie lichamen!",p:35,df:"hard"}]},
+{id:30,n:"Maritiem Museum",la:51.9179,lo:4.4822,e:"⚓",c:"culture",r:15,ch:[
+  {t:"photo",ti:"Kapitein Pose",d:"Poseer als scheepskapitein.",p:20,df:"easy"},
+  {t:"quiz",ti:"Maritiem Kennis",d:"Rotterdam is de grootste haven van Europa. Welke plek wereldwijd?",a:"Top 10",o:["Top 10","Top 3","Nummer 1","Top 20"],p:25,df:"medium"}]},
+{id:31,n:"Kunsthal",la:51.9108,lo:4.4737,e:"🖼️",c:"culture",r:20,ch:[{t:"creative",ti:"Levend Kunstwerk",d:"Creëer een 'levend kunstwerk' met het hele team.",p:30,df:"medium"}]},
+{id:32,n:"Depot Boijmans",la:51.9085,lo:4.4715,e:"🪞",c:"culture",r:15,ch:[
+  {t:"photo",ti:"Spiegel Selfie",d:"Selfie in de spiegelende gevel!",p:25,df:"medium"},
+  {t:"quiz",ti:"Depot Feit",d:"Hoeveel kunstwerken in het Depot?",a:"151.000",o:["151.000","50.000","200.000","75.000"],p:25,df:"medium"}]},
+{id:33,n:"Wereldmuseum",la:51.9079,lo:4.4804,e:"🌍",c:"culture",r:15,ch:[{t:"photo",ti:"Wereldreis Foto",d:"Foto alsof jullie op wereldreis gaan.",p:20,df:"easy"}]},
+{id:34,n:"Nieuwe Instituut",la:51.9145,lo:4.4722,e:"📐",c:"culture",r:15,ch:[{t:"photo",ti:"Architectuur Shot",d:"Meest artistieke architectuurfoto.",p:25,df:"medium"}]},
+{id:35,n:"Huis Sonneveld",la:51.9139,lo:4.4744,e:"🏠",c:"culture",r:10,ch:[{t:"photo",ti:"Art Deco Pose",d:"Art deco stijl voor het functionalistische huis.",p:20,df:"easy"}]},
+{id:36,n:"Mariniersmuseum",la:51.9185,lo:4.4900,e:"🎖️",c:"culture",r:15,ch:[{t:"photo",ti:"Marinier Pose",d:"Sta in de houding als een marinier!",p:20,df:"easy"}]},
+{id:37,n:"Witte de Withstraat",la:51.9151,lo:4.4769,e:"🎨",c:"street",r:20,ch:[
+  {t:"creative",ti:"Terras Interview",d:"Interview terrasbezoeker: 'Advies voor een bruidegom?'",p:40,df:"hard"},
+  {t:"photo",ti:"Street Art Hunt",d:"Vind street art, maak foto die het 'aanvult'.",p:25,df:"medium"}]},
+{id:38,n:"Skatepark Westblaak",la:51.9163,lo:4.4754,e:"🛹",c:"landmark",r:20,ch:[{t:"video",ti:"Skatepark Move",d:"Trick, pose, of epic fail. Humor > vaardigheid!",p:30,df:"medium"}]},
+{id:39,n:"Walk of Fame",la:51.9158,lo:4.4820,e:"⭐",c:"landmark",r:10,ch:[{t:"photo",ti:"Ster Selfie",d:"Selfie bij ster van favoriete Rotterdammer.",p:15,df:"easy"}]},
+{id:40,n:"Chinatown Poort",la:51.9215,lo:4.4694,e:"🏮",c:"landmark",r:15,ch:[{t:"photo",ti:"Draak Pose",d:"Groepsfoto met kung-fu poses!",p:20,df:"easy"}]},
+{id:41,n:"Schouwburgplein",la:51.9220,lo:4.4730,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Flash Mob",d:"Mini flash mob! Min. 10 sec!",p:35,df:"hard"}]},
+{id:42,n:"Westersingel",la:51.9161,lo:4.4745,e:"🦆",c:"park",r:20,ch:[{t:"creative",ti:"Eenden Tellen",d:"Tel alle eenden. Dichtst bij wint!",p:20,df:"easy"}]},
+{id:43,n:"Noordereiland",la:51.9130,lo:4.4990,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Eiland Leven",d:"Meest fotogenieke hoekje.",p:25,df:"medium"}]},
+{id:44,n:"Wilhelminapier",la:51.9060,lo:4.4850,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"Skyline Shot",d:"Mooiste skyline foto.",p:20,df:"easy"}]},
+{id:45,n:"KPN Toren",la:51.9073,lo:4.4899,e:"📡",c:"architecture",r:20,ch:[{t:"photo",ti:"Leunende Toren",d:"Perspectieffoto: toren 'tegenhouden'.",p:25,df:"medium"}]},
+{id:46,n:"Spido Kade",la:51.9098,lo:4.4818,e:"🚤",c:"landmark",r:15,ch:[{t:"quiz",ti:"Spido Kennis",d:"Hoe lang duurt een Spido rondvaart?",a:"75 minuten",o:["75 minuten","45 minuten","60 minuten","90 minuten"],p:15,df:"easy"}]},
+{id:47,n:"Monument De Boeg",la:51.9126,lo:4.4827,e:"🚢",c:"monument",r:10,ch:[{t:"photo",ti:"Titanic Moment",d:"Titanic-pose bij De Boeg!",p:25,df:"medium"}]},
+{id:48,n:"Nieuwe Luxor",la:51.9051,lo:4.4913,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Theater Scene",d:"Speel filmscène na. Oscar-waardig!",p:30,df:"medium"}]},
+{id:49,n:"Fenix Food Factory",la:51.9025,lo:4.4850,e:"🍔",c:"food",r:15,ch:[{t:"photo",ti:"Food Foto",d:"Meest Instagram-waardige food foto.",p:20,df:"easy"}]},
+{id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"photo",ti:"Drijvend Bos",d:"Foto met drijvende bomen!",p:20,df:"easy"}]},
+{id:51,n:"Maastunnel",la:51.9058,lo:4.4636,e:"🚇",c:"landmark",r:20,ch:[
+  {t:"video",ti:"Tunnel Echo",d:"Test de echo! Schreeuw iets grappigs.",p:25,df:"medium"},
+  {t:"quiz",ti:"Tunnel Quiz",d:"Wanneer werd de Maastunnel geopend?",a:"1942",o:["1942","1935","1950","1960"],p:20,df:"medium"}]},
+{id:52,n:"Het Park",la:51.9064,lo:4.4674,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Park Panorama",d:"Ontspannen groepsfoto in het park.",p:15,df:"easy"}]},
+{id:53,n:"Veerhaven",la:51.9068,lo:4.4776,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Haven Romantiek",d:"Romantische foto bij de zeilschepen.",p:20,df:"easy"}]},
+{id:54,n:"Maastoren",la:51.9071,lo:4.4920,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber",d:"Foto waarbij Maastoren klein lijkt.",p:25,df:"medium"}]},
+{id:55,n:"Rijnhavenbrug",la:51.9038,lo:4.4872,e:"🌁",c:"bridge",r:15,ch:[{t:"photo",ti:"Hoerenloper Foto",d:"Groepsfoto op de bijzondere loopbrug.",p:20,df:"easy"}]},
+{id:56,n:"Foodhallen",la:51.9064,lo:4.4887,e:"🍽️",c:"food",r:20,ch:[{t:"photo",ti:"Foodie Foto",d:"Groepsfoto met favoriete gerecht.",p:20,df:"easy"}]},
+{id:57,n:"Floating Office",la:51.9042,lo:4.4932,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Drijvend Kantoor",d:"Foto met het drijvende kantoor.",p:20,df:"easy"}]},
+{id:58,n:"Luchtpark Hofbogen",la:51.9282,lo:4.4767,e:"🌿",c:"park",r:15,ch:[{t:"photo",ti:"Rooftop Panorama",d:"Panoramafoto vanaf het dak!",p:25,df:"medium"}]},
+{id:59,n:"DakAkker",la:51.9244,lo:4.4758,e:"🌱",c:"landmark",r:15,ch:[{t:"photo",ti:"Dakboerderij",d:"Foto op de hoogste dakboerderij van Europa.",p:25,df:"medium"}]},
+{id:60,n:"Het Industriegebouw",la:51.9250,lo:4.4916,e:"🏭",c:"landmark",r:15,ch:[{t:"photo",ti:"Industrieel Shot",d:"Stoere industriële foto.",p:15,df:"easy"}]},
+{id:61,n:"BlueCity",la:51.9198,lo:4.4981,e:"♻️",c:"landmark",r:15,ch:[{t:"quiz",ti:"BlueCity Quiz",d:"BlueCity zit in een voormalig zwembad. Hoe heette het?",a:"Tropicana",o:["Tropicana","Aquarena","De Dolfijn","Waterlinie"],p:25,df:"medium"}]},
+{id:62,n:"Het Slaakhuys",la:51.9255,lo:4.4988,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Art Deco Parel",d:"Foto van dit art deco monument.",p:20,df:"easy"}]},
+{id:63,n:"Gebouw Delftse Poort",la:51.9240,lo:4.4716,e:"🏙️",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber Selfie",d:"Selfie met het hoogste gebouw.",p:20,df:"easy"}]},
+{id:64,n:"Willemswerf",la:51.9157,lo:4.4883,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Glijbaan Raadsel",d:"Welke filmster gleed van de glijbaan hier?",a:"Jackie Chan",o:["Jackie Chan","Jet Li","Bruce Willis","Arnold Schwarzenegger"],p:30,df:"hard"}]},
+{id:65,n:"Concertgebouw De Doelen",la:51.9234,lo:4.4740,e:"🎵",c:"culture",r:20,ch:[{t:"video",ti:"Luchtgitaar",d:"10 sec luchtgitaar voor De Doelen!",p:25,df:"medium"}]},
+{id:66,n:"Oude Luxor Theater",la:51.9232,lo:4.4770,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Broadway Moment",d:"Zing 10 sec musical voor de ingang.",p:30,df:"medium"}]},
+{id:67,n:"Geldersekade Panorama",la:51.9190,lo:4.4915,e:"🌅",c:"viewpoint",r:15,ch:[{t:"photo",ti:"Panorama Shot",d:"Panoramafoto Oude Haven + Witte Huis.",p:20,df:"easy"}]},
+{id:68,n:"Pauluskerk",la:51.9167,lo:4.4716,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Kerk Foto",d:"Foto bij de moderne Pauluskerk.",p:15,df:"easy"}]},
+{id:69,n:"Arminius Kerk",la:51.9155,lo:4.4727,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Kerk Contrast",d:"Foto: contrast oud en nieuw Rotterdam.",p:20,df:"easy"}]},
+{id:70,n:"Binnenwegplein",la:51.9192,lo:4.4768,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Kinetisch Kunstwerk",d:"Foto met het bewegende kunstwerk.",p:20,df:"easy"}]},
+{id:71,n:"THOMS",la:51.9221,lo:4.4808,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Proost!",d:"Groepsfoto met een drankje!",p:15,df:"easy"}]},
+{id:72,n:"Bokaal",la:51.9213,lo:4.4862,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Bar Selfie",d:"Selfie aan de bar!",p:15,df:"easy"}]},
+{id:73,n:"De Après Skihut",la:51.9223,lo:4.4767,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Skihut Sfeer",d:"Doe alsof jullie op wintersport zijn!",p:20,df:"easy"}]},
+{id:74,n:"De Gele Kanarie",la:51.9248,lo:4.4880,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Kanarie Pose",d:"Poseer als een kanarie!",p:20,df:"easy"}]},
+{id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Scheepje Ahoy",d:"Foto op het rode schip!",p:20,df:"easy"}]},
+{id:76,n:"BIRD Rotterdam",la:51.9288,lo:4.4782,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Band Foto",d:"Albumcover-waardige foto voor BIRD.",p:20,df:"easy"}]},
+{id:77,n:"De Vrienden Live",la:51.9199,lo:4.4931,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Vrienden Foto",d:"Jullie zijn de beste vrienden!",p:15,df:"easy"}]},
+{id:78,n:"Hitz",la:51.9224,lo:4.4780,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Hitz Party",d:"Groepsfoto aan de bar!",p:15,df:"easy"}]},
+{id:79,n:"Sijf",la:51.9165,lo:4.4768,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Terras Genieten",d:"Beste terras-selfie van de dag!",p:15,df:"easy"}]},
+{id:80,n:"NRC",la:51.9151,lo:4.4769,e:"🍸",c:"bar",r:15,ch:[{t:"photo",ti:"Cocktail Shot",d:"Meest Instagrambare cocktail-foto.",p:20,df:"easy"}]},
+{id:81,n:"Biergarten",la:51.9244,lo:4.4755,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Oktoberfest Pose",d:"Prosit! Oktoberfest-imitatie.",p:20,df:"easy"}]},
+{id:82,n:"Poppodium Annabel",la:51.9252,lo:4.4735,e:"🎸",c:"bar",r:20,ch:[{t:"photo",ti:"Rockster Pose",d:"Rockster-pose voor het poppodium!",p:20,df:"easy"}]},
+{id:83,n:"Happy Italy",la:51.9202,lo:4.4868,e:"🍕",c:"restaurant",r:15,ch:[
+  {t:"photo",ti:"Maffia Meeting",d:"'Maffia vergadering' foto. Godfather vibes.",p:25,df:"medium"},
+  {t:"creative",ti:"Pizza Bestelling",d:"Bestel in nep-Italiaans accent. Film de reactie!",p:35,df:"hard"}]},
+{id:84,n:"Sugo Pizza",la:51.9214,lo:4.4781,e:"🍕",c:"restaurant",r:15,ch:[{t:"photo",ti:"Sugo Selfie",d:"Beste 'Italian kiss' pose.",p:20,df:"easy"}]},
+{id:85,n:"O'Pazzo",la:51.9222,lo:4.4900,e:"🍝",c:"restaurant",r:15,ch:[{t:"creative",ti:"Pazzo Performance",d:"'O Pazzo' = 'de gek'. Doe iets geks!",p:30,df:"medium"}]},
+{id:86,n:"Vapiano",la:51.9208,lo:4.4863,e:"🍝",c:"restaurant",r:15,ch:[{t:"quiz",ti:"Vapiano Quiz",d:"Wat betekent 'Vapiano'?",a:"Langzaam",o:["Langzaam","Snel","Lekker","Vers"],p:20,df:"easy"}]},
+{id:87,n:"Old Scuola",la:51.9248,lo:4.4912,e:"🎓",c:"restaurant",r:15,ch:[{t:"photo",ti:"Old School Pose",d:"'Old school maffia' pose. Denkbeeldige sigaren!",p:20,df:"easy"}]},
+{id:88,n:"Historisch Delfshaven",la:51.9068,lo:4.4496,e:"🏚️",c:"historic",r:15,ch:[
+  {t:"photo",ti:"Historisch Portret",d:"Foto bij de historische havenhuisjes.",p:25,df:"medium"},
+  {t:"quiz",ti:"Pilgrim Fathers",d:"De Pilgrim Fathers vertrokken vanuit Delfshaven. Waarheen?",a:"Amerika",o:["Amerika","Indonesië","Suriname","Zuid-Afrika"],p:20,df:"easy"}]},
+{id:89,n:"Stadsbrouwerij De Pelgrim",la:51.9066,lo:4.4485,e:"🍺",c:"bar",r:15,ch:[
+  {t:"photo",ti:"Brouwerij Proost",d:"Proost met een lokaal biertje!",p:20,df:"easy"},
+  {t:"quiz",ti:"Pelgrim Quiz",d:"Naar welke groep is deze brouwerij vernoemd?",a:"Pilgrim Fathers",o:["Pilgrim Fathers","Geuzen","Watergeuzen","VOC"],p:20,df:"medium"}]},
+{id:90,n:"Standbeeld Piet Hein",la:51.9073,lo:4.4491,e:"🗿",c:"art",r:15,ch:[{t:"photo",ti:"Zeeheld Pose",d:"Stoere zeeheld naast Piet Hein!",p:20,df:"easy"}]},
+{id:91,n:"Historische Tramhalte",la:51.9081,lo:4.4682,e:"🚃",c:"historic",r:15,ch:[{t:"photo",ti:"Tramhalte Pose",d:"Wacht op de tram (die niet komt).",p:15,df:"easy"}]},
+{id:92,n:"Cruise Terminal",la:51.9066,lo:4.4870,e:"🚢",c:"landmark",r:20,ch:[{t:"photo",ti:"Bon Voyage",d:"Afscheidsfoto: op cruise!",p:20,df:"easy"}]},
+{id:93,n:"Poortgebouw",la:51.9090,lo:4.4939,e:"🏚️",c:"landmark",r:15,ch:[{t:"photo",ti:"Kraakpand Pose",d:"Foto bij het bekendste kraakpand.",p:20,df:"easy"}]},
+{id:94,n:"Entrepotgebouw",la:51.9063,lo:4.4981,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Vijf Werelddelen",d:"Foto bij de gevel.",p:20,df:"easy"}]},
+{id:95,n:"WTC Rotterdam",la:51.9213,lo:4.4793,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Beursgebouw",d:"Power-pose voor het WTC.",p:15,df:"easy"}]},
+{id:96,n:"Haagsche Veer",la:51.9242,lo:4.4800,e:"🏛️",c:"historic",r:15,ch:[{t:"photo",ti:"Gevangenispoort",d:"Foto bij de voormalige gevangenispoort.",p:20,df:"easy"}]},
+{id:97,n:"Villa Thalia",la:51.9240,lo:4.4785,e:"🎭",c:"culture",r:15,ch:[{t:"photo",ti:"Theater Pose",d:"Dramatische pose voor Villa Thalia!",p:20,df:"easy"}]},
+{id:98,n:"Chabot Museum",la:51.9137,lo:4.4741,e:"🎨",c:"culture",r:15,ch:[{t:"photo",ti:"Expressionisme",d:"Expressionistische foto à la Chabot.",p:25,df:"medium"}]},
+{id:99,n:"Natuurhistorisch Museum",la:51.9131,lo:4.4746,e:"🦕",c:"culture",r:15,ch:[{t:"photo",ti:"Dino Pose",d:"Beste dinosaurus-imitatie!",p:20,df:"easy"}]},
+{id:100,n:"KINO Rotterdam",la:51.9162,lo:4.4692,e:"🎬",c:"culture",r:15,ch:[{t:"photo",ti:"Filmster Pose",d:"Red carpet pose bij de bioscoop!",p:20,df:"easy"}]},
+{id:101,n:"Belasting & Douane Museum",la:51.9069,lo:4.4764,e:"💰",c:"culture",r:15,ch:[{t:"photo",ti:"Smokkelaar Pose",d:"Doe alsof je smokkelt langs de douane.",p:25,df:"medium"}]},
+{id:102,n:"Historische Tuin Schoonoord",la:51.9077,lo:4.4720,e:"🌷",c:"park",r:15,ch:[{t:"photo",ti:"Tuinfoto",d:"Mooiste foto in de historische tuin.",p:20,df:"easy"}]},
+];
+
+// ═══════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ═══════════════════════════════════════════
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000,p=Math.PI/180;
+  const a=Math.sin((lat2-lat1)*p/2)**2+Math.cos(lat1*p)*Math.cos(lat2*p)*Math.sin((lon2-lon1)*p/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function fmtDist(m){return m<1000?`${Math.round(m)}m`:`${(m/1000).toFixed(1)}km`}
+function fmtTime(s){const m=Math.floor(s/60),sec=s%60;return`${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`}
+function fmtHM(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}u ${m}m`:`${m}m`}
+function stars(df){return df==='easy'?'★':df==='medium'?'★★':'★★★'}
+
+function getNearby(pos,completed,n=3,maxR=NEARBY_RADIUS){
+  if(!pos)return[];
+  let locs=L_DATA.filter(l=>!completed[l.id]).map(l=>({...l,dist:haversine(pos.lat,pos.lng,l.la,l.lo)}));
+  locs.sort((a,b)=>a.dist-b.dist);
+  let result=locs.filter(l=>l.dist<=maxR).slice(0,n);
+  if(result.length<n)result=locs.filter(l=>l.dist<=maxR*2).slice(0,n);
+  if(result.length<n)result=locs.slice(0,n);
+  return result;
+}
+
+// ═══════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════
+function App(){
+  const[screen,setScreen]=useState('splash'); // splash, setup, lobby, game
+  const[myTeam,setMyTeam]=useState(null);
+  const[teams,setTeams]=useState([]);
+  const[scores,setScores]=useState({});
+  const[completed,setCompleted]=useState({}); // {locationId: {challengeIdx: true}}
+  const[visitedLocs,setVisitedLocs]=useState(new Set());
+  const[pos,setPos]=useState(null);
+  const[tab,setTab]=useState('leaderboard');
+  const[selLoc,setSelLoc]=useState(null);
+  const[toast,setToast]=useState(null);
+  const[scorePopup,setScorePopup]=useState(null);
+  const[ghost,setGhost]=useState({active:false,timeLeft:0,used:0});
+  const[gameStart,setGameStart]=useState(null);
+  const[elapsed,setElapsed]=useState(0);
+  const[phase,setPhase]=useState(0); // 0=waiting,1-4=phases
+  const[barBreak,setBarBreak]=useState(null); // {name,time}
+  const[jorikInTeam,setJorikInTeam]=useState(false);
+  const[weddingDone,setWeddingDone]=useState(false);
+  const[showWedding,setShowWedding]=useState(false);
+  const[activityFeed,setActivityFeed]=useState([]);
+  const[isAdmin]=useState(new URLSearchParams(window.location.search).get('admin')==='true');
+
+  // Timer
+  useEffect(()=>{
+    if(!gameStart)return;
+    const i=setInterval(()=>setElapsed(Math.floor((Date.now()-gameStart)/1000)),1000);
+    return()=>clearInterval(i);
+  },[gameStart]);
+
+  // GPS
+  useEffect(()=>{
+    const w=navigator.geolocation.watchPosition(
+      p=>setPos({lat:p.coords.latitude,lng:p.coords.longitude}),
+      ()=>{},
+      {enableHighAccuracy:true,maximumAge:3000,timeout:10000}
+    );
+    return()=>navigator.geolocation.clearWatch(w);
+  },[]);
+
+  // Ghost timer
+  useEffect(()=>{
+    if(ghost.timeLeft<=0){if(ghost.active)setGhost(g=>({...g,active:false}));return;}
+    const t=setTimeout(()=>setGhost(g=>({...g,timeLeft:g.timeLeft-1})),1000);
+    return()=>clearTimeout(t);
+  },[ghost.timeLeft,ghost.active]);
+
+  // Toast auto-dismiss
+  useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),4000);return()=>clearTimeout(t)}},[toast]);
+  useEffect(()=>{if(scorePopup){const t=setTimeout(()=>setScorePopup(null),1200);return()=>clearTimeout(t)}},[scorePopup]);
+
+  // Supabase real-time subscriptions
+  useEffect(()=>{
+    if(OFFLINE||!sb)return;
+    // Subscribe to team score changes
+    const teamSub=sb.channel('teams').on('postgres_changes',{event:'UPDATE',schema:'public',table:'teams'},payload=>{
+      const t=payload.new;
+      setTeams(prev=>prev.map(p=>p.id===t.id?{...p,...t}:p));
+      if(t.id!==myTeam?.id){
+        setToast(`${t.emoji} ${t.name}: ${t.score} pts`);
+      }
+    }).subscribe();
+    // Subscribe to activity feed
+    const actSub=sb.channel('activity').on('postgres_changes',{event:'INSERT',schema:'public',table:'activity_feed'},payload=>{
+      setActivityFeed(prev=>[payload.new,...prev].slice(0,50));
+    }).subscribe();
+    return()=>{teamSub.unsubscribe();actSub.unsubscribe()};
+  },[myTeam]);
+
+  const addActivity=(msg,pts=0)=>{
+    const entry={team_id:myTeam?.id,message:msg,points:pts,created_at:new Date().toISOString(),team_emoji:myTeam?.emoji,team_name:myTeam?.name};
+    setActivityFeed(prev=>[entry,...prev].slice(0,50));
+    if(!OFFLINE&&sb)sb.from('activity_feed').insert(entry);
+  };
+
+  const completeChallenge=(locId,chIdx,pts)=>{
+    const key=`${locId}_${chIdx}`;
+    if(completed[locId]?.[chIdx])return;
+    // Check first-to-complete
+    let totalPts=pts;
+    // TODO: check Supabase for first completion
+    totalPts+=FIRST_BONUS; // For now assume first in offline mode
+
+    setCompleted(prev=>({...prev,[locId]:{...prev[locId],[chIdx]:true}}));
+    setVisitedLocs(prev=>new Set([...prev,locId]));
+    setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+totalPts}));
+    setScorePopup(`+${totalPts}`);
+    setToast(`${L_DATA.find(l=>l.id===locId)?.e} +${totalPts} pts!`);
+
+    const loc=L_DATA.find(l=>l.id===locId);
+    addActivity(`${loc?.ch[chIdx]?.ti} bij ${loc?.n} voltooid!`,totalPts);
+
+    // Update Supabase
+    if(!OFFLINE&&sb&&myTeam){
+      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc?.ch[chIdx]?.t,points_earned:totalPts});
+      sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id);
+    }
+  };
+
+  const activateGhost=()=>{
+    if(ghost.used>=GHOST_MAX_USES)return;
+    setGhost({active:true,timeLeft:GHOST_DURATION,used:ghost.used+1});
+    addActivity('is als een geest verdwenen! 👻');
+  };
+
+  const startGame=()=>{
+    setGameStart(Date.now());
+    setPhase(1);
+    setScreen('game');
+    addActivity('Het spel is begonnen! 🎮');
+  };
+
+  // Completion counts
+  const myScore=scores[myTeam?.id]||0;
+  const myChallenges=Object.values(completed).reduce((sum,loc)=>sum+Object.keys(loc).length,0);
+
+  // ═══════════ SPLASH ═══════════
+  if(screen==='splash'){
+    return(
+      <div style={{height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24,background:'radial-gradient(circle at 30% 40%,rgba(0,212,255,0.15),transparent 50%),radial-gradient(circle at 70% 60%,rgba(255,215,0,0.1),transparent 50%),#0a0e27'}}>
+        <div style={{fontSize:64,marginBottom:16,animation:'float 3s ease-in-out infinite'}}>🏙️</div>
+        <h1 style={{fontSize:32,fontWeight:900,background:'linear-gradient(135deg,#00d4ff,#ffd700)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>STADSSPEL</h1>
+        <h2 style={{fontSize:20,fontWeight:300,color:'#888',marginBottom:4}}>ROTTERDAM</h2>
+        <div style={{fontSize:14,color:'#555',marginBottom:40}}>Jorik's Bachelor Party · 6 Juni 2026</div>
+        <button className="btn btn-cyan" onClick={()=>setScreen('setup')} style={{padding:'16px 48px',fontSize:16,borderRadius:16}}>
+          START
+        </button>
+        <div style={{marginTop:40,fontSize:12,color:'#333'}}>102 locaties · 4 teams · 1 winnaar</div>
+      </div>
+    );
+  }
+
+  // ═══════════ TEAM SETUP ═══════════
+  if(screen==='setup'){
+    return <TeamSetup teams={teams} setTeams={setTeams} onJoin={(team)=>{setMyTeam(team);setScreen('lobby')}} isAdmin={isAdmin}/>;
+  }
+
+  // ═══════════ LOBBY ═══════════
+  if(screen==='lobby'){
+    return(
+      <div style={{height:'100%',display:'flex',flexDirection:'column',padding:24,paddingTop:48}}>
+        <div style={{textAlign:'center',marginBottom:32}}>
+          <div style={{fontSize:14,color:'#00d4ff',fontWeight:600,marginBottom:4}}>LOBBY</div>
+          <h1 style={{fontSize:24,fontWeight:800}}>Wachten op Game Master...</h1>
+          <p style={{fontSize:13,color:'#666',marginTop:8}}>Startlocatie: Maritiem Museum, Leuvehaven</p>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:32}}>
+          {teams.map((t,i)=>(
+            <div key={i} className="glass animate-in" style={{padding:20,textAlign:'center',animationDelay:`${i*0.1}s`,borderLeft:`3px solid ${t.color}`}}>
+              <div style={{fontSize:36,marginBottom:8}}>{t.emoji}</div>
+              <div style={{fontWeight:700,fontSize:14}}>{t.name}</div>
+              {t.id===myTeam?.id&&<div style={{fontSize:10,color:'#00d4ff',marginTop:4}}>Jouw team</div>}
+            </div>
+          ))}
+        </div>
+        {isAdmin&&<button className="btn btn-gold" onClick={startGame} style={{padding:16,fontSize:16}}>🎮 START HET SPEL</button>}
+        {!isAdmin&&<div style={{textAlign:'center',fontSize:13,color:'#555'}}>De game master start het spel...</div>}
+        {OFFLINE&&<div style={{textAlign:'center',marginTop:12}}><button className="btn btn-ghost" onClick={startGame} style={{fontSize:12}}>Demo: start zelf</button></div>}
+      </div>
+    );
+  }
+
+  // ═══════════ MAIN GAME ═══════════
+  return(
+    <div style={{height:'100%',display:'flex',flexDirection:'column'}}>
+      {OFFLINE&&<div className="offline-banner">⚡ Offline Mode — Multiplayer uitgeschakeld</div>}
+      {toast&&<div className="toast"><div className="toast-inner">{toast}</div></div>}
+      {scorePopup&&<div className="score-popup">{scorePopup}</div>}
+
+      {/* Game HUD */}
+      <div style={{padding:'12px 16px',paddingTop:OFFLINE?28:12,background:'rgba(10,14,39,0.95)',borderBottom:'1px solid rgba(255,255,255,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:100}}>
+        <div>
+          <div style={{fontSize:13,fontWeight:700}}>{myTeam?.emoji} {myTeam?.name}</div>
+          <div style={{fontSize:11,color:'#888'}}>Fase {phase}/4 · {fmtHM(elapsed)}</div>
+        </div>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontSize:22,fontWeight:900,color:'#ffd700'}}>{myScore}</div>
+          <div style={{fontSize:10,color:'#888'}}>{myChallenges} challenges</div>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:11,color:'#888'}}>{visitedLocs.size}/102 locaties</div>
+          {ghost.active&&<div style={{fontSize:10,color:'#a855f7'}}>👻 {fmtTime(ghost.timeLeft)}</div>}
+        </div>
+      </div>
+
+      {/* Phase progress */}
+      <div className="phase-bar" style={{padding:'0 16px'}}>
+        {[1,2,3,4].map(p=><div key={p} className={`phase-dot ${phase>p?'done':phase===p?'active':''}`}/>)}
+      </div>
+
+      {/* Tab content */}
+      <div style={{flex:1,overflow:'hidden',position:'relative'}}>
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)}/>}
+        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} ghost={ghost} onGhost={activateGhost} phase={phase}/>}
+        {tab==='activity'&&<ActivityView feed={activityFeed}/>}
+      </div>
+
+      {/* Bottom sheet for challenges */}
+      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam}/>}
+
+      {/* Wedding video modal */}
+      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone}/>}
+
+      {/* Tab bar */}
+      <div className="tab-bar">
+        {[{id:'leaderboard',icon:'🏆',label:'Ranking'},{id:'map',icon:'🗺️',label:'Kaart'},{id:'activity',icon:'📢',label:'Feed'}].map(t=>(
+          <button key={t.id} className={`tab-btn ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}>
+            <span className="tab-icon">{t.icon}</span>{t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// TEAM SETUP
+// ═══════════════════════════════════════════
+function TeamSetup({teams,setTeams,onJoin,isAdmin}){
+  const[name,setName]=useState('');
+  const[emoji,setEmoji]=useState('');
+  const[color,setColor]=useState('');
+  const usedEmojis=teams.map(t=>t.emoji);
+
+  const create=()=>{
+    if(!name||!emoji||!color)return;
+    const team={id:Date.now(),name,emoji,color,score:0};
+    setTeams(prev=>[...prev,team]);
+    if(!OFFLINE&&sb)sb.from('teams').insert({name,emoji,color});
+    onJoin(team);
+  };
+
+  return(
+    <div style={{height:'100%',overflow:'auto',padding:24,paddingTop:48}}>
+      <div style={{textAlign:'center',marginBottom:32}}>
+        <div style={{fontSize:48,marginBottom:12}}>🎮</div>
+        <h1 style={{fontSize:24,fontWeight:800}}>Team Aanmaken</h1>
+        <p style={{fontSize:13,color:'#666',marginTop:8}}>Kies een naam, icoon en kleur</p>
+      </div>
+
+      <div className="glass" style={{padding:20,marginBottom:16}}>
+        <label style={{fontSize:12,color:'#888',fontWeight:600,display:'block',marginBottom:8}}>TEAMNAAM</label>
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder="Bijv. De Maffiosi"
+          style={{width:'100%',padding:12,borderRadius:10,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:16,outline:'none'}}/>
+      </div>
+
+      <div className="glass" style={{padding:20,marginBottom:16}}>
+        <label style={{fontSize:12,color:'#888',fontWeight:600,display:'block',marginBottom:8}}>TEAM ICOON</label>
+        <div className="emoji-grid">
+          {TEAM_EMOJIS.map(e=>(
+            <button key={e} className={`emoji-btn ${emoji===e?'selected':''} ${usedEmojis.includes(e)&&emoji!==e?'taken':''}`}
+              onClick={()=>!usedEmojis.includes(e)&&setEmoji(e)} disabled={usedEmojis.includes(e)&&emoji!==e}>{e}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="glass" style={{padding:20,marginBottom:24}}>
+        <label style={{fontSize:12,color:'#888',fontWeight:600,display:'block',marginBottom:8}}>TEAM KLEUR</label>
+        <div className="color-grid">
+          {TEAM_COLORS.map(c=>(
+            <button key={c.hex} className={`color-btn ${color===c.hex?'selected':''}`}
+              style={{background:c.hex}} onClick={()=>setColor(c.hex)}/>
+          ))}
+        </div>
+      </div>
+
+      <button className="btn btn-cyan" onClick={create} disabled={!name||!emoji||!color}
+        style={{width:'100%',padding:16,fontSize:16,borderRadius:14}}>
+        Team Aanmaken & Joinen
+      </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// LEADERBOARD VIEW (Primary tab)
+// ═══════════════════════════════════════════
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding}){
+  const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
+
+  return(
+    <div style={{height:'100%',overflowY:'auto',padding:16,paddingBottom:90}}>
+      {/* Bar break countdown */}
+      {barBreak&&(
+        <div className="glass" style={{padding:14,marginBottom:14,textAlign:'center',borderColor:'rgba(255,215,0,0.3)'}}>
+          <div style={{fontSize:11,color:'#ffd700',fontWeight:700}}>🍺 VOLGENDE BAR BREAK</div>
+          <div style={{fontSize:16,fontWeight:700,marginTop:4}}>{barBreak.name}</div>
+        </div>
+      )}
+
+      {/* Wedding video mission - only when Jorik is NOT in team */}
+      {!jorikInTeam&&!weddingDone&&(
+        <div className="secret-banner" onClick={onShowWedding}>
+          <div className="secret-badge">🤫 GEHEIME MISSIE</div>
+          <div style={{fontWeight:700,fontSize:14}}>Bruiloftsvideo opnemen</div>
+          <div style={{fontSize:12,color:'#888',marginTop:4}}>Tik hier voor instructies · +{WEDDING_VIDEO_BONUS} pts</div>
+        </div>
+      )}
+      {weddingDone&&(
+        <div className="glass" style={{padding:14,marginBottom:14,borderColor:'rgba(0,255,136,0.3)'}}>
+          <div style={{fontSize:12,color:'#00ff88',fontWeight:700}}>✅ Geheime missie voltooid!</div>
+        </div>
+      )}
+
+      {/* Leaderboard cards */}
+      {sorted.map((t,i)=>(
+        <div key={t.id} className={`lb-card glass animate-in animate-in-${i+1} ${i===0?'lb-first':''}`}
+          style={{borderLeft:`4px solid ${t.color}`}}>
+          <div className={`lb-rank ${i===0?'lb-rank-1':i===1?'lb-rank-2':i===2?'lb-rank-3':'lb-rank-other'}`}>#{i+1}</div>
+          <div className="lb-emoji">{t.emoji}</div>
+          <div className="lb-info">
+            <div className="lb-name">{t.name} {t.id===myTeam?.id?'(jij)':''}</div>
+            <div className="lb-stats">{t.challenges_completed||0} challenges · {t.locations_visited||0} locaties</div>
+          </div>
+          <div className="lb-score" style={{color:t.color}}>{t.score}</div>
+        </div>
+      ))}
+
+      {sorted.length===0&&(
+        <div style={{textAlign:'center',padding:40,color:'#555'}}>
+          <div style={{fontSize:48,marginBottom:16}}>🏆</div>
+          <div>Nog geen scores</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// MAP VIEW
+// ═══════════════════════════════════════════
+function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,phase}){
+  const mapRef=useRef(null);
+  const mapInst=useRef(null);
+  const markersRef=useRef([]);
+  const userMarkerRef=useRef(null);
+
+  // Init map
+  useEffect(()=>{
+    if(!mapRef.current||mapInst.current)return;
+    const m=L.map(mapRef.current).setView([START_POS.lat,START_POS.lng],15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'',maxZoom:19}).addTo(m);
+
+    // Add all location markers
+    L_DATA.forEach(loc=>{
+      const mk=L.marker([loc.la,loc.lo],{
+        icon:L.divIcon({className:'',iconAnchor:[18,18],interactive:true,
+          html:`<div style="font-size:28px;display:flex;align-items:center;justify-content:center;width:36px;height:36px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${loc.e}</div>`
+        })
+      }).addTo(m);
+      mk.on('click',()=>onSelect(loc.id));
+      mk._locId=loc.id;
+      markersRef.current.push(mk);
+    });
+
+    // Dinner zone circle (phase 4)
+    L.circle([DINNER_ZONE.lat,DINNER_ZONE.lng],{radius:DINNER_ZONE.r,color:'#ffd700',fillColor:'#ffd700',fillOpacity:0.05,weight:2,dashArray:'8 4'}).addTo(m);
+
+    mapInst.current=m;
+  },[]);
+
+  // Update user position
+  useEffect(()=>{
+    if(!mapInst.current||!pos)return;
+    if(userMarkerRef.current)mapInst.current.removeLayer(userMarkerRef.current);
+    userMarkerRef.current=L.marker([pos.lat,pos.lng],{
+      icon:L.divIcon({className:'',iconAnchor:[12,12],
+        html:'<div style="width:24px;height:24px;border-radius:50%;background:#00d4ff;border:3px solid white;box-shadow:0 0 15px rgba(0,212,255,0.8);animation:pulse 2s infinite"></div>'
+      })
+    }).addTo(mapInst.current);
+  },[pos]);
+
+  // Get nearby challenges
+  const nearby=getNearby(pos,completed);
+
+  return(
+    <div style={{height:'100%',display:'flex',flexDirection:'column',position:'relative'}}>
+      <div ref={mapRef} style={{flex:1}}/>
+
+      {/* Ghost mode button */}
+      <div style={{position:'absolute',top:10,right:10,zIndex:1000}}>
+        <button className={`btn ${ghost.active?'btn-danger':'btn-ghost'}`} onClick={onGhost} disabled={ghost.used>=GHOST_MAX_USES&&!ghost.active}
+          style={{fontSize:12,padding:'8px 14px',borderRadius:10}}>
+          {ghost.active?`👻 ${fmtTime(ghost.timeLeft)}`:`👻 Ghost (${GHOST_MAX_USES-ghost.used} over)`}
+        </button>
+      </div>
+
+      {/* Nearby challenges panel */}
+      <div className="nearby-panel">
+        <div style={{fontSize:11,color:'#888',fontWeight:600,marginBottom:6,padding:'0 4px'}}>
+          DICHTBIJ
+        </div>
+        {nearby.map(loc=>(
+          <div key={loc.id} className="nearby-card" onClick={()=>onSelect(loc.id)}>
+            <div className="nearby-emoji">{loc.e}</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:13}}>{loc.n}</div>
+              <div style={{fontSize:11,color:'#888'}}>{loc.ch.length} challenges · {loc.ch.reduce((s,c)=>s+c.p,0)} pts</div>
+            </div>
+            <div className="nearby-dist">{fmtDist(loc.dist)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// ACTIVITY FEED
+// ═══════════════════════════════════════════
+function ActivityView({feed}){
+  return(
+    <div style={{height:'100%',overflowY:'auto',padding:16,paddingBottom:90}}>
+      <div style={{fontSize:11,color:'#888',fontWeight:600,marginBottom:12}}>ACTIVITEIT</div>
+      {feed.length===0&&(
+        <div style={{textAlign:'center',padding:40,color:'#555'}}>
+          <div style={{fontSize:40,marginBottom:12}}>📢</div>
+          <div>Nog geen activiteit</div>
+        </div>
+      )}
+      {feed.map((item,i)=>(
+        <div key={i} className="glass animate-in" style={{padding:14,marginBottom:10}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{fontSize:20}}>{item.team_emoji||'🎮'}</div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:13,fontWeight:600}}>{item.team_name||'Systeem'}</div>
+              <div style={{fontSize:12,color:'#aaa'}}>{item.message}</div>
+            </div>
+            {item.points>0&&<div style={{fontSize:13,fontWeight:800,color:'#ffd700'}}>+{item.points}</div>}
+          </div>
+          <div style={{fontSize:10,color:'#555',marginTop:6}}>{new Date(item.created_at).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// CHALLENGE BOTTOM SHEET
+// ═══════════════════════════════════════════
+function ChallengeSheet({loc,pos,completed,onComplete,onClose}){
+  if(!loc)return null;
+  const dist=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):null;
+  const hasPhotoCompleted=loc.ch.some((ch,i)=>(ch.t==='photo'||ch.t==='video'||ch.t==='creative')&&completed[i]);
+
+  return(
+    <>
+      <div className="sheet-overlay" onClick={onClose}/>
+      <div className="sheet">
+        <div className="sheet-handle"/>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:16}}>
+          <div>
+            <div style={{fontSize:28,marginBottom:4}}>{loc.e}</div>
+            <h2 style={{fontSize:20,fontWeight:800}}>{loc.n}</h2>
+            <div style={{display:'flex',gap:8,marginTop:6,alignItems:'center'}}>
+              <span style={{fontSize:11,padding:'2px 8px',borderRadius:6,background:'rgba(0,212,255,0.15)',color:'#00d4ff'}}>{loc.c}</span>
+              {dist!=null&&<span style={{fontSize:12,color:'#888'}}>{fmtDist(dist)}</span>}
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'#666',fontSize:28,cursor:'pointer',padding:4}}>✕</button>
+        </div>
+
+        {loc.ch.map((ch,idx)=>{
+          const done=completed[idx];
+          const isQuiz=ch.t==='quiz';
+          const locked=isQuiz&&!hasPhotoCompleted;
+
+          return(
+            <div key={idx} className={`ch-card ${done?'completed':''} ${locked?'locked':''}`}>
+              {locked&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1,fontSize:14,color:'#ffd700',fontWeight:700}}>🔒 Eerst een foto-opdracht!</div>}
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:8}}>
+                <div style={{flex:1}}>
+                  <span className={`ch-type ch-type-${ch.t}`}>{ch.t}</span>
+                  <h3 style={{fontSize:15,fontWeight:700,marginTop:6}}>{ch.ti}</h3>
+                </div>
+                <div className="points-badge">+{ch.p}</div>
+              </div>
+              <p style={{fontSize:13,color:'#aaa',marginBottom:10,lineHeight:1.4}}>{ch.d}</p>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div className="difficulty"><span className="star">{stars(ch.df)}</span> {ch.df}</div>
+                {done&&<div style={{fontSize:13,color:'#00ff88',fontWeight:700}}>✓ Voltooid</div>}
+              </div>
+              {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete}/>}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function ChallengeAction({ch,locId,chIdx,onComplete}){
+  const fileRef=useRef(null);
+  const[preview,setPreview]=useState(null);
+  const[quizAnswer,setQuizAnswer]=useState(null);
+  const[quizFeedback,setQuizFeedback]=useState(null);
+
+  const handleFile=e=>{
+    const f=e.target.files[0];
+    if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{setPreview(ev.target.result);onComplete(locId,chIdx,ch.p)};
+    r.readAsDataURL(f);
+  };
+
+  const handleQuiz=opt=>{
+    setQuizAnswer(opt);
+    if(opt===ch.a){
+      setQuizFeedback('correct');
+      setTimeout(()=>onComplete(locId,chIdx,ch.p),600);
+    }else{
+      setQuizFeedback('wrong');
+      setTimeout(()=>{setQuizFeedback(null);setQuizAnswer(null)},1500);
+    }
+  };
+
+  if(ch.t==='quiz'){
+    return(
+      <div style={{marginTop:12}}>
+        {ch.o.map((opt,i)=>(
+          <button key={i} className={`quiz-option ${quizAnswer===opt?(quizFeedback==='correct'?'correct':'wrong'):''}`}
+            onClick={()=>!quizAnswer&&handleQuiz(opt)} disabled={!!quizAnswer}>
+            {opt}
+          </button>
+        ))}
+        {quizFeedback==='wrong'&&<div style={{fontSize:13,color:'#ff4444',marginTop:6}}>❌ Fout! Probeer opnieuw...</div>}
+        {quizFeedback==='correct'&&<div style={{fontSize:13,color:'#00ff88',marginTop:6}}>✅ Correct!</div>}
+      </div>
+    );
+  }
+
+  const accept=ch.t==='video'?'video/*':ch.t==='creative'?'image/*,video/*':'image/*';
+  return(
+    <div style={{marginTop:12}}>
+      <input ref={fileRef} type="file" accept={accept} capture="environment" style={{display:'none'}} onChange={handleFile}/>
+      <button className="btn btn-cyan" onClick={()=>fileRef.current?.click()} style={{width:'100%'}}>
+        {ch.t==='video'?'🎬 Video Opnemen':ch.t==='creative'?'📸 Foto/Video Maken':'📸 Foto Maken'}
+      </button>
+      {preview&&<img src={preview} className="photo-preview" alt="preview"/>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// WEDDING VIDEO MISSION
+// ═══════════════════════════════════════════
+function WeddingMission({onClose,onComplete,done}){
+  const fileRef=useRef(null);
+  const[uploaded,setUploaded]=useState(false);
+
+  return(
+    <>
+      <div className="sheet-overlay" onClick={onClose}/>
+      <div className="sheet" style={{background:'linear-gradient(180deg,#1a0e30 0%,#0f1335 100%)'}}>
+        <div className="sheet-handle"/>
+        <div style={{textAlign:'center',marginBottom:20}}>
+          <div style={{fontSize:48,marginBottom:12}}>🤫🎬</div>
+          <h2 style={{fontSize:22,fontWeight:800,background:'linear-gradient(135deg,#a855f7,#ff6b35)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>GEHEIME MISSIE</h2>
+          <div style={{fontSize:14,color:'#888',marginTop:8}}>Bruiloftsvideo voor Jorik</div>
+        </div>
+
+        <div className="glass" style={{padding:16,marginBottom:16}}>
+          <h3 style={{fontSize:14,fontWeight:700,color:'#a855f7',marginBottom:8}}>INSTRUCTIES</h3>
+          <p style={{fontSize:13,color:'#ccc',lineHeight:1.6}}>
+            Neem een video op met jullie team. Dit wordt onderdeel van een verrassingsvideo die op Jorik's bruiloft wordt vertoond.
+          </p>
+          <p style={{fontSize:13,color:'#ff6b35',fontWeight:600,marginTop:12}}>
+            ⚠️ Doe dit ALLEEN wanneer Jorik NIET bij jullie team is!
+          </p>
+          <p style={{fontSize:13,color:'#888',marginTop:12,fontStyle:'italic'}}>
+            Het script wordt later nog toegevoegd door de organisatie.
+          </p>
+        </div>
+
+        <div style={{padding:16}}>
+          {!done&&!uploaded&&(
+            <>
+              <input ref={fileRef} type="file" accept="video/*" capture="environment" style={{display:'none'}}
+                onChange={e=>{if(e.target.files[0]){setUploaded(true);onComplete()}}}/>
+              <button className="btn btn-cyan" onClick={()=>fileRef.current?.click()} style={{width:'100%',padding:16}}>
+                🎬 Video Opnemen (+{WEDDING_VIDEO_BONUS} pts)
+              </button>
+            </>
+          )}
+          {(done||uploaded)&&<div style={{textAlign:'center',fontSize:16,color:'#00ff88',fontWeight:700}}>✅ Video opgenomen! Dankjewel!</div>}
+        </div>
+
+        <button className="btn btn-ghost" onClick={onClose} style={{width:'100%',marginTop:8}}>Sluiten</button>
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
