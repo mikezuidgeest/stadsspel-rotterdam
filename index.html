@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V6 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V7 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -188,6 +188,18 @@
     /* Provisional score badge */
     .provisional-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(255,215,0,0.2);color:#ffd700}
 
+    /* === V7 ADDITIONS === */
+
+    /* Quiz cooldown overlay */
+    .quiz-cooldown{margin-top:10px;padding:14px;border-radius:12px;background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.3);text-align:center}
+    .quiz-cooldown-title{font-size:13px;color:#ff4444;font-weight:700;margin-bottom:4px}
+    .quiz-cooldown-timer{font-size:28px;font-weight:900;color:#ff4444;font-variant-numeric:tabular-nums;letter-spacing:2px}
+    .quiz-cooldown-hint{font-size:11px;color:#888;margin-top:6px}
+
+    /* Wrong-count badge on quiz card */
+    .wrong-badge{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:rgba(255,68,68,0.18);color:#ff7070}
+    .quiz-option.cooldown{opacity:0.35;cursor:not-allowed;filter:grayscale(1)}
+
     /* Filter pills */
     .filter-pills{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
     .filter-pills::-webkit-scrollbar{display:none}
@@ -302,6 +314,10 @@ const PHOTO_GATE_RADIUS=50;        // meters — must be within this to take a p
 const PHOTO_GATE_GRACE=20;         // extra meters allowed (GPS noise tolerance)
 const REVIEW_REJECT_PENALTY=true;  // when admin rejects, deduct points awarded
 // Status enum for photo_reviews table: 'pending' | 'approved' | 'rejected'
+
+// V7 QUIZ RULE (Mike's design): one shot, wrong = 0 pts + marked done.
+// Knowledge rewarded, guessing doesn't pay. No retries, no mercy.
+const QUIZ_WRONG_FEEDBACK_MS=2500;   // how long the wrong-answer + reveal stays on screen
 
 // V5.1 HOTFIX: iOS detection — DeviceMotion requires explicit permission on iOS 13+
 // Without that permission, accelerometer events never fire and GPS sleep never wakes.
@@ -825,26 +841,43 @@ function App(){
     const key=`${locId}_${chIdx}`;
     if(!isDynamicBonus&&completed[locId]?.[chIdx])return;
 
+    // V7: wrong-quiz → pts=0 path. Mark challenge done, no score change, no first-to-complete bonus.
+    const isWrongZero=pts===0;
+
     let totalPts=pts;
-    if(!isDynamicBonus)totalPts+=FIRST_BONUS; // first-to-complete bonus (offline assumption)
+    if(!isDynamicBonus&&!isWrongZero)totalPts+=FIRST_BONUS; // first-to-complete bonus skipped when wrong
 
     if(!isDynamicBonus){
       setCompleted(prev=>({...prev,[locId]:{...prev[locId],[chIdx]:true}}));
     }
     if(locId>0)setVisitedLocs(prev=>new Set([...prev,locId]));
-    setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+totalPts}));
-    setScorePopup(`+${totalPts}`);
+    if(totalPts>0){
+      setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+totalPts}));
+      setScorePopup(`+${totalPts}`);
+    }
     const loc=L_DATA.find(l=>l.id===locId);
-    if(loc)setToast(`${loc.e} +${totalPts} pts!`);
+    if(loc){
+      if(isWrongZero){
+        setToast(`${loc.e} ❌ Fout · 0 pts`);
+      }else{
+        setToast(`${loc.e} +${totalPts} pts!`);
+      }
+    }
 
     if(loc){
-      const label=isDynamicBonus
-        ?`🎲 Bonus quiz bij ${loc.n} gehaald!`
-        :`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid!`;
-      addActivity(label,totalPts,photoData);
+      let label;
+      if(isWrongZero){
+        label=`zat ernaast bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · 0 pts`;
+      }else if(isDynamicBonus){
+        label=`🎲 Bonus quiz bij ${loc.n} gehaald!`;
+      }else{
+        label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid!`;
+      }
+      addActivity(label,isWrongZero?0:totalPts,photoData);
     }
 
     // V5: Mark this quiz as seen so the same one doesn't appear again
+    // (applies whether they got it right or wrong — they've now seen it)
     if(!isDynamicBonus&&loc&&loc.ch[chIdx]?.t==='quiz'){
       setSeenQuizzes(prev=>new Set([...prev,`${locId}_q_${chIdx}`]));
     }
@@ -852,8 +885,10 @@ function App(){
     // Update Supabase
     if(!OFFLINE&&sb&&myTeam&&loc&&!isDynamicBonus){
       sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts});
-      sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id);
-    }else if(!OFFLINE&&sb&&myTeam&&isDynamicBonus){
+      if(totalPts>0){
+        sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id);
+      }
+    }else if(!OFFLINE&&sb&&myTeam&&isDynamicBonus&&totalPts>0){
       // Still persist the team score update, but don't create a completed_challenges row
       sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id);
     }
@@ -864,6 +899,7 @@ function App(){
     setGhost({active:true,timeLeft:GHOST_DURATION,used:ghost.used+1});
     addActivity('is als een geest verdwenen! 👻');
   };
+
 
   const startGame=()=>{
     setGameStart(Date.now());
@@ -902,7 +938,7 @@ function App(){
         <h1 style={{fontSize:32,fontWeight:900,background:'linear-gradient(135deg,#00d4ff,#ffd700)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>STADSSPEL</h1>
         <h2 style={{fontSize:20,fontWeight:300,color:'#888',marginBottom:4}}>ROTTERDAM</h2>
         <div style={{fontSize:14,color:'#555',marginBottom:8}}>Jorik's Bachelor Party · 6 Juni 2026</div>
-        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V6 · DE VERLOREN RING</div>
+        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V7 · DE VERLOREN RING</div>
         <button className="btn btn-cyan" onClick={()=>setScreen('setup')} style={{padding:'16px 48px',fontSize:16,borderRadius:16}}>
           START
         </button>
@@ -1587,28 +1623,42 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
     r.readAsDataURL(f);
   };
 
+  // V7: one shot. Correct → full points. Wrong → 0 pts, challenge marked done.
   const handleQuiz=opt=>{
+    if(quizAnswer)return;
     setQuizAnswer(opt);
     if(opt===ch.a){
       setQuizFeedback('correct');
-      setTimeout(()=>onComplete(locId,chIdx,ch.p,null),600);
+      setTimeout(()=>onComplete(locId,chIdx,ch.p,null),700);
     }else{
       setQuizFeedback('wrong');
-      setTimeout(()=>{setQuizFeedback(null);setQuizAnswer(null)},1500);
+      // Reveal the correct answer during feedback, then mark done with 0 pts
+      setTimeout(()=>onComplete(locId,chIdx,0,null),QUIZ_WRONG_FEEDBACK_MS);
     }
   };
 
   if(ch.t==='quiz'){
     return(
       <div style={{marginTop:12}}>
-        {ch.o.map((opt,i)=>(
-          <button key={i} className={`quiz-option ${quizAnswer===opt?(quizFeedback==='correct'?'correct':'wrong'):''}`}
-            onClick={()=>!quizAnswer&&handleQuiz(opt)} disabled={!!quizAnswer}>
-            {opt}
-          </button>
-        ))}
-        {quizFeedback==='wrong'&&<div style={{fontSize:13,color:'#ff4444',marginTop:6}}>❌ Fout! Probeer opnieuw...</div>}
-        {quizFeedback==='correct'&&<div style={{fontSize:13,color:'#00ff88',marginTop:6}}>✅ Correct!</div>}
+        <div style={{fontSize:11,color:'#888',marginBottom:8,fontStyle:'italic'}}>
+          ⚡ Eén kans — fout gegokt = 0 pts
+        </div>
+        {ch.o.map((opt,i)=>{
+          const isChosen=quizAnswer===opt;
+          const isRightAnswer=opt===ch.a;
+          // During wrong-feedback, highlight the correct answer in green too
+          const revealRight=quizFeedback==='wrong'&&isRightAnswer;
+          return(
+            <button key={i}
+              className={`quiz-option ${isChosen?(quizFeedback==='correct'?'correct':'wrong'):''} ${revealRight?'correct':''}`}
+              onClick={()=>handleQuiz(opt)}
+              disabled={!!quizAnswer}>
+              {opt}{revealRight&&<span style={{marginLeft:8,fontSize:11,fontWeight:700}}>← juist</span>}
+            </button>
+          );
+        })}
+        {quizFeedback==='wrong'&&<div style={{fontSize:13,color:'#ff4444',marginTop:8,fontWeight:600}}>❌ Helaas. Het juiste antwoord was: {ch.a} · 0 pts</div>}
+        {quizFeedback==='correct'&&<div style={{fontSize:13,color:'#00ff88',marginTop:8,fontWeight:600}}>✅ Correct! +{ch.p} pts</div>}
       </div>
     );
   }
