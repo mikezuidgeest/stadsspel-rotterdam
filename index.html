@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V5 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V6 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -162,6 +162,32 @@
     .activity-row{padding:14px;margin-bottom:10px;border-radius:14px;backdrop-filter:blur(10px);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)}
     .activity-photo{width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-top:10px;cursor:pointer}
 
+    /* === V6 ADDITIONS === */
+
+    /* Photo gate (when too far) */
+    .gate-blocked{margin-top:12px;padding:14px;border-radius:12px;background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.3);display:flex;align-items:center;gap:12px}
+    .gate-icon{font-size:24px}
+    .gate-text{flex:1;font-size:13px;color:#ff6b35;font-weight:600}
+    .gate-distance{font-size:18px;font-weight:900;color:#ff6b35;font-variant-numeric:tabular-nums}
+    .gate-hint{font-size:11px;color:#888;font-weight:400;margin-top:2px}
+
+    /* Admin review queue */
+    .review-card{padding:14px;margin-bottom:12px;border-radius:14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,215,0,0.2)}
+    .review-photo{width:100%;max-height:280px;object-fit:cover;border-radius:10px;margin:8px 0}
+    .review-meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:#888}
+    .review-actions{display:flex;gap:8px;margin-top:10px}
+    .review-actions .btn{flex:1;padding:10px;font-size:13px}
+    .review-dist-good{color:#00ff88;font-weight:700}
+    .review-dist-warn{color:#ffd700;font-weight:700}
+    .review-dist-bad{color:#ff4444;font-weight:700}
+    .review-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+    .review-badge-pending{background:rgba(255,215,0,0.2);color:#ffd700}
+    .review-badge-approved{background:rgba(0,255,136,0.2);color:#00ff88}
+    .review-badge-rejected{background:rgba(255,68,68,0.2);color:#ff4444}
+
+    /* Provisional score badge */
+    .provisional-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(255,215,0,0.2);color:#ffd700}
+
     /* Filter pills */
     .filter-pills{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
     .filter-pills::-webkit-scrollbar{display:none}
@@ -270,6 +296,12 @@ const GPS_ACCURACY_WEAK=50;   // meters — "weak" signal threshold
 // V5 FEATURE 6: BATTERY-AWARE POLLING CONFIG
 const STILL_TIMEOUT_MS=30000; // pause GPS after 30s without motion
 const MOTION_THRESHOLD=0.8;   // acceleration threshold (m/s²)
+
+// V6 PHOTO VALIDATION CONFIG
+const PHOTO_GATE_RADIUS=50;        // meters — must be within this to take a photo
+const PHOTO_GATE_GRACE=20;         // extra meters allowed (GPS noise tolerance)
+const REVIEW_REJECT_PENALTY=true;  // when admin rejects, deduct points awarded
+// Status enum for photo_reviews table: 'pending' | 'approved' | 'rejected'
 
 // V5.1 HOTFIX: iOS detection — DeviceMotion requires explicit permission on iOS 13+
 // Without that permission, accelerometer events never fire and GPS sleep never wakes.
@@ -581,6 +613,9 @@ function App(){
   const gpsCtrlRef=useRef({start:null,stop:null});
   const[photoLightbox,setPhotoLightbox]=useState(null); // enlarged photo url
   const[feedFilter,setFeedFilter]=useState('all'); // 'all' | 'photos' | 'mine'
+  // V6: admin review queue
+  const[reviewQueue,setReviewQueue]=useState([]); // pending photo_reviews for admin
+  const[pendingMine,setPendingMine]=useState(0); // count of my team's pending reviews
 
   // Timer
   useEffect(()=>{
@@ -698,7 +733,6 @@ function App(){
   // Supabase real-time subscriptions
   useEffect(()=>{
     if(OFFLINE||!sb)return;
-    // Subscribe to team score changes
     const teamSub=sb.channel('teams').on('postgres_changes',{event:'UPDATE',schema:'public',table:'teams'},payload=>{
       const t=payload.new;
       setTeams(prev=>prev.map(p=>p.id===t.id?{...p,...t}:p));
@@ -706,12 +740,66 @@ function App(){
         setToast(`${t.emoji} ${t.name}: ${t.score} pts`);
       }
     }).subscribe();
-    // Subscribe to activity feed
     const actSub=sb.channel('activity').on('postgres_changes',{event:'INSERT',schema:'public',table:'activity_feed'},payload=>{
       setActivityFeed(prev=>[payload.new,...prev].slice(0,50));
     }).subscribe();
-    return()=>{teamSub.unsubscribe();actSub.unsubscribe()};
-  },[myTeam]);
+
+    // V6: subscribe to photo_reviews — for admin queue + per-team rejection notices
+    const reviewInsertSub=sb.channel('reviews_insert').on('postgres_changes',{event:'INSERT',schema:'public',table:'photo_reviews'},payload=>{
+      const r=payload.new;
+      if(isAdmin&&r.status==='pending'){
+        setReviewQueue(prev=>[r,...prev]);
+      }
+      if(r.team_id===myTeam?.id&&r.status==='pending'){
+        setPendingMine(c=>c+1);
+      }
+    }).subscribe();
+    const reviewUpdateSub=sb.channel('reviews_update').on('postgres_changes',{event:'UPDATE',schema:'public',table:'photo_reviews'},payload=>{
+      const r=payload.new;
+      // Remove from admin queue once decided
+      if(isAdmin)setReviewQueue(prev=>prev.filter(x=>x.id!==r.id));
+      // Notify the affected team
+      if(r.team_id===myTeam?.id){
+        setPendingMine(c=>Math.max(0,c-1));
+        if(r.status==='rejected'){
+          setToast(`❌ Foto "${r.challenge_title}" afgekeurd · -${r.points_awarded} pts`);
+          setScores(prev=>({...prev,[myTeam.id]:Math.max(0,(prev[myTeam.id]||0)-r.points_awarded)}));
+        }else if(r.status==='approved'){
+          setToast(`✅ Foto "${r.challenge_title}" goedgekeurd!`);
+        }
+      }
+    }).subscribe();
+
+    // Initial fetch for admin: pending reviews already in the table
+    if(isAdmin){
+      sb.from('photo_reviews').select('*').eq('status','pending').order('created_at',{ascending:false}).then(res=>{
+        if(res.data)setReviewQueue(res.data);
+      },()=>{/* table missing — silent */});
+    }
+    return()=>{
+      teamSub.unsubscribe();actSub.unsubscribe();
+      reviewInsertSub.unsubscribe();reviewUpdateSub.unsubscribe();
+    };
+  },[myTeam,isAdmin]);
+
+  // V6: admin actions
+  const approveReview=(r)=>{
+    if(!sb)return;
+    sb.from('photo_reviews').update({status:'approved',reviewed_at:new Date().toISOString()}).eq('id',r.id);
+    setReviewQueue(prev=>prev.filter(x=>x.id!==r.id));
+  };
+  const rejectReview=(r)=>{
+    if(!sb)return;
+    sb.from('photo_reviews').update({status:'rejected',reviewed_at:new Date().toISOString()}).eq('id',r.id);
+    // Also deduct points from the team in Supabase
+    if(REVIEW_REJECT_PENALTY){
+      sb.from('teams').select('score').eq('id',r.team_id).single().then(res=>{
+        const newScore=Math.max(0,(res.data?.score||0)-r.points_awarded);
+        sb.from('teams').update({score:newScore}).eq('id',r.team_id);
+      });
+    }
+    setReviewQueue(prev=>prev.filter(x=>x.id!==r.id));
+  };
 
   const addActivity=(msg,pts=0,photoData=null)=>{
     const entry={
@@ -814,7 +902,7 @@ function App(){
         <h1 style={{fontSize:32,fontWeight:900,background:'linear-gradient(135deg,#00d4ff,#ffd700)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>STADSSPEL</h1>
         <h2 style={{fontSize:20,fontWeight:300,color:'#888',marginBottom:4}}>ROTTERDAM</h2>
         <div style={{fontSize:14,color:'#555',marginBottom:8}}>Jorik's Bachelor Party · 6 Juni 2026</div>
-        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V5.1 · DE VERLOREN RING</div>
+        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V6 · DE VERLOREN RING</div>
         <button className="btn btn-cyan" onClick={()=>setScreen('setup')} style={{padding:'16px 48px',fontSize:16,borderRadius:16}}>
           START
         </button>
@@ -883,9 +971,10 @@ function App(){
 
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} ghost={ghost} onGhost={activateGhost} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
+        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox}/>}
       </div>
 
       {/* V5: Narrative story modal */}
@@ -897,16 +986,22 @@ function App(){
       {photoLightbox&&<PhotoLightbox media={photoLightbox} onClose={()=>setPhotoLightbox(null)}/>}
 
       {/* Bottom sheet for challenges */}
-      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes}/>}
+      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam}/>}
 
       {/* Wedding video modal */}
       {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone}/>}
 
       {/* Tab bar */}
       <div className="tab-bar">
-        {[{id:'leaderboard',icon:'🏆',label:'Ranking'},{id:'map',icon:'🗺️',label:'Kaart'},{id:'activity',icon:'📢',label:'Feed'}].map(t=>(
-          <button key={t.id} className={`tab-btn ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}>
+        {[
+          {id:'leaderboard',icon:'🏆',label:'Ranking'},
+          {id:'map',icon:'🗺️',label:'Kaart'},
+          {id:'activity',icon:'📢',label:'Feed'},
+          ...(isAdmin?[{id:'review',icon:'✅',label:'Beoordeel',badge:reviewQueue.length}]:[]),
+        ].map(t=>(
+          <button key={t.id} className={`tab-btn ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)} style={{position:'relative'}}>
             <span className="tab-icon">{t.icon}</span>{t.label}
+            {t.badge>0&&<span style={{position:'absolute',top:2,right:'25%',background:'#ff4444',color:'#fff',fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:9,minWidth:14,textAlign:'center'}}>{t.badge}</span>}
           </button>
         ))}
       </div>
@@ -1018,7 +1113,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory,pendingMine}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V5: map current phase to the relevant narrative entry
   const phaseKey=phase>=1&&phase<=4?`phase${phase}`:null;
@@ -1034,6 +1129,17 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
           <div style={{fontSize:11,color:'#888',fontStyle:'italic'}}>Tik voor verhaal →</div>
         </div>
       )}
+      {/* V6: pending review badge for own team */}
+      {pendingMine>0&&(
+        <div className="glass" style={{padding:10,marginBottom:10,borderColor:'rgba(255,215,0,0.3)',display:'flex',alignItems:'center',gap:10}}>
+          <div style={{fontSize:18}}>⏳</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:12,color:'#ffd700',fontWeight:700}}>{pendingMine} foto{pendingMine===1?'':"'s"} in beoordeling</div>
+            <div style={{fontSize:10,color:'#888',marginTop:2}}>Punten zijn voorlopig toegekend · game master kan ze afkeuren</div>
+          </div>
+        </div>
+      )}
+
       {/* Bar break countdown */}
       {barBreak&&(
         <div className="glass" style={{padding:14,marginBottom:14,textAlign:'center',borderColor:'rgba(255,215,0,0.3)'}}>
@@ -1284,9 +1390,70 @@ function PhotoLightbox({media,onClose}){
 }
 
 // ═══════════════════════════════════════════
+// V6: ADMIN REVIEW QUEUE
+// ═══════════════════════════════════════════
+function AdminReviewView({queue,onApprove,onReject,onPhoto}){
+  return(
+    <div style={{height:'100%',overflowY:'auto',padding:16,paddingBottom:90}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <div>
+          <div style={{fontSize:11,color:'#888',fontWeight:600,letterSpacing:1}}>BEOORDELEN</div>
+          <div style={{fontSize:18,fontWeight:800,marginTop:2}}>Wachtrij ({queue.length})</div>
+        </div>
+        <div style={{fontSize:10,color:'#555',textAlign:'right'}}>Goedkeuren = punten blijven<br/>Afkeuren = punten worden ingetrokken</div>
+      </div>
+
+      {queue.length===0&&(
+        <div style={{textAlign:'center',padding:40,color:'#555'}}>
+          <div style={{fontSize:48,marginBottom:12}}>✅</div>
+          <div style={{fontWeight:600}}>Niets te beoordelen</div>
+          <div style={{fontSize:12,color:'#666',marginTop:6}}>Foto's verschijnen hier zodra teams ze indienen.</div>
+        </div>
+      )}
+
+      {queue.map(r=>{
+        const dist=r.gps_distance;
+        const distClass=dist==null?'':dist<=PHOTO_GATE_RADIUS?'review-dist-good':dist<=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE?'review-dist-warn':'review-dist-bad';
+        return(
+          <div key={r.id} className="review-card" style={{borderLeft:r.team_color?`3px solid ${r.team_color}`:undefined}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'start'}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700}}>{r.team_emoji||'🎮'} {r.team_name}</div>
+                <div style={{fontSize:12,color:'#aaa',marginTop:2}}>📍 {r.location_name}</div>
+                <div style={{fontSize:13,color:'#fff',fontWeight:600,marginTop:6}}>{r.challenge_title}</div>
+                <div style={{fontSize:11,color:'#666',marginTop:2}}>{r.challenge_type} · +{r.points_awarded} pts</div>
+              </div>
+              <span className="review-badge review-badge-pending">pending</span>
+            </div>
+
+            {r.photo_url
+              ?(isVideoData(r.photo_url)
+                ?<video src={r.photo_url} className="review-photo" controls muted onClick={()=>onPhoto&&onPhoto(r.photo_url)}/>
+                :<img src={r.photo_url} className="review-photo" alt="submission" onClick={()=>onPhoto&&onPhoto(r.photo_url)}/>)
+              :<div style={{padding:20,textAlign:'center',color:'#666',background:'rgba(255,255,255,0.03)',borderRadius:10,marginTop:8,fontSize:12}}>
+                  📷 Foto te groot voor cloud-sync · alleen bij team beschikbaar
+                </div>}
+
+            <div className="review-meta">
+              <span>📡 GPS afstand: <span className={distClass}>{dist!=null?`${dist}m`:'onbekend'}</span></span>
+              <span>{new Date(r.created_at).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</span>
+            </div>
+
+            <div className="review-actions">
+              <button className="btn btn-danger" onClick={()=>{if(confirm(`Foto van ${r.team_name} afkeuren? -${r.points_awarded} pts.`))onReject(r)}}>✗ Afkeuren</button>
+              <button className="btn btn-cyan" onClick={()=>onApprove(r)}>✓ Goedkeuren</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
 // CHALLENGE BOTTOM SHEET — V5: dynamic quiz rotation + photo feed
 // ═══════════════════════════════════════════
-function ChallengeSheet({loc,pos,completed,onComplete,onClose,seenQuizzes}){
+function ChallengeSheet({loc,pos,completed,onComplete,onClose,seenQuizzes,isAdmin,myTeam}){
   if(!loc)return null;
   const dist=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):null;
   const hasPhotoCompleted=loc.ch.some((ch,i)=>(ch.t==='photo'||ch.t==='video'||ch.t==='creative')&&completed[i]);
@@ -1336,7 +1503,7 @@ function ChallengeSheet({loc,pos,completed,onComplete,onClose,seenQuizzes}){
                 <div className="difficulty"><span className="star">{stars(ch.df)}</span> {ch.df}</div>
                 {done&&<div style={{fontSize:13,color:'#00ff88',fontWeight:700}}>✓ Voltooid</div>}
               </div>
-              {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete}/>}
+              {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam}/>}
             </div>
           );
         })}
@@ -1355,7 +1522,7 @@ function ChallengeSheet({loc,pos,completed,onComplete,onClose,seenQuizzes}){
             <div style={{fontSize:11,color:'#888',marginBottom:8,fontStyle:'italic'}}>
               {rotatedQuiz._pool?'🎯 Bonus Rotterdam-vraag':'⭐ Extra vraag voor deze plek'}
             </div>
-            <ChallengeAction ch={rotatedQuiz} locId={loc.id} chIdx={`dyn_${loc.id}_${Date.now()}`} onComplete={(lid,cidx,pts,photo)=>{
+            <ChallengeAction ch={rotatedQuiz} locId={loc.id} chIdx={`dyn_${loc.id}_${Date.now()}`} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} onComplete={(lid,cidx,pts,photo)=>{
               // Dynamic-quiz rewards: award points, log activity, but do NOT mark built-in challenge
               onComplete(lid,-99,pts,photo);
             }}/>
@@ -1366,12 +1533,17 @@ function ChallengeSheet({loc,pos,completed,onComplete,onClose,seenQuizzes}){
   );
 }
 
-function ChallengeAction({ch,locId,chIdx,onComplete}){
+function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   const fileRef=useRef(null);
   const[preview,setPreview]=useState(null);
   const[quizAnswer,setQuizAnswer]=useState(null);
   const[quizFeedback,setQuizFeedback]=useState(null);
   const[processing,setProcessing]=useState(false);
+
+  // V6: GPS gate — for media challenges only. Quizzes don't gate.
+  const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
+  const gateRadius=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE; // 50 + 20 = 70m total
+  const tooFar=isMedia&&!isAdmin&&dist!=null&&dist>gateRadius;
 
   const handleFile=async(e)=>{
     const f=e.target.files[0];
@@ -1380,15 +1552,35 @@ function ChallengeAction({ch,locId,chIdx,onComplete}){
     const r=new FileReader();
     r.onload=async(ev)=>{
       const raw=ev.target.result;
-      // V5: compress images before shipping to feed; keep videos raw but cap size
       let shareable=raw;
       if(!isVideoData(raw)){
         shareable=await compressPhoto(raw,640,0.6);
       }else if(raw.length>700000){
-        shareable=null; // too large to ship via Supabase row, show locally only
+        shareable=null;
       }
       setPreview(raw);
       setProcessing(false);
+
+      // V6: Insert a photo_review row into Supabase for the admin queue
+      if(!OFFLINE&&sb&&myTeam&&isMedia){
+        const reviewRow={
+          team_id:myTeam.id,
+          team_name:myTeam.name,
+          team_emoji:myTeam.emoji,
+          team_color:myTeam.color,
+          location_id:locId,
+          location_name:loc?.n||'',
+          challenge_idx:typeof chIdx==='number'?chIdx:-99,
+          challenge_title:ch.ti,
+          challenge_type:ch.t,
+          gps_distance:dist!=null?Math.round(dist):null,
+          points_awarded:ch.p,
+          photo_url:shareable&&shareable.length<800000?shareable:null,
+          status:'pending',
+        };
+        sb.from('photo_reviews').insert(reviewRow).then(()=>{},()=>{/* table may not exist yet — silent */});
+      }
+
       onComplete(locId,chIdx,ch.p,shareable);
     };
     r.onerror=()=>{setProcessing(false);onComplete(locId,chIdx,ch.p,null)};
@@ -1421,6 +1613,21 @@ function ChallengeAction({ch,locId,chIdx,onComplete}){
     );
   }
 
+  // V6: GPS gate UI when too far
+  if(tooFar){
+    const need=Math.round(dist-gateRadius);
+    return(
+      <div className="gate-blocked">
+        <div className="gate-icon">📍</div>
+        <div style={{flex:1}}>
+          <div className="gate-text">Loop dichterbij om de foto te maken</div>
+          <div className="gate-hint">Je staat {Math.round(dist)}m weg · max {gateRadius}m toegestaan</div>
+        </div>
+        <div className="gate-distance">-{need}m</div>
+      </div>
+    );
+  }
+
   const accept=ch.t==='video'?'video/*':ch.t==='creative'?'image/*,video/*':'image/*';
   return(
     <div style={{marginTop:12}}>
@@ -1428,6 +1635,12 @@ function ChallengeAction({ch,locId,chIdx,onComplete}){
       <button className="btn btn-cyan" onClick={()=>fileRef.current?.click()} disabled={processing} style={{width:'100%'}}>
         {processing?'⏳ Verwerken...':ch.t==='video'?'🎬 Video Opnemen':ch.t==='creative'?'📸 Foto/Video Maken':'📸 Foto Maken'}
       </button>
+      {isAdmin&&dist!=null&&dist>gateRadius&&(
+        <div style={{fontSize:11,color:'#ff6b35',marginTop:6,textAlign:'center'}}>⚠️ Admin override · normaal {Math.round(dist)}m te ver</div>
+      )}
+      {!isAdmin&&isMedia&&dist!=null&&dist<=gateRadius&&(
+        <div style={{fontSize:11,color:'#00ff88',marginTop:6,textAlign:'center'}}>✓ Je bent op locatie ({Math.round(dist)}m)</div>
+      )}
       {preview&&(isVideoData(preview)
         ?<video src={preview} className="photo-preview" controls muted/>
         :<img src={preview} className="photo-preview" alt="preview"/>)}
