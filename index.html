@@ -271,6 +271,16 @@ const GPS_ACCURACY_WEAK=50;   // meters — "weak" signal threshold
 const STILL_TIMEOUT_MS=30000; // pause GPS after 30s without motion
 const MOTION_THRESHOLD=0.8;   // acceleration threshold (m/s²)
 
+// V5.1 HOTFIX: iOS detection — DeviceMotion requires explicit permission on iOS 13+
+// Without that permission, accelerometer events never fire and GPS sleep never wakes.
+// On iOS we skip the sleep logic entirely (GPS stays always-on, same as V4).
+const IS_IOS=/iPhone|iPad|iPod/i.test(navigator.userAgent)||
+  (navigator.userAgent.includes('Mac')&&'ontouchend' in document);
+// Motion-based sleep only works when DeviceMotion fires without a permission prompt.
+// iOS 13+ exposes DeviceMotionEvent.requestPermission — treat that as "not available".
+const MOTION_AVAILABLE=typeof DeviceMotionEvent!=='undefined'&&
+  typeof DeviceMotionEvent.requestPermission!=='function'&&!IS_IOS;
+
 // ═══════════════════════════════════════════
 // 102 VERIFIED LOCATIONS
 // ═══════════════════════════════════════════
@@ -567,6 +577,8 @@ function App(){
   const[gpsSnap,setGpsSnap]=useState(null); // snapped-to POI name
   // V5 FEATURE 6: motion tracking
   const motionRef=useRef({lastMotion:Date.now(),still:false});
+  // V5.1 HOTFIX: expose GPS controls so the status pill can force-wake on tap
+  const gpsCtrlRef=useRef({start:null,stop:null});
   const[photoLightbox,setPhotoLightbox]=useState(null); // enlarged photo url
   const[feedFilter,setFeedFilter]=useState('all'); // 'all' | 'photos' | 'mine'
 
@@ -578,6 +590,7 @@ function App(){
   },[gameStart]);
 
   // V5 FEATURE 5 + 6: GPS with smoothing, snap-to-POI, battery-aware polling
+  // V5.1 HOTFIX: skip sleep logic on iOS / no-motion; expose wake via ref for tap-to-wake pill
   useEffect(()=>{
     let watchId=null;
     let active=true;
@@ -609,52 +622,66 @@ function App(){
       if(watchId!=null||!active)return;
       watchId=navigator.geolocation.watchPosition(onPos,()=>{},
         {enableHighAccuracy:true,maximumAge:3000,timeout:10000});
+      motionRef.current.still=false;
+      motionRef.current.lastMotion=Date.now();
+      // Reset visual state immediately so the pill returns to 'weak' until first fix
+      setGpsStatus('weak');
     };
     const stopWatch=()=>{
       if(watchId!=null){navigator.geolocation.clearWatch(watchId);watchId=null}
     };
 
+    // Expose controls so the status pill can force-wake on tap
+    gpsCtrlRef.current={start:startWatch,stop:stopWatch};
+
     startWatch();
 
-    // Battery-aware: check motion every 10s; pause GPS when still > STILL_TIMEOUT_MS
-    const motionCheck=setInterval(()=>{
-      if(!active)return;
-      const stillFor=Date.now()-motionRef.current.lastMotion;
-      if(stillFor>STILL_TIMEOUT_MS&&watchId!=null){
-        stopWatch();
-        motionRef.current.still=true;
-        setGpsStatus('sleep');
-      }
-    },10000);
-
-    // DeviceMotion listener to wake GPS back up
-    const onMotion=(ev)=>{
-      const a=ev.accelerationIncludingGravity||ev.acceleration;
-      if(!a)return;
-      const mag=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2);
-      // On Earth, still device ≈ 9.8; moving ≈ spikes outside this
-      if(Math.abs(mag-9.8)>MOTION_THRESHOLD){
-        motionRef.current.lastMotion=Date.now();
-        if(motionRef.current.still){
-          motionRef.current.still=false;
-          startWatch();
+    // Motion-based sleep only runs where DeviceMotion fires without a permission prompt
+    let motionCheck=null,onMotion=null;
+    if(MOTION_AVAILABLE){
+      motionCheck=setInterval(()=>{
+        if(!active)return;
+        const stillFor=Date.now()-motionRef.current.lastMotion;
+        if(stillFor>STILL_TIMEOUT_MS&&watchId!=null){
+          stopWatch();
+          motionRef.current.still=true;
+          setGpsStatus('sleep');
         }
-      }
-    };
-    try{
-      if(typeof DeviceMotionEvent!=='undefined'){
-        // iOS 13+ requires permission; we don't prompt here to avoid friction.
-        // If denied, we just keep the GPS always-on (behavior matches V4).
-        window.addEventListener('devicemotion',onMotion,{passive:true});
-      }
-    }catch(e){}
+      },10000);
+
+      onMotion=(ev)=>{
+        const a=ev.accelerationIncludingGravity||ev.acceleration;
+        if(!a)return;
+        const mag=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2);
+        if(Math.abs(mag-9.8)>MOTION_THRESHOLD){
+          motionRef.current.lastMotion=Date.now();
+          if(motionRef.current.still){
+            motionRef.current.still=false;
+            startWatch();
+          }
+        }
+      };
+      try{window.addEventListener('devicemotion',onMotion,{passive:true})}catch(e){}
+    }
+    // On iOS or browsers without motion: GPS stays always-on (same as V4)
 
     return()=>{
       active=false;
       stopWatch();
-      clearInterval(motionCheck);
-      try{window.removeEventListener('devicemotion',onMotion)}catch(e){}
+      if(motionCheck)clearInterval(motionCheck);
+      if(onMotion){try{window.removeEventListener('devicemotion',onMotion)}catch(e){}}
+      gpsCtrlRef.current={start:null,stop:null};
     };
+  },[]);
+
+  // V5.1 HOTFIX: force-wake callback for the GPS pill tap
+  const wakeGps=useCallback(()=>{
+    motionRef.current.lastMotion=Date.now();
+    motionRef.current.still=false;
+    // Stop first then start — ensures a fresh watchPosition even if stale
+    gpsCtrlRef.current.stop&&gpsCtrlRef.current.stop();
+    gpsCtrlRef.current.start&&gpsCtrlRef.current.start();
+    setToast('📡 GPS wakker geschud');
   },[]);
 
   // Ghost timer
@@ -787,7 +814,7 @@ function App(){
         <h1 style={{fontSize:32,fontWeight:900,background:'linear-gradient(135deg,#00d4ff,#ffd700)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>STADSSPEL</h1>
         <h2 style={{fontSize:20,fontWeight:300,color:'#888',marginBottom:4}}>ROTTERDAM</h2>
         <div style={{fontSize:14,color:'#555',marginBottom:8}}>Jorik's Bachelor Party · 6 Juni 2026</div>
-        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V5 · DE VERLOREN RING</div>
+        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V5.1 · DE VERLOREN RING</div>
         <button className="btn btn-cyan" onClick={()=>setScreen('setup')} style={{padding:'16px 48px',fontSize:16,borderRadius:16}}>
           START
         </button>
@@ -857,7 +884,7 @@ function App(){
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
         {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)}/>}
-        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} ghost={ghost} onGhost={activateGhost} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap}/>}
+        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} ghost={ghost} onGhost={activateGhost} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
       </div>
 
@@ -1056,7 +1083,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 // ═══════════════════════════════════════════
 // MAP VIEW
 // ═══════════════════════════════════════════
-function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,phase,gpsStatus,gpsSnap}){
+function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,phase,gpsStatus,gpsSnap,onWakeGps}){
   const mapRef=useRef(null);
   const mapInst=useRef(null);
   const markersRef=useRef([]);
@@ -1104,11 +1131,12 @@ function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,phase,gpsStat
     <div style={{height:'100%',display:'flex',flexDirection:'column',position:'relative'}}>
       <div ref={mapRef} style={{flex:1}}/>
 
-      {/* V5: GPS status pill */}
-      <div className="gps-pill">
+      {/* V5.1: GPS status pill — tap to force-wake when sleeping */}
+      <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer'}} title="Tik om GPS te wekken">
         <span className={`gps-dot ${gpsStatus||'weak'}`}/>
-        {gpsStatus==='good'?'GPS goed':gpsStatus==='sleep'?'GPS slaapt':'GPS zwak'}
+        {gpsStatus==='good'?'GPS goed':gpsStatus==='sleep'?'GPS rust':'GPS zwak'}
         {gpsSnap&&<span style={{color:'#00d4ff'}}>· op {gpsSnap}</span>}
+        {gpsStatus==='sleep'&&<span className="snap-btn">tik om te wekken</span>}
       </div>
 
       {/* Ghost mode button */}
