@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V7 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V8 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -71,6 +71,7 @@
     .points-badge{font-size:13px;font-weight:800;color:#ffd700}
 
     /* Quiz */
+    .quiz-option:disabled{pointer-events:none;cursor:not-allowed}
     .quiz-option{display:block;width:100%;padding:12px;margin-bottom:8px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:14px;cursor:pointer;text-align:left;transition:all .2s}
     .quiz-option:hover{background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.3)}
     .quiz-option.correct{background:rgba(0,255,136,0.2);border-color:#00ff88;color:#00ff88}
@@ -333,158 +334,158 @@ const MOTION_AVAILABLE=typeof DeviceMotionEvent!=='undefined'&&
 // 102 VERIFIED LOCATIONS
 // ═══════════════════════════════════════════
 const L_DATA=[
-{id:1,n:"Erasmusbrug",la:51.9055,lo:4.4853,e:"🌉",c:"bridge",r:25,ch:[
+{id:1,n:"Erasmusbrug",la:51.907792,lo:4.489798,e:"🌉",c:"bridge",r:25,ch:[
   {t:"photo",ti:"Erasmusbrug Pose",d:"Maak de meest epische foto op de brug. Filmaffiche waardig!",p:25,df:"medium"},
   {t:"video",ti:"Brug Catwalk",d:"Loop als een model over de Erasmusbrug. Hele team, min. 10 sec.",p:35,df:"hard"},
   {t:"quiz",ti:"Brug Kennis",d:"Wat is de bijnaam van de Erasmusbrug?",a:"De Zwaan",o:["De Zwaan","De Harp","De Naald","Het Zeil"],p:15,df:"easy"}]},
-{id:2,n:"Markthal",la:51.9200,lo:4.4875,e:"🏗️",c:"landmark",r:25,ch:[
+{id:2,n:"Markthal",la:51.920109,lo:4.486957,e:"🏗️",c:"landmark",r:25,ch:[
   {t:"photo",ti:"Plafond Selfie",d:"Spectaculaire foto van het beschilderde plafond.",p:20,df:"easy"},
   {t:"creative",ti:"Proeverij Challenge",d:"Koop het raarste ding, laat iemand het blind proeven op video.",p:35,df:"hard"},
   {t:"quiz",ti:"Markthal Trivia",d:"Hoeveel m² is het kunstwerk op het plafond?",a:"11.000 m²",o:["11.000 m²","5.000 m²","8.500 m²","15.000 m²"],p:25,df:"medium"}]},
-{id:3,n:"Kubuswoningen",la:51.9200,lo:4.4903,e:"🎲",c:"architecture",r:15,ch:[
+{id:3,n:"Kubuswoningen",la:51.920394,lo:4.490127,e:"🎲",c:"architecture",r:15,ch:[
   {t:"photo",ti:"Schuine Pose",d:"Hele team schuin, net als de kubussen.",p:20,df:"easy"},
   {t:"quiz",ti:"Kubus Quiz",d:"Wie ontwierp de kubuswoningen?",a:"Piet Blom",o:["Piet Blom","Rem Koolhaas","Berlage","Rietveld"],p:25,df:"medium"}]},
-{id:4,n:"Euromast",la:51.9061,lo:4.4658,e:"🗼",c:"landmark",r:25,ch:[
+{id:4,n:"Euromast",la:51.905405,lo:4.466604,e:"🗼",c:"landmark",r:25,ch:[
   {t:"photo",ti:"Toren Perspectief",d:"Perspectieffoto: iemand 'houdt' de Euromast vast of 'eet' hem op.",p:25,df:"medium"},
   {t:"quiz",ti:"Euromast Hoogte",d:"Hoe hoog is de Euromast?",a:"185 meter",o:["185 meter","165 meter","200 meter","150 meter"],p:20,df:"easy"}]},
-{id:5,n:"Hotel New York",la:51.9042,lo:4.4842,e:"🏨",c:"historic",r:15,ch:[
+{id:5,n:"Hotel New York",la:51.904092,lo:4.484505,e:"🏨",c:"historic",r:15,ch:[
   {t:"creative",ti:"Emigranten Scene",d:"Speel afscheidsscène na alsof jullie naar Amerika vertrekken!",p:35,df:"hard"},
   {t:"photo",ti:"New York Stijl",d:"Foto in 'Roaring Twenties' stijl bij de ingang.",p:25,df:"medium"}]},
-{id:6,n:"SS Rotterdam",la:51.8920,lo:4.4712,e:"🚢",c:"landmark",r:25,ch:[
+{id:6,n:"SS Rotterdam",la:51.8978,lo:4.473277,e:"🚢",c:"landmark",r:25,ch:[
   {t:"photo",ti:"Titanic Pose",d:"Titanic-pose bij het schip. 'I'm the king of the world!'",p:25,df:"medium"},
   {t:"quiz",ti:"Schip Kennis",d:"In welk jaar maakte de SS Rotterdam haar laatste reis?",a:"2000",o:["2000","1997","2005","1990"],p:25,df:"medium"}]},
-{id:7,n:"Rotterdam Centraal",la:51.9247,lo:4.4688,e:"🚂",c:"landmark",r:20,ch:[
+{id:7,n:"Rotterdam Centraal",la:51.924639,lo:4.469133,e:"🚂",c:"landmark",r:20,ch:[
   {t:"photo",ti:"Station Selfie",d:"Groepsfoto voor het iconische puntdak.",p:15,df:"easy"},
   {t:"quiz",ti:"Station Kennis",d:"Wanneer werd het huidige Rotterdam Centraal geopend?",a:"2014",o:["2014","2010","2018","2012"],p:20,df:"easy"}]},
-{id:8,n:"De Hef",la:51.9133,lo:4.4986,e:"🏗️",c:"bridge",r:15,ch:[
+{id:8,n:"De Hef",la:51.913745,lo:4.498184,e:"🏗️",c:"bridge",r:15,ch:[
   {t:"photo",ti:"Hef Silhouet",d:"Silhouetfoto met De Hef op de achtergrond.",p:25,df:"medium"},
   {t:"quiz",ti:"Hef Quiz",d:"Jeff Bezos wilde De Hef demonteren. Hoe reageerde Rotterdam?",a:"Dreigde met eieren gooien",o:["Dreigde met eieren gooien","Ging akkoord","Eiste 10 miljoen","Negeerde het"],p:30,df:"hard"}]},
-{id:9,n:"Willemsbrug",la:51.9170,lo:4.4907,e:"🔴",c:"bridge",r:15,ch:[{t:"photo",ti:"Rode Brug Foto",d:"Groepsfoto op de rode brug met skyline.",p:20,df:"easy"}]},
-{id:10,n:"Laurenskerk",la:51.9213,lo:4.4841,e:"⛪",c:"historic",r:20,ch:[
+{id:9,n:"Willemsbrug",la:51.917202,lo:4.491591,e:"🔴",c:"bridge",r:15,ch:[{t:"photo",ti:"Rode Brug Foto",d:"Groepsfoto op de rode brug met skyline.",p:20,df:"easy"}]},
+{id:10,n:"Laurenskerk",la:51.921551,lo:4.485452,e:"⛪",c:"historic",r:20,ch:[
   {t:"photo",ti:"Kerktoren Shot",d:"Creatieve foto: iemand 'houdt' de kerktoren vast.",p:25,df:"medium"},
   {t:"quiz",ti:"Kerk Kennis",d:"De Laurenskerk overleefde 1940. Wanneer begon de bouw?",a:"1449",o:["1449","1352","1510","1601"],p:25,df:"medium"}]},
-{id:11,n:"POST Rotterdam",la:51.9221,lo:4.4782,e:"📮",c:"landmark",r:20,ch:[
+{id:11,n:"POST Rotterdam",la:51.922067,lo:4.480053,e:"📮",c:"landmark",r:20,ch:[
   {t:"photo",ti:"Postkantoor Pose",d:"Groepsfoto alsof jullie een pakketje ophalen.",p:20,df:"easy"},
   {t:"quiz",ti:"POST Kennis",d:"Wat was dit gebouw oorspronkelijk?",a:"Hoofdpostkantoor",o:["Hoofdpostkantoor","Stadhuis","Bibliotheek","Rechtbank"],p:15,df:"easy"}]},
-{id:12,n:"Stadhuis Rotterdam",la:51.9231,lo:4.4784,e:"🏛️",c:"landmark",r:25,ch:[
+{id:12,n:"Stadhuis Rotterdam",la:51.923237,lo:4.478512,e:"🏛️",c:"landmark",r:25,ch:[
   {t:"photo",ti:"Burgemeester Pose",d:"Eén teamlid houdt toespraak als burgemeester.",p:25,df:"medium"},
   {t:"video",ti:"Raadsvergadering",d:"15-sec nep-raadsvergadering over belachelijk onderwerp.",p:30,df:"medium"}]},
 {id:13,n:"Koopgoot",la:51.9201,lo:4.4795,e:"🛍️",c:"landmark",r:30,ch:[
   {t:"creative",ti:"Mannequin Challenge",d:"Hele team bevriest als mannequins. Foto!",p:30,df:"medium"},
   {t:"quiz",ti:"Koopgoot Trivia",d:"Hoe heet de Koopgoot officieel?",a:"Beurstraverse",o:["Beurstraverse","Cooltraverse","Winkeltraverse","Lijnbaanpassage"],p:15,df:"easy"}]},
-{id:14,n:"Hofplein",la:51.9245,lo:4.4777,e:"⛲",c:"square",r:35,ch:[{t:"photo",ti:"Fontein Foto",d:"Groepsfoto bij de fontein!",p:20,df:"easy"}]},
+{id:14,n:"Hofplein",la:51.924788,lo:4.477553,e:"⛲",c:"square",r:35,ch:[{t:"photo",ti:"Fontein Foto",d:"Groepsfoto bij de fontein!",p:20,df:"easy"}]},
 {id:15,n:"Standbeeld Erasmus",la:51.9221,lo:4.4859,e:"📚",c:"art",r:10,ch:[
   {t:"photo",ti:"Erasmus Imitatie",d:"Imiteer de pose van Erasmus. Heel team doet mee.",p:20,df:"easy"},
   {t:"quiz",ti:"Erasmus Quiz",d:"Waarvoor is Erasmus het meest bekend?",a:"Lof der Zotheid",o:["Lof der Zotheid","Het Achterhuis","Max Havelaar","De Ontdekking van de Hemel"],p:20,df:"easy"}]},
-{id:16,n:"Grotekerkplein",la:51.9224,lo:4.4851,e:"🏛️",c:"square",r:20,ch:[{t:"creative",ti:"Plein Performance",d:"15-sec sketch: 'Jorik's eerste date'.",p:35,df:"hard"}]},
+{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"creative",ti:"Plein Performance",d:"15-sec sketch: 'Jorik's eerste date'.",p:35,df:"hard"}]},
 {id:17,n:"Zadkine Monument",la:51.9180,lo:4.4815,e:"🗿",c:"art",r:15,ch:[
   {t:"photo",ti:"Verwoeste Stad Pose",d:"Recreëer de pose: armen omhoog, mond open!",p:25,df:"medium"},
   {t:"quiz",ti:"Monument Quiz",d:"Aan welke gebeurtenis herinnert dit beeld?",a:"Bombardement Rotterdam 1940",o:["Bombardement Rotterdam 1940","Watersnoodramp 1953","Bevrijding 1945","Havenarbeidersstaking 1970"],p:25,df:"medium"}]},
-{id:18,n:"Het Schielandshuis",la:51.9179,lo:4.4812,e:"🏰",c:"historic",r:20,ch:[{t:"photo",ti:"Historisch Portret",d:"'Schilderachtig' portret voor het oudste gebouw.",p:20,df:"easy"}]},
-{id:19,n:"Binnenrotte",la:51.9205,lo:4.4865,e:"🎪",c:"square",r:25,ch:[{t:"creative",ti:"Markt Bingo",d:"Vind: iets roods, een buitenlander, een straatmuzikant, iets gratis, een hond.",p:35,df:"hard"}]},
-{id:20,n:"Oude Haven",la:51.9192,lo:4.4909,e:"⛵",c:"landmark",r:15,ch:[
+{id:18,n:"Het Schielandshuis",la:51.918933,lo:4.481813,e:"🏰",c:"historic",r:20,ch:[{t:"photo",ti:"Historisch Portret",d:"'Schilderachtig' portret voor het oudste gebouw.",p:20,df:"easy"}]},
+{id:19,n:"Binnenrotte",la:51.921313,lo:4.486875,e:"🎪",c:"square",r:25,ch:[{t:"creative",ti:"Markt Bingo",d:"Vind: iets roods, een buitenlander, een straatmuzikant, iets gratis, een hond.",p:35,df:"hard"}]},
+{id:20,n:"Oude Haven",la:51.919257,lo:4.492419,e:"⛵",c:"landmark",r:15,ch:[
   {t:"video",ti:"Shanty Zingen",d:"Zing een piraten-lied bij de schepen. Min. 15 sec!",p:30,df:"medium"},
   {t:"photo",ti:"Zeeman Pose",d:"Poseer als stoere zeeman.",p:15,df:"easy"}]},
-{id:21,n:"Luchtsingel",la:51.9254,lo:4.4764,e:"🌉",c:"landmark",r:15,ch:[
+{id:21,n:"Luchtsingel",la:51.925534,lo:4.476293,e:"🌉",c:"landmark",r:15,ch:[
   {t:"photo",ti:"Gele Brug Groep",d:"Groepsfoto op de gele brug!",p:20,df:"easy"},
   {t:"quiz",ti:"Luchtsingel Feit",d:"Hoe is de Luchtsingel gefinancierd?",a:"Crowdfunding",o:["Crowdfunding","Gemeente Rotterdam","EU subsidie","Loterij"],p:25,df:"medium"}]},
-{id:22,n:"Marten Toonder",la:51.9197,lo:4.4883,e:"🐻",c:"art",r:15,ch:[{t:"photo",ti:"Bommel & Tom Poes",d:"Poseer met Heer Bommel en Tom Poes!",p:20,df:"easy"}]},
-{id:23,n:"Kabouter Buttplug",la:51.9157,lo:4.4755,e:"🎅",c:"art",r:15,ch:[
+{id:22,n:"Marten Toonder",la:51.919729,lo:4.488082,e:"🐻",c:"art",r:15,ch:[{t:"photo",ti:"Bommel & Tom Poes",d:"Poseer met Heer Bommel en Tom Poes!",p:20,df:"easy"}]},
+{id:23,n:"Kabouter Buttplug",la:51.917066,lo:4.473353,e:"🎅",c:"art",r:15,ch:[
   {t:"photo",ti:"Kerstman Pose",d:"Creatieve foto met het kunstwerk van Paul McCarthy.",p:25,df:"medium"},
   {t:"quiz",ti:"Buttplug Quiz",d:"Hoe heet dit kunstwerk officieel?",a:"Santa Claus",o:["Santa Claus","Gnome","Kabouter","Christmas Tree"],p:20,df:"easy"}]},
 {id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"photo",ti:"Baasje Pose",d:"Poseer alsof Fikkie jouw hond is.",p:15,df:"easy"}]},
-{id:25,n:"L'Homme qui Marche",la:51.9165,lo:4.4741,e:"🚶",c:"art",r:15,ch:[{t:"photo",ti:"Wandelende Man",d:"Imiteer het beeld. Heel team dezelfde pose!",p:20,df:"easy"}]},
+{id:25,n:"L'Homme qui Marche",la:51.917633,lo:4.472299,e:"🚶",c:"art",r:15,ch:[{t:"photo",ti:"Wandelende Man",d:"Imiteer het beeld. Heel team dezelfde pose!",p:20,df:"easy"}]},
 {id:26,n:"Sylvette (Picasso)",la:51.9149,lo:4.4735,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Picasso Pose",d:"Kubistische foto geïnspireerd door Picasso.",p:25,df:"medium"}]},
 {id:27,n:"Cascade (Van Lieshout)",la:51.9178,lo:4.4800,e:"🎪",c:"art",r:20,ch:[{t:"photo",ti:"Cascade Climb",d:"Beklim het kunstwerk en maak een epische foto.",p:25,df:"medium"}]},
 {id:28,n:"Make It Happen Mural",la:51.9149,lo:4.4789,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Mural Foto",d:"Foto waarbij jullie het muurschildering 'aanvullen'.",p:20,df:"easy"}]},
 {id:29,n:"ZOHO Letters",la:51.9290,lo:4.4765,e:"🔤",c:"art",r:20,ch:[{t:"photo",ti:"Letter Pose",d:"Spel 'JORIK' met jullie lichamen!",p:35,df:"hard"}]},
-{id:30,n:"Maritiem Museum",la:51.9179,lo:4.4822,e:"⚓",c:"culture",r:15,ch:[
+{id:30,n:"Maritiem Museum",la:51.917627,lo:4.481887,e:"⚓",c:"culture",r:15,ch:[
   {t:"photo",ti:"Kapitein Pose",d:"Poseer als scheepskapitein.",p:20,df:"easy"},
   {t:"quiz",ti:"Maritiem Kennis",d:"Rotterdam is de grootste haven van Europa. Welke plek wereldwijd?",a:"Top 10",o:["Top 10","Top 3","Nummer 1","Top 20"],p:25,df:"medium"}]},
-{id:31,n:"Kunsthal",la:51.9108,lo:4.4737,e:"🖼️",c:"culture",r:20,ch:[{t:"creative",ti:"Levend Kunstwerk",d:"Creëer een 'levend kunstwerk' met het hele team.",p:30,df:"medium"}]},
-{id:32,n:"Depot Boijmans",la:51.9085,lo:4.4715,e:"🪞",c:"culture",r:15,ch:[
+{id:31,n:"Kunsthal",la:51.910803,lo:4.473427,e:"🖼️",c:"culture",r:20,ch:[{t:"creative",ti:"Levend Kunstwerk",d:"Creëer een 'levend kunstwerk' met het hele team.",p:30,df:"medium"}]},
+{id:32,n:"Depot Boijmans",la:51.913803,lo:4.471221,e:"🪞",c:"culture",r:15,ch:[
   {t:"photo",ti:"Spiegel Selfie",d:"Selfie in de spiegelende gevel!",p:25,df:"medium"},
   {t:"quiz",ti:"Depot Feit",d:"Hoeveel kunstwerken in het Depot?",a:"151.000",o:["151.000","50.000","200.000","75.000"],p:25,df:"medium"}]},
 {id:33,n:"Wereldmuseum",la:51.9079,lo:4.4804,e:"🌍",c:"culture",r:15,ch:[{t:"photo",ti:"Wereldreis Foto",d:"Foto alsof jullie op wereldreis gaan.",p:20,df:"easy"}]},
-{id:34,n:"Nieuwe Instituut",la:51.9145,lo:4.4722,e:"📐",c:"culture",r:15,ch:[{t:"photo",ti:"Architectuur Shot",d:"Meest artistieke architectuurfoto.",p:25,df:"medium"}]},
-{id:35,n:"Huis Sonneveld",la:51.9139,lo:4.4744,e:"🏠",c:"culture",r:10,ch:[{t:"photo",ti:"Art Deco Pose",d:"Art deco stijl voor het functionalistische huis.",p:20,df:"easy"}]},
-{id:36,n:"Mariniersmuseum",la:51.9185,lo:4.4900,e:"🎖️",c:"culture",r:15,ch:[{t:"photo",ti:"Marinier Pose",d:"Sta in de houding als een marinier!",p:20,df:"easy"}]},
-{id:37,n:"Witte de Withstraat",la:51.9151,lo:4.4769,e:"🎨",c:"street",r:20,ch:[
+{id:34,n:"Nieuwe Instituut",la:51.914708,lo:4.471158,e:"📐",c:"culture",r:15,ch:[{t:"photo",ti:"Architectuur Shot",d:"Meest artistieke architectuurfoto.",p:25,df:"medium"}]},
+{id:35,n:"Huis Sonneveld",la:51.915611,lo:4.472337,e:"🏠",c:"culture",r:10,ch:[{t:"photo",ti:"Art Deco Pose",d:"Art deco stijl voor het functionalistische huis.",p:20,df:"easy"}]},
+{id:36,n:"Mariniersmuseum",la:51.918716,lo:4.491564,e:"🎖️",c:"culture",r:15,ch:[{t:"photo",ti:"Marinier Pose",d:"Sta in de houding als een marinier!",p:20,df:"easy"}]},
+{id:37,n:"Witte de Withstraat",la:51.915524,lo:4.476784,e:"🎨",c:"street",r:20,ch:[
   {t:"creative",ti:"Terras Interview",d:"Interview terrasbezoeker: 'Advies voor een bruidegom?'",p:40,df:"hard"},
   {t:"photo",ti:"Street Art Hunt",d:"Vind street art, maak foto die het 'aanvult'.",p:25,df:"medium"}]},
-{id:38,n:"Skatepark Westblaak",la:51.9163,lo:4.4754,e:"🛹",c:"landmark",r:20,ch:[{t:"video",ti:"Skatepark Move",d:"Trick, pose, of epic fail. Humor > vaardigheid!",p:30,df:"medium"}]},
+{id:38,n:"Skatepark Westblaak",la:51.916824,lo:4.476183,e:"🛹",c:"landmark",r:20,ch:[{t:"video",ti:"Skatepark Move",d:"Trick, pose, of epic fail. Humor > vaardigheid!",p:30,df:"medium"}]},
 {id:39,n:"Walk of Fame",la:51.9158,lo:4.4820,e:"⭐",c:"landmark",r:10,ch:[{t:"photo",ti:"Ster Selfie",d:"Selfie bij ster van favoriete Rotterdammer.",p:15,df:"easy"}]},
 {id:40,n:"Chinatown Poort",la:51.9215,lo:4.4694,e:"🏮",c:"landmark",r:15,ch:[{t:"photo",ti:"Draak Pose",d:"Groepsfoto met kung-fu poses!",p:20,df:"easy"}]},
-{id:41,n:"Schouwburgplein",la:51.9220,lo:4.4730,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Flash Mob",d:"Mini flash mob! Min. 10 sec!",p:35,df:"hard"}]},
-{id:42,n:"Westersingel",la:51.9161,lo:4.4745,e:"🦆",c:"park",r:20,ch:[{t:"creative",ti:"Eenden Tellen",d:"Tel alle eenden. Dichtst bij wint!",p:20,df:"easy"}]},
-{id:43,n:"Noordereiland",la:51.9130,lo:4.4990,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Eiland Leven",d:"Meest fotogenieke hoekje.",p:25,df:"medium"}]},
-{id:44,n:"Wilhelminapier",la:51.9060,lo:4.4850,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"Skyline Shot",d:"Mooiste skyline foto.",p:20,df:"easy"}]},
-{id:45,n:"KPN Toren",la:51.9073,lo:4.4899,e:"📡",c:"architecture",r:20,ch:[{t:"photo",ti:"Leunende Toren",d:"Perspectieffoto: toren 'tegenhouden'.",p:25,df:"medium"}]},
+{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Flash Mob",d:"Mini flash mob! Min. 10 sec!",p:35,df:"hard"}]},
+{id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"creative",ti:"Eenden Tellen",d:"Tel alle eenden. Dichtst bij wint!",p:20,df:"easy"}]},
+{id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Eiland Leven",d:"Meest fotogenieke hoekje.",p:25,df:"medium"}]},
+{id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"Skyline Shot",d:"Mooiste skyline foto.",p:20,df:"easy"}]},
+{id:45,n:"KPN Toren",la:51.907179,lo:4.489141,e:"📡",c:"architecture",r:20,ch:[{t:"photo",ti:"Leunende Toren",d:"Perspectieffoto: toren 'tegenhouden'.",p:25,df:"medium"}]},
 {id:46,n:"Spido Kade",la:51.9098,lo:4.4818,e:"🚤",c:"landmark",r:15,ch:[{t:"quiz",ti:"Spido Kennis",d:"Hoe lang duurt een Spido rondvaart?",a:"75 minuten",o:["75 minuten","45 minuten","60 minuten","90 minuten"],p:15,df:"easy"}]},
-{id:47,n:"Monument De Boeg",la:51.9126,lo:4.4827,e:"🚢",c:"monument",r:10,ch:[{t:"photo",ti:"Titanic Moment",d:"Titanic-pose bij De Boeg!",p:25,df:"medium"}]},
-{id:48,n:"Nieuwe Luxor",la:51.9051,lo:4.4913,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Theater Scene",d:"Speel filmscène na. Oscar-waardig!",p:30,df:"medium"}]},
-{id:49,n:"Fenix Food Factory",la:51.9025,lo:4.4850,e:"🍔",c:"food",r:15,ch:[{t:"photo",ti:"Food Foto",d:"Meest Instagram-waardige food foto.",p:20,df:"easy"}]},
+{id:47,n:"Monument De Boeg",la:51.912273,lo:4.484558,e:"🚢",c:"monument",r:10,ch:[{t:"photo",ti:"Titanic Moment",d:"Titanic-pose bij De Boeg!",p:25,df:"medium"}]},
+{id:48,n:"Nieuwe Luxor",la:51.906782,lo:4.491185,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Theater Scene",d:"Speel filmscène na. Oscar-waardig!",p:30,df:"medium"}]},
+{id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[{t:"photo",ti:"Food Foto",d:"Meest Instagram-waardige food foto.",p:20,df:"easy"}]},
 {id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"photo",ti:"Drijvend Bos",d:"Foto met drijvende bomen!",p:20,df:"easy"}]},
-{id:51,n:"Maastunnel",la:51.9058,lo:4.4636,e:"🚇",c:"landmark",r:20,ch:[
+{id:51,n:"Maastunnel",la:51.902719,lo:4.468246,e:"🚇",c:"landmark",r:20,ch:[
   {t:"video",ti:"Tunnel Echo",d:"Test de echo! Schreeuw iets grappigs.",p:25,df:"medium"},
   {t:"quiz",ti:"Tunnel Quiz",d:"Wanneer werd de Maastunnel geopend?",a:"1942",o:["1942","1935","1950","1960"],p:20,df:"medium"}]},
-{id:52,n:"Het Park",la:51.9064,lo:4.4674,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Park Panorama",d:"Ontspannen groepsfoto in het park.",p:15,df:"easy"}]},
-{id:53,n:"Veerhaven",la:51.9068,lo:4.4776,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Haven Romantiek",d:"Romantische foto bij de zeilschepen.",p:20,df:"easy"}]},
-{id:54,n:"Maastoren",la:51.9071,lo:4.4920,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber",d:"Foto waarbij Maastoren klein lijkt.",p:25,df:"medium"}]},
-{id:55,n:"Rijnhavenbrug",la:51.9038,lo:4.4872,e:"🌁",c:"bridge",r:15,ch:[{t:"photo",ti:"Hoerenloper Foto",d:"Groepsfoto op de bijzondere loopbrug.",p:20,df:"easy"}]},
-{id:56,n:"Foodhallen",la:51.9064,lo:4.4887,e:"🍽️",c:"food",r:20,ch:[{t:"photo",ti:"Foodie Foto",d:"Groepsfoto met favoriete gerecht.",p:20,df:"easy"}]},
-{id:57,n:"Floating Office",la:51.9042,lo:4.4932,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Drijvend Kantoor",d:"Foto met het drijvende kantoor.",p:20,df:"easy"}]},
-{id:58,n:"Luchtpark Hofbogen",la:51.9282,lo:4.4767,e:"🌿",c:"park",r:15,ch:[{t:"photo",ti:"Rooftop Panorama",d:"Panoramafoto vanaf het dak!",p:25,df:"medium"}]},
-{id:59,n:"DakAkker",la:51.9244,lo:4.4758,e:"🌱",c:"landmark",r:15,ch:[{t:"photo",ti:"Dakboerderij",d:"Foto op de hoogste dakboerderij van Europa.",p:25,df:"medium"}]},
-{id:60,n:"Het Industriegebouw",la:51.9250,lo:4.4916,e:"🏭",c:"landmark",r:15,ch:[{t:"photo",ti:"Industrieel Shot",d:"Stoere industriële foto.",p:15,df:"easy"}]},
+{id:52,n:"Het Park",la:51.906157,lo:4.470373,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Park Panorama",d:"Ontspannen groepsfoto in het park.",p:15,df:"easy"}]},
+{id:53,n:"Veerhaven",la:51.907406,lo:4.478667,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Haven Romantiek",d:"Romantische foto bij de zeilschepen.",p:20,df:"easy"}]},
+{id:54,n:"Maastoren",la:51.908768,lo:4.493358,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber",d:"Foto waarbij Maastoren klein lijkt.",p:25,df:"medium"}]},
+{id:55,n:"Rijnhavenbrug",la:51.903332,lo:4.485836,e:"🌁",c:"bridge",r:15,ch:[{t:"photo",ti:"Hoerenloper Foto",d:"Groepsfoto op de bijzondere loopbrug.",p:20,df:"easy"}]},
+{id:56,n:"Foodhallen",la:51.906033,lo:4.487959,e:"🍽️",c:"food",r:20,ch:[{t:"photo",ti:"Foodie Foto",d:"Groepsfoto met favoriete gerecht.",p:20,df:"easy"}]},
+{id:57,n:"Floating Office",la:51.90408,lo:4.488447,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Drijvend Kantoor",d:"Foto met het drijvende kantoor.",p:20,df:"easy"}]},
+{id:58,n:"Luchtpark Hofbogen",la:51.926834,lo:4.478982,e:"🌿",c:"park",r:15,ch:[{t:"photo",ti:"Rooftop Panorama",d:"Panoramafoto vanaf het dak!",p:25,df:"medium"}]},
+{id:59,n:"DakAkker",la:51.925465,lo:4.476699,e:"🌱",c:"landmark",r:15,ch:[{t:"photo",ti:"Dakboerderij",d:"Foto op de hoogste dakboerderij van Europa.",p:25,df:"medium"}]},
+{id:60,n:"Het Industriegebouw",la:51.923711,lo:4.492121,e:"🏭",c:"landmark",r:15,ch:[{t:"photo",ti:"Industrieel Shot",d:"Stoere industriële foto.",p:15,df:"easy"}]},
 {id:61,n:"BlueCity",la:51.9198,lo:4.4981,e:"♻️",c:"landmark",r:15,ch:[{t:"quiz",ti:"BlueCity Quiz",d:"BlueCity zit in een voormalig zwembad. Hoe heette het?",a:"Tropicana",o:["Tropicana","Aquarena","De Dolfijn","Waterlinie"],p:25,df:"medium"}]},
 {id:62,n:"Het Slaakhuys",la:51.9255,lo:4.4988,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Art Deco Parel",d:"Foto van dit art deco monument.",p:20,df:"easy"}]},
 {id:63,n:"Gebouw Delftse Poort",la:51.9240,lo:4.4716,e:"🏙️",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber Selfie",d:"Selfie met het hoogste gebouw.",p:20,df:"easy"}]},
-{id:64,n:"Willemswerf",la:51.9157,lo:4.4883,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Glijbaan Raadsel",d:"Welke filmster gleed van de glijbaan hier?",a:"Jackie Chan",o:["Jackie Chan","Jet Li","Bruce Willis","Arnold Schwarzenegger"],p:30,df:"hard"}]},
+{id:64,n:"Willemswerf",la:51.916963,lo:4.49011,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Glijbaan Raadsel",d:"Welke filmster gleed van de glijbaan hier?",a:"Jackie Chan",o:["Jackie Chan","Jet Li","Bruce Willis","Arnold Schwarzenegger"],p:30,df:"hard"}]},
 {id:65,n:"Concertgebouw De Doelen",la:51.9234,lo:4.4740,e:"🎵",c:"culture",r:20,ch:[{t:"video",ti:"Luchtgitaar",d:"10 sec luchtgitaar voor De Doelen!",p:25,df:"medium"}]},
-{id:66,n:"Oude Luxor Theater",la:51.9232,lo:4.4770,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Broadway Moment",d:"Zing 10 sec musical voor de ingang.",p:30,df:"medium"}]},
+{id:66,n:"Oude Luxor Theater",la:51.922997,lo:4.477027,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Broadway Moment",d:"Zing 10 sec musical voor de ingang.",p:30,df:"medium"}]},
 {id:67,n:"Geldersekade Panorama",la:51.9190,lo:4.4915,e:"🌅",c:"viewpoint",r:15,ch:[{t:"photo",ti:"Panorama Shot",d:"Panoramafoto Oude Haven + Witte Huis.",p:20,df:"easy"}]},
-{id:68,n:"Pauluskerk",la:51.9167,lo:4.4716,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Kerk Foto",d:"Foto bij de moderne Pauluskerk.",p:15,df:"easy"}]},
+{id:68,n:"Pauluskerk",la:51.919994,lo:4.472557,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Kerk Foto",d:"Foto bij de moderne Pauluskerk.",p:15,df:"easy"}]},
 {id:69,n:"Arminius Kerk",la:51.9155,lo:4.4727,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Kerk Contrast",d:"Foto: contrast oud en nieuw Rotterdam.",p:20,df:"easy"}]},
-{id:70,n:"Binnenwegplein",la:51.9192,lo:4.4768,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Kinetisch Kunstwerk",d:"Foto met het bewegende kunstwerk.",p:20,df:"easy"}]},
-{id:71,n:"THOMS",la:51.9221,lo:4.4808,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Proost!",d:"Groepsfoto met een drankje!",p:15,df:"easy"}]},
-{id:72,n:"Bokaal",la:51.9213,lo:4.4862,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Bar Selfie",d:"Selfie aan de bar!",p:15,df:"easy"}]},
+{id:70,n:"Binnenwegplein",la:51.918234,lo:4.477439,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Kinetisch Kunstwerk",d:"Foto met het bewegende kunstwerk.",p:20,df:"easy"}]},
+{id:71,n:"THOMS",la:51.921926,lo:4.481385,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Proost!",d:"Groepsfoto met een drankje!",p:15,df:"easy"}]},
+{id:72,n:"Bokaal",la:51.92245,lo:4.488359,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Bar Selfie",d:"Selfie aan de bar!",p:15,df:"easy"}]},
 {id:73,n:"De Après Skihut",la:51.9223,lo:4.4767,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Skihut Sfeer",d:"Doe alsof jullie op wintersport zijn!",p:20,df:"easy"}]},
-{id:74,n:"De Gele Kanarie",la:51.9248,lo:4.4880,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Kanarie Pose",d:"Poseer als een kanarie!",p:20,df:"easy"}]},
+{id:74,n:"De Gele Kanarie",la:51.924182,lo:4.489447,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Kanarie Pose",d:"Poseer als een kanarie!",p:20,df:"easy"}]},
 {id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Scheepje Ahoy",d:"Foto op het rode schip!",p:20,df:"easy"}]},
-{id:76,n:"BIRD Rotterdam",la:51.9288,lo:4.4782,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Band Foto",d:"Albumcover-waardige foto voor BIRD.",p:20,df:"easy"}]},
-{id:77,n:"De Vrienden Live",la:51.9199,lo:4.4931,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Vrienden Foto",d:"Jullie zijn de beste vrienden!",p:15,df:"easy"}]},
+{id:76,n:"BIRD Rotterdam",la:51.926726,lo:4.478851,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Band Foto",d:"Albumcover-waardige foto voor BIRD.",p:20,df:"easy"}]},
+{id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Vrienden Foto",d:"Jullie zijn de beste vrienden!",p:15,df:"easy"}]},
 {id:78,n:"Hitz",la:51.9224,lo:4.4780,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Hitz Party",d:"Groepsfoto aan de bar!",p:15,df:"easy"}]},
-{id:79,n:"Sijf",la:51.9165,lo:4.4768,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Terras Genieten",d:"Beste terras-selfie van de dag!",p:15,df:"easy"}]},
-{id:80,n:"NRC",la:51.9151,lo:4.4769,e:"🍸",c:"bar",r:15,ch:[{t:"photo",ti:"Cocktail Shot",d:"Meest Instagrambare cocktail-foto.",p:20,df:"easy"}]},
-{id:81,n:"Biergarten",la:51.9244,lo:4.4755,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Oktoberfest Pose",d:"Prosit! Oktoberfest-imitatie.",p:20,df:"easy"}]},
+{id:79,n:"Sijf",la:51.917446,lo:4.474287,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Terras Genieten",d:"Beste terras-selfie van de dag!",p:15,df:"easy"}]},
+{id:80,n:"NRC",la:51.915542,lo:4.476326,e:"🍸",c:"bar",r:15,ch:[{t:"photo",ti:"Cocktail Shot",d:"Meest Instagrambare cocktail-foto.",p:20,df:"easy"}]},
+{id:81,n:"Biergarten",la:51.925686,lo:4.476209,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Oktoberfest Pose",d:"Prosit! Oktoberfest-imitatie.",p:20,df:"easy"}]},
 {id:82,n:"Poppodium Annabel",la:51.9252,lo:4.4735,e:"🎸",c:"bar",r:20,ch:[{t:"photo",ti:"Rockster Pose",d:"Rockster-pose voor het poppodium!",p:20,df:"easy"}]},
-{id:83,n:"Happy Italy",la:51.9202,lo:4.4868,e:"🍕",c:"restaurant",r:15,ch:[
+{id:83,n:"Happy Italy",la:51.923054,lo:4.485392,e:"🍕",c:"restaurant",r:15,ch:[
   {t:"photo",ti:"Maffia Meeting",d:"'Maffia vergadering' foto. Godfather vibes.",p:25,df:"medium"},
   {t:"creative",ti:"Pizza Bestelling",d:"Bestel in nep-Italiaans accent. Film de reactie!",p:35,df:"hard"}]},
 {id:84,n:"Sugo Pizza",la:51.9214,lo:4.4781,e:"🍕",c:"restaurant",r:15,ch:[{t:"photo",ti:"Sugo Selfie",d:"Beste 'Italian kiss' pose.",p:20,df:"easy"}]},
-{id:85,n:"O'Pazzo",la:51.9222,lo:4.4900,e:"🍝",c:"restaurant",r:15,ch:[{t:"creative",ti:"Pazzo Performance",d:"'O Pazzo' = 'de gek'. Doe iets geks!",p:30,df:"medium"}]},
+{id:85,n:"O'Pazzo",la:51.922147,lo:4.490306,e:"🍝",c:"restaurant",r:15,ch:[{t:"creative",ti:"Pazzo Performance",d:"'O Pazzo' = 'de gek'. Doe iets geks!",p:30,df:"medium"}]},
 {id:86,n:"Vapiano",la:51.9208,lo:4.4863,e:"🍝",c:"restaurant",r:15,ch:[{t:"quiz",ti:"Vapiano Quiz",d:"Wat betekent 'Vapiano'?",a:"Langzaam",o:["Langzaam","Snel","Lekker","Vers"],p:20,df:"easy"}]},
-{id:87,n:"Old Scuola",la:51.9248,lo:4.4912,e:"🎓",c:"restaurant",r:15,ch:[{t:"photo",ti:"Old School Pose",d:"'Old school maffia' pose. Denkbeeldige sigaren!",p:20,df:"easy"}]},
+{id:87,n:"Old Scuola",la:51.923431,lo:4.49322,e:"🎓",c:"restaurant",r:15,ch:[{t:"photo",ti:"Old School Pose",d:"'Old school maffia' pose. Denkbeeldige sigaren!",p:20,df:"easy"}]},
 {id:88,n:"Historisch Delfshaven",la:51.9068,lo:4.4496,e:"🏚️",c:"historic",r:15,ch:[
   {t:"photo",ti:"Historisch Portret",d:"Foto bij de historische havenhuisjes.",p:25,df:"medium"},
   {t:"quiz",ti:"Pilgrim Fathers",d:"De Pilgrim Fathers vertrokken vanuit Delfshaven. Waarheen?",a:"Amerika",o:["Amerika","Indonesië","Suriname","Zuid-Afrika"],p:20,df:"easy"}]},
-{id:89,n:"Stadsbrouwerij De Pelgrim",la:51.9066,lo:4.4485,e:"🍺",c:"bar",r:15,ch:[
+{id:89,n:"Stadsbrouwerij De Pelgrim",la:51.908763,lo:4.448879,e:"🍺",c:"bar",r:15,ch:[
   {t:"photo",ti:"Brouwerij Proost",d:"Proost met een lokaal biertje!",p:20,df:"easy"},
   {t:"quiz",ti:"Pelgrim Quiz",d:"Naar welke groep is deze brouwerij vernoemd?",a:"Pilgrim Fathers",o:["Pilgrim Fathers","Geuzen","Watergeuzen","VOC"],p:20,df:"medium"}]},
 {id:90,n:"Standbeeld Piet Hein",la:51.9073,lo:4.4491,e:"🗿",c:"art",r:15,ch:[{t:"photo",ti:"Zeeheld Pose",d:"Stoere zeeheld naast Piet Hein!",p:20,df:"easy"}]},
 {id:91,n:"Historische Tramhalte",la:51.9081,lo:4.4682,e:"🚃",c:"historic",r:15,ch:[{t:"photo",ti:"Tramhalte Pose",d:"Wacht op de tram (die niet komt).",p:15,df:"easy"}]},
-{id:92,n:"Cruise Terminal",la:51.9066,lo:4.4870,e:"🚢",c:"landmark",r:20,ch:[{t:"photo",ti:"Bon Voyage",d:"Afscheidsfoto: op cruise!",p:20,df:"easy"}]},
-{id:93,n:"Poortgebouw",la:51.9090,lo:4.4939,e:"🏚️",c:"landmark",r:15,ch:[{t:"photo",ti:"Kraakpand Pose",d:"Foto bij het bekendste kraakpand.",p:20,df:"easy"}]},
-{id:94,n:"Entrepotgebouw",la:51.9063,lo:4.4981,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Vijf Werelddelen",d:"Foto bij de gevel.",p:20,df:"easy"}]},
-{id:95,n:"WTC Rotterdam",la:51.9213,lo:4.4793,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Beursgebouw",d:"Power-pose voor het WTC.",p:15,df:"easy"}]},
+{id:92,n:"Cruise Terminal",la:51.905972,lo:4.486959,e:"🚢",c:"landmark",r:20,ch:[{t:"photo",ti:"Bon Voyage",d:"Afscheidsfoto: op cruise!",p:20,df:"easy"}]},
+{id:93,n:"Poortgebouw",la:51.910386,lo:4.495969,e:"🏚️",c:"landmark",r:15,ch:[{t:"photo",ti:"Kraakpand Pose",d:"Foto bij het bekendste kraakpand.",p:20,df:"easy"}]},
+{id:94,n:"Entrepotgebouw",la:51.910747,lo:4.499283,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Vijf Werelddelen",d:"Foto bij de gevel.",p:20,df:"easy"}]},
+{id:95,n:"WTC Rotterdam",la:51.921033,lo:4.480344,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Beursgebouw",d:"Power-pose voor het WTC.",p:15,df:"easy"}]},
 {id:96,n:"Haagsche Veer",la:51.9242,lo:4.4800,e:"🏛️",c:"historic",r:15,ch:[{t:"photo",ti:"Gevangenispoort",d:"Foto bij de voormalige gevangenispoort.",p:20,df:"easy"}]},
-{id:97,n:"Villa Thalia",la:51.9240,lo:4.4785,e:"🎭",c:"culture",r:15,ch:[{t:"photo",ti:"Theater Pose",d:"Dramatische pose voor Villa Thalia!",p:20,df:"easy"}]},
-{id:98,n:"Chabot Museum",la:51.9137,lo:4.4741,e:"🎨",c:"culture",r:15,ch:[{t:"photo",ti:"Expressionisme",d:"Expressionistische foto à la Chabot.",p:25,df:"medium"}]},
-{id:99,n:"Natuurhistorisch Museum",la:51.9131,lo:4.4746,e:"🦕",c:"culture",r:15,ch:[{t:"photo",ti:"Dino Pose",d:"Beste dinosaurus-imitatie!",p:20,df:"easy"}]},
-{id:100,n:"KINO Rotterdam",la:51.9162,lo:4.4692,e:"🎬",c:"culture",r:15,ch:[{t:"photo",ti:"Filmster Pose",d:"Red carpet pose bij de bioscoop!",p:20,df:"easy"}]},
-{id:101,n:"Belasting & Douane Museum",la:51.9069,lo:4.4764,e:"💰",c:"culture",r:15,ch:[{t:"photo",ti:"Smokkelaar Pose",d:"Doe alsof je smokkelt langs de douane.",p:25,df:"medium"}]},
-{id:102,n:"Historische Tuin Schoonoord",la:51.9077,lo:4.4720,e:"🌷",c:"park",r:15,ch:[{t:"photo",ti:"Tuinfoto",d:"Mooiste foto in de historische tuin.",p:20,df:"easy"}]},
+{id:97,n:"Villa Thalia",la:51.923002,lo:4.476314,e:"🎭",c:"culture",r:15,ch:[{t:"photo",ti:"Theater Pose",d:"Dramatische pose voor Villa Thalia!",p:20,df:"easy"}]},
+{id:98,n:"Chabot Museum",la:51.914735,lo:4.472336,e:"🎨",c:"culture",r:15,ch:[{t:"photo",ti:"Expressionisme",d:"Expressionistische foto à la Chabot.",p:25,df:"medium"}]},
+{id:99,n:"Natuurhistorisch Museum",la:51.91077,lo:4.472479,e:"🦕",c:"culture",r:15,ch:[{t:"photo",ti:"Dino Pose",d:"Beste dinosaurus-imitatie!",p:20,df:"easy"}]},
+{id:100,n:"KINO Rotterdam",la:51.917129,lo:4.469393,e:"🎬",c:"culture",r:15,ch:[{t:"photo",ti:"Filmster Pose",d:"Red carpet pose bij de bioscoop!",p:20,df:"easy"}]},
+{id:101,n:"Belasting & Douane Museum",la:51.907617,lo:4.476414,e:"💰",c:"culture",r:15,ch:[{t:"photo",ti:"Smokkelaar Pose",d:"Doe alsof je smokkelt langs de douane.",p:25,df:"medium"}]},
+{id:102,n:"Historische Tuin Schoonoord",la:51.908937,lo:4.473386,e:"🌷",c:"park",r:15,ch:[{t:"photo",ti:"Tuinfoto",d:"Mooiste foto in de historische tuin.",p:20,df:"easy"}]},
 ];
 
 // ═══════════════════════════════════════════
@@ -938,7 +939,7 @@ function App(){
         <h1 style={{fontSize:32,fontWeight:900,background:'linear-gradient(135deg,#00d4ff,#ffd700)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>STADSSPEL</h1>
         <h2 style={{fontSize:20,fontWeight:300,color:'#888',marginBottom:4}}>ROTTERDAM</h2>
         <div style={{fontSize:14,color:'#555',marginBottom:8}}>Jorik's Bachelor Party · 6 Juni 2026</div>
-        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V7 · DE VERLOREN RING</div>
+        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V8 · DE VERLOREN RING</div>
         <button className="btn btn-cyan" onClick={()=>setScreen('setup')} style={{padding:'16px 48px',fontSize:16,borderRadius:16}}>
           START
         </button>
@@ -1492,6 +1493,9 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto}){
 function ChallengeSheet({loc,pos,completed,onComplete,onClose,seenQuizzes,isAdmin,myTeam}){
   if(!loc)return null;
   const dist=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):null;
+  // V7.1 hotfix: only lock quizzes when the location actually HAS a photo challenge to unlock against.
+  // Otherwise quiz-only locations (Spido Kade, BlueCity, Willemswerf) would be permanently unreachable.
+  const hasAnyPhoto=loc.ch.some(ch=>ch.t==='photo'||ch.t==='video'||ch.t==='creative');
   const hasPhotoCompleted=loc.ch.some((ch,i)=>(ch.t==='photo'||ch.t==='video'||ch.t==='creative')&&completed[i]);
 
   // V5: compute the quiz to show for this visit (rotate through unseen)
@@ -1522,7 +1526,7 @@ function ChallengeSheet({loc,pos,completed,onComplete,onClose,seenQuizzes,isAdmi
         {loc.ch.map((ch,idx)=>{
           const done=completed[idx];
           const isQuiz=ch.t==='quiz';
-          const locked=isQuiz&&!hasPhotoCompleted;
+          const locked=isQuiz&&hasAnyPhoto&&!hasPhotoCompleted;
 
           return(
             <div key={idx} className={`ch-card ${done?'completed':''} ${locked?'locked':''}`} style={{position:'relative'}}>
@@ -1575,6 +1579,8 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   const[quizAnswer,setQuizAnswer]=useState(null);
   const[quizFeedback,setQuizFeedback]=useState(null);
   const[processing,setProcessing]=useState(false);
+  // V7.1: synchronous quiz lock (refs beat React's async state race on mobile)
+  const quizLockRef=useRef(false);
 
   // V6: GPS gate — for media challenges only. Quizzes don't gate.
   const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
@@ -1624,8 +1630,11 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   };
 
   // V7: one shot. Correct → full points. Wrong → 0 pts, challenge marked done.
+  // V7.1: ref-based lock — state is async, so two fast taps could both pass the
+  // `if(quizAnswer)` check before React re-renders the disabled buttons.
   const handleQuiz=opt=>{
-    if(quizAnswer)return;
+    if(quizLockRef.current)return;
+    quizLockRef.current=true;
     setQuizAnswer(opt);
     if(opt===ch.a){
       setQuizFeedback('correct');
