@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V8 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V9 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -201,6 +201,25 @@
     .wrong-badge{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:800;background:rgba(255,68,68,0.18);color:#ff7070}
     .quiz-option.cooldown{opacity:0.35;cursor:not-allowed;filter:grayscale(1)}
 
+    /* === V9 ADDITIONS === */
+
+    /* Tier badge on leaderboard cards */
+    .tier-badge{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+    .tier-badge .tier-emoji{font-size:14px}
+    .tier-unlock-popup{position:fixed;top:30%;left:50%;transform:translateX(-50%);z-index:10004;padding:24px 32px;border-radius:20px;backdrop-filter:blur(20px);background:rgba(10,14,39,0.95);border:2px solid #ffd700;text-align:center;animation:fadeInUp .4s ease;box-shadow:0 8px 40px rgba(255,215,0,0.4)}
+    .tier-unlock-emoji{font-size:64px;margin-bottom:12px;animation:float 2s ease-in-out infinite}
+    .tier-unlock-title{font-size:14px;color:#ffd700;font-weight:800;letter-spacing:2px;margin-bottom:4px}
+    .tier-unlock-name{font-size:22px;font-weight:900;background:linear-gradient(135deg,#ffd700,#ff6b35);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+    /* Next-reward mini banner on leaderboard */
+    .reward-card{margin:10px 0 14px;padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(168,85,247,0.06));border:1px solid rgba(0,212,255,0.2);display:flex;align-items:center;gap:12px}
+    .reward-icon{font-size:24px}
+    .reward-info{flex:1;min-width:0}
+    .reward-label{font-size:10px;color:#888;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+    .reward-target{font-size:13px;color:#fff;font-weight:600}
+    .reward-progress{width:100%;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:6px;overflow:hidden}
+    .reward-progress-fill{height:100%;background:linear-gradient(90deg,#00d4ff,#a855f7);border-radius:2px;transition:width .4s ease}
+
     /* Filter pills */
     .filter-pills{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
     .filter-pills::-webkit-scrollbar{display:none}
@@ -319,6 +338,28 @@ const REVIEW_REJECT_PENALTY=true;  // when admin rejects, deduct points awarded
 // V7 QUIZ RULE (Mike's design): one shot, wrong = 0 pts + marked done.
 // Knowledge rewarded, guessing doesn't pay. No retries, no mercy.
 const QUIZ_WRONG_FEEDBACK_MS=2500;   // how long the wrong-answer + reveal stays on screen
+
+// V9 PROGRESSION CONFIG
+// Bonus Ghost Mode charges unlocked at score milestones
+const GHOST_BONUS_THRESHOLDS=[
+  {score:100, charges:1, label:'+1 Ghost lading op 100 pts'},
+  {score:250, charges:2, label:'+2 Ghost ladingen op 250 pts'},
+];
+// Tier badges based on completed challenges
+const TIER_BADGES=[
+  {min:20, badge:'🏆', name:'Legende', color:'#ffd700'},
+  {min:15, badge:'🥇', name:'Goud',    color:'#ffd700'},
+  {min:10, badge:'🥈', name:'Zilver',  color:'#c0c0c0'},
+  {min:5,  badge:'🥉', name:'Brons',   color:'#cd7f32'},
+];
+function tierFor(challengeCount){
+  return TIER_BADGES.find(t => challengeCount >= t.min) || null;
+}
+function nextTier(challengeCount){
+  // Highest tier whose min is greater than current count
+  const upcoming=[...TIER_BADGES].reverse().find(t => t.min > challengeCount);
+  return upcoming || null;
+}
 
 // V5.1 HOTFIX: iOS detection — DeviceMotion requires explicit permission on iOS 13+
 // Without that permission, accelerometer events never fire and GPS sleep never wakes.
@@ -606,6 +647,11 @@ function App(){
   const[toast,setToast]=useState(null);
   const[scorePopup,setScorePopup]=useState(null);
   const[ghost,setGhost]=useState({active:false,timeLeft:0,used:0});
+  // V9: dynamic max charges (starts at GHOST_MAX_USES, grows via score milestones)
+  const[ghostMax,setGhostMax]=useState(GHOST_MAX_USES);
+  const[unlockedMilestones,setUnlockedMilestones]=useState(new Set());
+  const[unlockPopup,setUnlockPopup]=useState(null); // {emoji, label, name}
+  const[lastTier,setLastTier]=useState(null); // for tier-unlock popup
   const[gameStart,setGameStart]=useState(null);
   const[elapsed,setElapsed]=useState(0);
   const[phase,setPhase]=useState(0); // 0=waiting,1-4=phases
@@ -896,10 +942,55 @@ function App(){
   };
 
   const activateGhost=()=>{
-    if(ghost.used>=GHOST_MAX_USES)return;
+    if(ghost.used>=ghostMax)return;
     setGhost({active:true,timeLeft:GHOST_DURATION,used:ghost.used+1});
     addActivity('is als een geest verdwenen! 👻');
   };
+
+  // V9: Unlock bonus Ghost charges at score milestones
+  useEffect(()=>{
+    const myScoreNow=scores[myTeam?.id]||0;
+    GHOST_BONUS_THRESHOLDS.forEach(t=>{
+      const key='ghost_'+t.score;
+      if(myScoreNow>=t.score && !unlockedMilestones.has(key)){
+        setGhostMax(prev=>prev+t.charges);
+        setUnlockedMilestones(prev=>new Set([...prev,key]));
+        setUnlockPopup({
+          emoji:'👻',
+          label:'GHOST UNLOCK · '+t.score+' PTS',
+          name:'+'+t.charges+' lading'+(t.charges>1?'en':''),
+        });
+        addActivity(`heeft ${t.charges} extra Ghost lading${t.charges>1?'en':''} ontgrendeld op ${t.score} pts!`,0);
+      }
+    });
+  },[scores,myTeam]);
+
+  // V9: Tier badges based on completed challenges (5/10/15/20)
+  useEffect(()=>{
+    if(!myTeam)return;
+    const totalChallenges=Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0);
+    const tier=tierFor(totalChallenges);
+    if(tier && (!lastTier || lastTier.min!==tier.min)){
+      setLastTier(tier);
+      // Only popup if this is a NEW tier (not the initial render)
+      if(lastTier!==null){
+        setUnlockPopup({
+          emoji:tier.badge,
+          label:'NIEUWE TIER',
+          name:tier.name+' · '+tier.min+' challenges',
+        });
+        addActivity(`is gepromoveerd naar ${tier.badge} ${tier.name}!`,0);
+      }
+    }
+  },[completed,myTeam]);
+
+  // V9: auto-dismiss unlock popup after 3.5s
+  useEffect(()=>{
+    if(unlockPopup){
+      const t=setTimeout(()=>setUnlockPopup(null),3500);
+      return()=>clearTimeout(t);
+    }
+  },[unlockPopup]);
 
 
   const startGame=()=>{
@@ -939,7 +1030,7 @@ function App(){
         <h1 style={{fontSize:32,fontWeight:900,background:'linear-gradient(135deg,#00d4ff,#ffd700)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>STADSSPEL</h1>
         <h2 style={{fontSize:20,fontWeight:300,color:'#888',marginBottom:4}}>ROTTERDAM</h2>
         <div style={{fontSize:14,color:'#555',marginBottom:8}}>Jorik's Bachelor Party · 6 Juni 2026</div>
-        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V8 · DE VERLOREN RING</div>
+        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V9 · DE VERLOREN RING</div>
         <button className="btn btn-cyan" onClick={()=>setScreen('setup')} style={{padding:'16px 48px',fontSize:16,borderRadius:16}}>
           START
         </button>
@@ -984,6 +1075,14 @@ function App(){
       {OFFLINE&&<div className="offline-banner">⚡ Offline Mode — Multiplayer uitgeschakeld</div>}
       {toast&&<div className="toast"><div className="toast-inner">{toast}</div></div>}
       {scorePopup&&<div className="score-popup">{scorePopup}</div>}
+      {/* V9: unlock popup */}
+      {unlockPopup&&(
+        <div className="tier-unlock-popup">
+          <div className="tier-unlock-emoji">{unlockPopup.emoji}</div>
+          <div className="tier-unlock-title">{unlockPopup.label}</div>
+          <div className="tier-unlock-name">{unlockPopup.name}</div>
+        </div>
+      )}
 
       {/* Game HUD */}
       <div style={{padding:'12px 16px',paddingTop:OFFLINE?28:12,background:'rgba(10,14,39,0.95)',borderBottom:'1px solid rgba(255,255,255,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:100}}>
@@ -1008,8 +1107,8 @@ function App(){
 
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine}/>}
-        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} ghost={ghost} onGhost={activateGhost} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax}/>}
+        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} ghost={ghost} onGhost={activateGhost} ghostMax={ghostMax} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox}/>}
       </div>
@@ -1150,8 +1249,15 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory,pendingMine}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
+  // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
+  const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
+  const myTier=tierFor(myChallengesDone);
+  const myNextTier=nextTier(myChallengesDone);
+  const myScore=scores[myTeam?.id]||0;
+  // Next ghost-charge milestone we haven't passed yet
+  const nextGhost=GHOST_BONUS_THRESHOLDS.find(t=>myScore<t.score);
   // V5: map current phase to the relevant narrative entry
   const phaseKey=phase>=1&&phase<=4?`phase${phase}`:null;
   const phaseStory=phaseKey?NARRATIVE[phaseKey]:null;
@@ -1166,6 +1272,42 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
           <div style={{fontSize:11,color:'#888',fontStyle:'italic'}}>Tik voor verhaal →</div>
         </div>
       )}
+      {/* V9: next reward banner — shows whichever milestone is closest */}
+      {(myNextTier||nextGhost)&&(
+        <div className="reward-card">
+          <div className="reward-icon">{myNextTier?myNextTier.badge:'👻'}</div>
+          <div className="reward-info">
+            <div className="reward-label">VOLGENDE BELONING</div>
+            <div className="reward-target">
+              {myNextTier?
+                `${myNextTier.name} bij ${myNextTier.min} challenges (${myChallengesDone}/${myNextTier.min})`
+                :
+                `${nextGhost.label} (${myScore}/${nextGhost.score} pts)`
+              }
+            </div>
+            <div className="reward-progress">
+              <div className="reward-progress-fill" style={{
+                width: myNextTier?
+                  `${Math.min(100, (myChallengesDone/myNextTier.min)*100)}%`
+                  :
+                  `${Math.min(100, (myScore/nextGhost.score)*100)}%`
+              }}/>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* V9: own current tier banner (if you have one) */}
+      {myTier&&!myNextTier&&(
+        <div className="reward-card" style={{borderColor:'rgba(255,215,0,0.4)'}}>
+          <div className="reward-icon">{myTier.badge}</div>
+          <div className="reward-info">
+            <div className="reward-label">MAX TIER BEHAALD</div>
+            <div className="reward-target">{myTier.name} · jullie zijn legendes</div>
+          </div>
+        </div>
+      )}
+
       {/* V6: pending review badge for own team */}
       {pendingMine>0&&(
         <div className="glass" style={{padding:10,marginBottom:10,borderColor:'rgba(255,215,0,0.3)',display:'flex',alignItems:'center',gap:10}}>
@@ -1200,18 +1342,32 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       )}
 
       {/* Leaderboard cards */}
-      {sorted.map((t,i)=>(
-        <div key={t.id} className={`lb-card glass animate-in animate-in-${i+1} ${i===0?'lb-first':''}`}
-          style={{borderLeft:`4px solid ${t.color}`}}>
-          <div className={`lb-rank ${i===0?'lb-rank-1':i===1?'lb-rank-2':i===2?'lb-rank-3':'lb-rank-other'}`}>#{i+1}</div>
-          <div className="lb-emoji">{t.emoji}</div>
-          <div className="lb-info">
-            <div className="lb-name">{t.name} {t.id===myTeam?.id?'(jij)':''}</div>
-            <div className="lb-stats">{t.challenges_completed||0} challenges · {t.locations_visited||0} locaties</div>
+      {sorted.map((t,i)=>{
+        // V9: only my team has accurate local 'completed' data; show tier on own card.
+        // Other teams' tier could be sourced from Supabase 'challenges_completed' field if present.
+        const isMine=t.id===myTeam?.id;
+        const teamChallenges=isMine?myChallengesDone:(t.challenges_completed||0);
+        const teamTier=tierFor(teamChallenges);
+        return(
+          <div key={t.id} className={`lb-card glass animate-in animate-in-${i+1} ${i===0?'lb-first':''}`}
+            style={{borderLeft:`4px solid ${t.color}`}}>
+            <div className={`lb-rank ${i===0?'lb-rank-1':i===1?'lb-rank-2':i===2?'lb-rank-3':'lb-rank-other'}`}>#{i+1}</div>
+            <div className="lb-emoji">{t.emoji}</div>
+            <div className="lb-info">
+              <div className="lb-name" style={{display:'flex',alignItems:'center',flexWrap:'wrap'}}>
+                {t.name} {isMine?'(jij)':''}
+                {teamTier&&(
+                  <span className="tier-badge" style={{color:teamTier.color,borderColor:teamTier.color+'66'}}>
+                    <span className="tier-emoji">{teamTier.badge}</span>{teamTier.name}
+                  </span>
+                )}
+              </div>
+              <div className="lb-stats">{teamChallenges} challenges · {t.locations_visited||0} locaties{isMine&&ghostMax>GHOST_MAX_USES?` · 👻×${ghostMax}`:''}</div>
+            </div>
+            <div className="lb-score" style={{color:t.color}}>{t.score}</div>
           </div>
-          <div className="lb-score" style={{color:t.color}}>{t.score}</div>
-        </div>
-      ))}
+        );
+      })}
 
       {sorted.length===0&&(
         <div style={{textAlign:'center',padding:40,color:'#555'}}>
@@ -1226,7 +1382,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 // ═══════════════════════════════════════════
 // MAP VIEW
 // ═══════════════════════════════════════════
-function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,phase,gpsStatus,gpsSnap,onWakeGps}){
+function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,ghostMax=GHOST_MAX_USES,phase,gpsStatus,gpsSnap,onWakeGps}){
   const mapRef=useRef(null);
   const mapInst=useRef(null);
   const markersRef=useRef([]);
@@ -1284,9 +1440,9 @@ function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,phase,gpsStat
 
       {/* Ghost mode button */}
       <div style={{position:'absolute',top:10,right:10,zIndex:1000}}>
-        <button className={`btn ${ghost.active?'btn-danger':'btn-ghost'}`} onClick={onGhost} disabled={ghost.used>=GHOST_MAX_USES&&!ghost.active}
+        <button className={`btn ${ghost.active?'btn-danger':'btn-ghost'}`} onClick={onGhost} disabled={ghost.used>=ghostMax&&!ghost.active}
           style={{fontSize:12,padding:'8px 14px',borderRadius:10}}>
-          {ghost.active?`👻 ${fmtTime(ghost.timeLeft)}`:`👻 Ghost (${GHOST_MAX_USES-ghost.used} over)`}
+          {ghost.active?`👻 ${fmtTime(ghost.timeLeft)}`:`👻 Ghost (${ghostMax-ghost.used} over)`}
         </button>
       </div>
 
