@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V16 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V17 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Inter+Tight:wght@500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -437,8 +437,14 @@ const sb=!OFFLINE?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 // ═══════════════════════════════════════════
 const START_POS={lat:51.9179,lng:4.4822}; // Maritiem Museum, Leuvehaven
 const DINNER_ZONE={lat:51.9206,lng:4.4868,r:400}; // Markthal/Bokaal area
-const GHOST_DURATION=300; // 5 min in seconds
-const GHOST_MAX_USES=3;
+// V17: Hot-target task timer — replaces the "diner countdown"
+const HOT_TARGET_MS=12*60*1000;          // 12 min to complete the active hot target
+const HOT_EXPIRE_PENALTY=5;              // -5 pts when timer expires
+// V17: Extra Tijd — replaces Ghost Mode. Each charge extends the active hot timer by 5 min.
+const TIME_CHARGE_MS=5*60*1000;
+const TIME_CHARGE_MAX=3;
+// Legacy ghost names kept as aliases so older logic compiles
+const GHOST_MAX_USES=TIME_CHARGE_MAX;
 const FIRST_BONUS=10;
 const BAR_BREAK_BONUS=25;
 const WEDDING_VIDEO_BONUS=50;
@@ -553,20 +559,22 @@ function nextLevel(score){
   return TEAM_LEVELS.find(l=>l.min>score)||null;
 }
 
-// V14: Hot-streak bonuses (B5) — consecutive correct quizzes
+// V14/V17: Hot-streak bonuses — consecutive correct quizzes
 const STREAK_REWARDS={3:20, 5:50}; // +bonus pts at these streak lengths
-const STREAK_GHOST_UNLOCK=7; // at 7 in a row → +1 ghost charge
+const STREAK_TIME_UNLOCK=7;        // at 7 in a row → +1 Extra Tijd charge
+const STREAK_GHOST_UNLOCK=STREAK_TIME_UNLOCK; // legacy alias
 
 // V7 QUIZ RULE (Mike's design): one shot, wrong = 0 pts + marked done.
 // Knowledge rewarded, guessing doesn't pay. No retries, no mercy.
 const QUIZ_WRONG_FEEDBACK_MS=2500;   // how long the wrong-answer + reveal stays on screen
 
-// V9 PROGRESSION CONFIG
-// Bonus Ghost Mode charges unlocked at score milestones
-const GHOST_BONUS_THRESHOLDS=[
-  {score:100, charges:1, label:'+1 Ghost lading op 100 pts'},
-  {score:250, charges:2, label:'+2 Ghost ladingen op 250 pts'},
+// V9/V17 PROGRESSION CONFIG — repurposed from Ghost charges to Extra Tijd charges
+const TIME_CHARGE_BONUSES=[
+  {score:100, charges:1, label:'+1 Extra Tijd op 100 pts'},
+  {score:250, charges:2, label:'+2 Extra Tijd op 250 pts'},
 ];
+// Legacy alias for any lingering references
+const GHOST_BONUS_THRESHOLDS=TIME_CHARGE_BONUSES;
 // Tier badges based on completed challenges
 const TIER_BADGES=[
   {min:20, badge:'🏆', name:'Legende', color:'var(--accent)'},
@@ -926,9 +934,14 @@ function App(){
   const[selLoc,setSelLoc]=useState(null);
   const[toast,setToast]=useState(null);
   const[scorePopup,setScorePopup]=useState(null);
-  const[ghost,setGhost]=useState({active:false,timeLeft:0,used:0});
-  // V9: dynamic max charges (starts at GHOST_MAX_USES, grows via score milestones)
-  const[ghostMax,setGhostMax]=useState(GHOST_MAX_USES);
+  // V17: Extra Tijd charges replace Ghost state
+  const[timeCharges,setTimeCharges]=useState(TIME_CHARGE_MAX);
+  const[timeChargeMax,setTimeChargeMax]=useState(TIME_CHARGE_MAX);
+  // Legacy compatibility: any code that still reads ghost/ghostMax gets a stub
+  const ghost={active:false,timeLeft:0,used:timeChargeMax-timeCharges};
+  const ghostMax=timeChargeMax;
+  const setGhost=()=>{};
+  const setGhostMax=setTimeChargeMax;
   const[unlockedMilestones,setUnlockedMilestones]=useState(new Set());
   const[unlockPopup,setUnlockPopup]=useState(null); // {emoji, label, name}
   const[lastTier,setLastTier]=useState(null); // for tier-unlock popup
@@ -972,6 +985,8 @@ function App(){
   const[lastLevelSeen,setLastLevelSeen]=useState(null); // for level-up detection
   const[nowTs,setNowTs]=useState(Date.now()); // tick state for countdown clocks
   const tapGuardRef=useRef(0); // V14: A4 — prevents repeated-click loss during re-render
+  // V17: hot target = the timed "next thing to do". {locId, chIdx, deadline, assignedAt}
+  const[hotTarget,setHotTarget]=useState(null);
 
   // Timer
   useEffect(()=>{
@@ -1075,12 +1090,8 @@ function App(){
     setToast('📡 GPS wakker geschud');
   },[]);
 
-  // Ghost timer
-  useEffect(()=>{
-    if(ghost.timeLeft<=0){if(ghost.active)setGhost(g=>({...g,active:false}));return;}
-    const t=setTimeout(()=>setGhost(g=>({...g,timeLeft:g.timeLeft-1})),1000);
-    return()=>clearTimeout(t);
-  },[ghost.timeLeft,ghost.active]);
+  // V17: hot target expiry — if deadline passes, apply -5 pt penalty and assign next
+  // Declared after assignHotTarget to avoid hoist issues — see below.
 
   // Toast auto-dismiss
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),4000);return()=>clearTimeout(t)}},[toast]);
@@ -1321,7 +1332,7 @@ function App(){
     // V14: hot-streak logic (quizzes only)
     let streakBonus=0;
     let streakLabel='';
-    let ghostStreakUnlock=false;
+    let timeUnlock=false;
     let newStreak=quizStreak;
     if(isQuiz){
       if(isWrongZero){
@@ -1332,8 +1343,8 @@ function App(){
           streakBonus=STREAK_REWARDS[newStreak];
           streakLabel=`🔥 ${newStreak} op rij`;
         }
-        if(newStreak===STREAK_GHOST_UNLOCK){
-          ghostStreakUnlock=true;
+        if(newStreak===STREAK_TIME_UNLOCK){
+          timeUnlock=true;
         }
       }
       setQuizStreak(newStreak);
@@ -1352,8 +1363,10 @@ function App(){
       setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+totalPts}));
       setScorePopup(`+${totalPts}`);
     }
-    if(ghostStreakUnlock){
-      setGhostMax(prev=>prev+1);
+    if(timeUnlock){
+      // V17: streak unlocks an Extra Tijd charge (max + current)
+      setTimeChargeMax(m=>m+1);
+      setTimeCharges(c=>c+1);
     }
     if(loc){
       if(isWrongZero){
@@ -1363,15 +1376,15 @@ function App(){
       }
     }
 
-    // V14: celebration on correct answer (A6)
+    // V14/V17: celebration on correct answer
     if(!isWrongZero&&loc){
-      const big=streakBonus>0||ghostStreakUnlock;
+      const big=streakBonus>0||timeUnlock;
       const breakdownBits=[`+${basePts} basis`];
       if(firstBonus>0)breakdownBits.push(`+${firstBonus} eerste`);
       if(streakBonus>0)breakdownBits.push(`+${streakBonus} streak`);
       celebrate({
-        emoji:ghostStreakUnlock?'👻':big?'🔥':loc.e,
-        title:ghostStreakUnlock?'Ghost ontgrendeld!':big?`${newStreak} op rij!`:'Goed zo!',
+        emoji:timeUnlock?'⏳':big?'🔥':loc.e,
+        title:timeUnlock?'Extra Tijd ontgrendeld!':big?`${newStreak} op rij!`:'Goed zo!',
         sub:`+${totalPts} pts`,
         breakdown:breakdownBits,
         big,
@@ -1406,6 +1419,11 @@ function App(){
     }else if(!OFFLINE&&sb&&myTeam&&isDynamicBonus&&totalPts>0){
       sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id).then(()=>{},(e)=>console.warn('teams update failed',e));
     }
+
+    // V17: if this was the hot target, clear it so the effect picks a new one
+    if(hotTarget&&hotTarget.locId===locId&&hotTarget.chIdx===chIdx){
+      setHotTarget(null);
+    }
   };
 
   // V14: level-up watcher (B2)
@@ -1427,11 +1445,65 @@ function App(){
     }
   },[scores,myTeam]);
 
-  const activateGhost=()=>{
-    if(ghost.used>=ghostMax)return;
-    setGhost({active:true,timeLeft:GHOST_DURATION,used:ghost.used+1});
-    addActivity('is als een geest verdwenen! 👻');
-  };
+  // V17: assign the next hot target — first uncompleted challenge with best ROI
+  const assignHotTarget=useCallback((override)=>{
+    const completedByLoc=completed;
+    // Candidates: any location with at least one uncompleted challenge
+    const candidates=[];
+    L_DATA.forEach(loc=>{
+      loc.ch.forEach((ch,chIdx)=>{
+        if(completedByLoc[loc.id]?.[chIdx])return;
+        const d=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):500;
+        const diffMult=ch.df==='hard'?1.3:ch.df==='medium'?1.15:1;
+        const roi=(ch.p*diffMult)/Math.max(d,30)*100;
+        candidates.push({locId:loc.id,chIdx,score:roi,dist:d});
+      });
+    });
+    if(!candidates.length){setHotTarget(null);return;}
+    // Prefer the exact override if given (used when a team deliberately picks a non-hot)
+    let pick;
+    if(override){
+      pick=candidates.find(c=>c.locId===override.locId&&c.chIdx===override.chIdx);
+    }
+    if(!pick){
+      candidates.sort((a,b)=>b.score-a.score);
+      pick=candidates[0];
+    }
+    setHotTarget({locId:pick.locId,chIdx:pick.chIdx,deadline:Date.now()+HOT_TARGET_MS,assignedAt:Date.now()});
+  },[completed,pos]);
+
+  // V17: first hot target when game starts
+  useEffect(()=>{
+    if(phase<1||phase>=5)return;
+    if(hotTarget)return;
+    if(myTeam?.spectator)return;
+    assignHotTarget();
+  },[phase,myTeam,hotTarget,assignHotTarget]);
+
+  // V17: hot target expiry watcher — deduct 5 pts and assign next
+  useEffect(()=>{
+    if(!hotTarget)return;
+    if(nowTs<hotTarget.deadline)return;
+    // Expired
+    const loc=L_DATA.find(l=>l.id===hotTarget.locId);
+    setScores(prev=>({...prev,[myTeam?.id]:Math.max(0,(prev[myTeam?.id]||0)-HOT_EXPIRE_PENALTY)}));
+    setToast(`⏱ Te laat bij ${loc?.n||'target'} · −${HOT_EXPIRE_PENALTY} pts`);
+    addActivity(`miste de deadline bij ${loc?.n||'target'} · −${HOT_EXPIRE_PENALTY} pts`,-HOT_EXPIRE_PENALTY);
+    if(!OFFLINE&&sb&&myTeam){
+      sb.from('teams').update({score:Math.max(0,(scores[myTeam.id]||0)-HOT_EXPIRE_PENALTY)}).eq('id',myTeam.id).then(()=>{},()=>{});
+    }
+    setHotTarget(null); // triggers the assign effect
+  },[nowTs,hotTarget,myTeam]);
+
+  // V17: Extra Tijd — add 5 min to the current hot target deadline
+  const activateExtraTime=useCallback(()=>{
+    if(timeCharges<=0||!hotTarget)return;
+    if(!confirm('+5 min extra tijd gebruiken?'))return;
+    setTimeCharges(c=>c-1);
+    setHotTarget(h=>h?{...h,deadline:h.deadline+TIME_CHARGE_MS}:h);
+    setToast('⏳ +5 min toegevoegd');
+    addActivity('heeft Extra Tijd gebruikt · +5 min ⏳');
+  },[timeCharges,hotTarget]);
 
   // V10: derive jorikInTeam from jorikTeamId (real cross-team sync via Supabase broadcast)
   useEffect(()=>{
@@ -1552,20 +1624,21 @@ function App(){
     }
   },[isAdmin]);
 
-  // V9: Unlock bonus Ghost charges at score milestones
+  // V9/V17: Unlock bonus Extra Tijd charges at score milestones
   useEffect(()=>{
     const myScoreNow=scores[myTeam?.id]||0;
-    GHOST_BONUS_THRESHOLDS.forEach(t=>{
-      const key='ghost_'+t.score;
+    TIME_CHARGE_BONUSES.forEach(t=>{
+      const key='time_'+t.score;
       if(myScoreNow>=t.score && !unlockedMilestones.has(key)){
-        setGhostMax(prev=>prev+t.charges);
+        setTimeChargeMax(m=>m+t.charges);
+        setTimeCharges(c=>c+t.charges);
         setUnlockedMilestones(prev=>new Set([...prev,key]));
         setUnlockPopup({
-          emoji:'👻',
-          label:'GHOST UNLOCK · '+t.score+' PTS',
+          emoji:'⏳',
+          label:'EXTRA TIJD · '+t.score+' PTS',
           name:'+'+t.charges+' lading'+(t.charges>1?'en':''),
         });
-        addActivity(`heeft ${t.charges} extra Ghost lading${t.charges>1?'en':''} ontgrendeld op ${t.score} pts!`,0);
+        addActivity(`heeft ${t.charges} Extra Tijd-lading${t.charges>1?'en':''} ontgrendeld op ${t.score} pts!`,0);
       }
     });
   },[scores,myTeam]);
@@ -1789,13 +1862,19 @@ function App(){
         </div>
       )}
 
-      {/* V14: Global countdown to diner */}
-      {phase>=1&&phase<5&&(()=>{
-        const ms=Math.max(0,dinerTs()-nowTs);
-        const mins=Math.floor(ms/60000);
-        const urgent=mins<=20;
-        const label=mins>=60?`${Math.floor(mins/60)}u ${mins%60}m tot diner`:`${mins}m tot diner`;
-        return <div className={`game-clock ${urgent?'urgent':''}`}>⏰ {label}</div>;
+      {/* V17: Hot-target countdown replaces the diner clock */}
+      {phase>=1&&phase<5&&hotTarget&&(()=>{
+        const ms=Math.max(0,hotTarget.deadline-nowTs);
+        const secs=Math.floor(ms/1000);
+        const mins=Math.floor(secs/60);
+        const urgent=secs<=120;
+        const loc=L_DATA.find(l=>l.id===hotTarget.locId);
+        const label=secs>=60?`${mins}m ${secs%60}s`:`${secs}s`;
+        return(
+          <div className={`game-clock ${urgent?'urgent':''}`} onClick={()=>setSelLoc(hotTarget.locId)} style={{cursor:'pointer'}}>
+            ⏱ {label} <span style={{opacity:0.7,marginLeft:'var(--sp-1)'}}>· {loc?.e||''} {loc?.n||'target'}</span>
+          </div>
+        );
       })()}
 
       {/* V15: HUD — consistent padding + type */}
@@ -1817,12 +1896,13 @@ function App(){
           <div className="t-num" style={{fontSize:'var(--fs-24)',color:'var(--accent-2)',textShadow:'0 0 20px rgba(228,178,92,0.35)'}}>{myScore}</div>
           <div className="t-label-sm" style={{marginTop:2}}>{myChallenges} · {visitedLocs.size} loc</div>
         </div>
-        <div style={{textAlign:'right',minWidth:56}}>
-          {ghost.active?(
-            <div className="chip" style={{color:'var(--quiz-2)',background:'rgba(178,155,255,0.18)',borderColor:'rgba(178,155,255,0.4)'}}>👻 {fmtTime(ghost.timeLeft)}</div>
-          ):(
-            <div className="chip">👻 {ghostMax-ghost.used}/{ghostMax}</div>
-          )}
+        <div style={{textAlign:'right',minWidth:64}}>
+          {/* V17: Extra Tijd — tap to add +5 min to hot target */}
+          <button onClick={activateExtraTime} disabled={timeCharges<=0||!hotTarget} className="chip"
+            style={{border:timeCharges>0?'1px solid rgba(228,178,92,0.35)':'1px solid var(--border)',background:timeCharges>0?'var(--accent-glow)':'var(--surface)',color:timeCharges>0?'var(--accent-2)':'var(--text-tertiary)',cursor:timeCharges>0&&hotTarget?'pointer':'default',opacity:timeCharges<=0?0.5:1,fontWeight:'var(--fw-bold)'}}
+            title={hotTarget?'+5 min extra tijd':'Geen actieve opdracht'}>
+            ⏳ {timeCharges}/{timeChargeMax}
+          </button>
           <div className="t-label-sm" style={{marginTop:'var(--sp-1)'}}>{visitedLocs.size}/102</div>
         </div>
       </div>
@@ -1854,7 +1934,7 @@ function App(){
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
         {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax}/>}
-        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} ghost={ghost} onGhost={activateGhost} ghostMax={ghostMax} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps}/>}
+        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} hotTarget={hotTarget} nowTs={nowTs}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage}/>}
       </div>
@@ -2109,8 +2189,8 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
   const myTier=tierFor(myChallengesDone);
   const myNextTier=nextTier(myChallengesDone);
   const myScore=scores[myTeam?.id]||0;
-  // Next ghost-charge milestone we haven't passed yet
-  const nextGhost=GHOST_BONUS_THRESHOLDS.find(t=>myScore<t.score);
+  // V17: next Extra Tijd unlock we haven't passed
+  const nextGhost=TIME_CHARGE_BONUSES.find(t=>myScore<t.score);
   // V5: map current phase to the relevant narrative entry
   const phaseKey=phase>=1&&phase<=4?`phase${phase}`:null;
   const phaseStory=phaseKey?NARRATIVE[phaseKey]:null;
@@ -2129,7 +2209,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       {/* Next reward banner */}
       {(myNextTier||nextGhost)&&(
         <div className="reward-card" style={{marginBottom:'var(--sp-3)'}}>
-          <div className="reward-icon">{myNextTier?myNextTier.badge:'👻'}</div>
+          <div className="reward-icon">{myNextTier?myNextTier.badge:'⏳'}</div>
           <div className="reward-info">
             <div className="t-label-sm" style={{marginBottom:'var(--sp-1)'}}>Volgende beloning</div>
             <div className="t-card-label">
@@ -2241,7 +2321,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 // ═══════════════════════════════════════════
 // MAP VIEW
 // ═══════════════════════════════════════════
-function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,ghostMax=GHOST_MAX_USES,phase,gpsStatus,gpsSnap,onWakeGps}){
+function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,hotTarget,nowTs}){
   const mapRef=useRef(null);
   const mapInst=useRef(null);
   const markersRef=useRef([]);
@@ -2335,8 +2415,7 @@ function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,ghostMax=GHOS
     if(mapInst.current&&pos)mapInst.current.setView([pos.lat,pos.lng],16,{animate:true});
   };
 
-  // Get nearby challenges
-  const nearby=getNearby(pos,completed);
+  // V17: nearby legacy computation kept for fallback if hotTarget is missing — mostly unused now
 
   return(
     <div style={{height:'100%',display:'flex',flexDirection:'column',position:'relative'}}>
@@ -2363,42 +2442,37 @@ function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,ghostMax=GHOS
         <button onClick={centerOnMe} style={{position:'absolute',bottom:180,right:12,zIndex:1000,width:38,height:38,borderRadius:19,background:'rgba(8,9,13,0.85)',border:'1px solid var(--border)',backdropFilter:'blur(12px)',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}} title="Centreer op mij">📍</button>
       )}
 
-      {/* Ghost mode button */}
-      <div style={{position:'absolute',top:12,right:12,zIndex:1000}}>
-        <button className={`btn ${ghost.active?'btn-danger':'btn-ghost'}`} onClick={onGhost} disabled={ghost.used>=ghostMax&&!ghost.active}
-          style={{fontSize:10,padding:'6px 12px',borderRadius:8,backdropFilter:'blur(8px)'}}>
-          {ghost.active?`👻 ${fmtTime(ghost.timeLeft)}`:`👻 Ghost ${ghostMax-ghost.used}/${ghostMax}`}
-        </button>
-      </div>
-
-      {/* V11: Compact nearby panel — max 3 cards */}
-      <div className="nearby-panel">
-        {nearby.slice(0,3).map(loc=>{
-          const primaryType=loc.ch[0]?.t||'photo';
-          const typeClass=primaryType==='photo'?'foto':primaryType==='creative'?'creatief':primaryType;
-          const types=[...new Set(loc.ch.map(c=>c.t))];
-          return(
-            <div key={loc.id} className="nearby-card" onClick={()=>onSelect(loc.id)}>
+      {/* V17: single hot-target card replaces the 3-card nearby stack */}
+      {hotTarget&&(()=>{
+        const loc=L_DATA.find(l=>l.id===hotTarget.locId);if(!loc)return null;
+        const ch=loc.ch[hotTarget.chIdx];if(!ch)return null;
+        const primaryType=ch.t;
+        const typeClass=primaryType==='photo'?'foto':primaryType==='creative'?'creatief':primaryType;
+        const label=primaryType==='photo'?'Foto':primaryType==='creative'?'Creatief':primaryType==='quiz'?'Quiz':'Video';
+        const secs=Math.max(0,Math.floor((hotTarget.deadline-nowTs)/1000));
+        const urgent=secs<=120;
+        const distM=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):null;
+        return(
+          <div className="nearby-panel">
+            <div className="nearby-card" onClick={()=>onSelect(loc.id)} style={{border:`2px solid ${urgent?'var(--danger)':'var(--accent)'}`,boxShadow:urgent?'0 8px 28px rgba(255,107,107,0.25)':'var(--sh-glow-gold)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>
               <div className={`nearby-indicator ${typeClass}`}/>
               <div className="nearby-info">
-                <div className="nearby-name">{loc.n}</div>
+                <div className="t-label-sm t-accent" style={{marginBottom:2}}>⏱ Hot target {secs>=60?`${Math.floor(secs/60)}m ${secs%60}s`:`${secs}s`}</div>
+                <div className="nearby-name">{loc.e} {loc.n}</div>
                 <div className="nearby-tags">
-                  {types.map(t=>{
-                    const tc=t==='photo'?'t-foto':t==='creative'?'t-creatief':t==='quiz'?'t-quiz':'t-video';
-                    const label=t==='photo'?'Foto':t==='creative'?'Creatief':t==='quiz'?'Quiz':'Video';
-                    return <span key={t} className={`nearby-tag ${tc}`}>{label}</span>;
-                  })}
+                  <span className={`nearby-tag t-${typeClass==='foto'?'foto':typeClass}`}>{label}</span>
+                  <span className="nearby-tag" style={{background:'rgba(255,255,255,0.06)',color:'var(--text-secondary)'}}>{ch.ti}</span>
                 </div>
               </div>
               <div className="nearby-end">
-                <div className="nearby-dist">{fmtDist(loc.dist)}</div>
-                <div className="nearby-pts">+{loc.ch.reduce((s,c)=>s+c.p,0)}</div>
+                {distM!=null&&<div className="nearby-dist">{fmtDist(distM)}</div>}
+                <div className="nearby-pts">+{ch.p}</div>
               </div>
               <div className="nearby-chevron">›</div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
