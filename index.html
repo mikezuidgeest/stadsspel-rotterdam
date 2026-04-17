@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V15 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V16 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Inter+Tight:wght@500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -1529,6 +1529,18 @@ function App(){
     }
   },[isAdmin,scores,teams]);
 
+  // V16: admin broadcasts a free-text message to all teams via activity_feed
+  const broadcastMessage=useCallback((msg)=>{
+    if(!isAdmin||!msg)return;
+    if(!OFFLINE&&sb){
+      sb.from('activity_feed').insert({
+        team_id:null, team_name:'Game Master', team_emoji:'📢', team_color:'#d4a054',
+        message:msg, points:0, created_at:new Date().toISOString(),
+      }).then(()=>{},()=>{});
+    }
+    setToast(`📢 Bericht verzonden`);
+  },[isAdmin]);
+
   // V12: admin removes a duplicate / rogue team
   const removeTeam=useCallback((teamId)=>{
     if(!isAdmin||!teamId)return;
@@ -1844,7 +1856,7 @@ function App(){
         {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} ghost={ghost} onGhost={activateGhost} ghostMax={ghostMax} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
-        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview}/>}
+        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage}/>}
       </div>
 
       {/* V5: Narrative story modal */}
@@ -1855,13 +1867,13 @@ function App(){
       {/* V5: Photo lightbox */}
       {photoLightbox&&<PhotoLightbox media={photoLightbox} onClose={()=>setPhotoLightbox(null)}/>}
 
-      {/* V10: Bar-break overlay */}
-      {barBreakActive&&<BarBreakOverlay info={barBreakActive} onClose={()=>setBarBreakActive(null)} onComplete={(mini,pts)=>{
+      {/* V10/V16: Bar-break overlay — now passes photo upload */}
+      {barBreakActive&&<BarBreakOverlay info={barBreakActive} onClose={()=>setBarBreakActive(null)} onComplete={(mini,pts,photo)=>{
         setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+pts}));
         setScorePopup(`+${pts}`);
-        addActivity(`haalde "${mini.title}" bij ${barBreakActive.name} · +${pts} pts`,pts);
+        addActivity(`haalde "${mini.title}" bij ${barBreakActive.name} · +${pts} pts`,pts,photo);
         if(!OFFLINE&&sb&&myTeam){
-          sb.from('teams').update({score:(scores[myTeam.id]||0)+pts}).eq('id',myTeam.id);
+          sb.from('teams').update({score:(scores[myTeam.id]||0)+pts}).eq('id',myTeam.id).then(()=>{},()=>{});
         }
       }}/>}
 
@@ -1871,8 +1883,8 @@ function App(){
       {/* Bottom sheet for challenges */}
       {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam}/>}
 
-      {/* Wedding video modal */}
-      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone}/>}
+      {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
+      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam}/>}
 
       {/* Tab bar */}
       <div className="tab-bar">
@@ -2206,9 +2218,9 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
                 )}
               </div>
               <div className="lb-stats">{teamChallenges} challenges · {t.locations_visited||0} locaties{isMine&&ghostMax>GHOST_MAX_USES?` · 👻×${ghostMax}`:''}</div>
-              {/* V14 (A3): member names on leaderboard row */}
+              {/* Member names on leaderboard row */}
               {Array.isArray(t.members)&&t.members.length>0&&(
-                <div style={{fontSize:10,color:'var(--text-tertiary)',marginTop:3,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.members.slice(0,4).join(' · ')}{t.members.length>4?' · …':''}</div>
+                <div className="t-caption truncate" style={{marginTop:2}}>{t.members.slice(0,4).join(' · ')}{t.members.length>4?' · …':''}</div>
               )}
             </div>
             <div className="lb-score" style={{color:t.color}}>{t.score}</div>
@@ -2421,23 +2433,23 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
   const photos=feed.filter(i=>!!i.photo);
 
   return(
-    <div style={{height:'100%',overflowY:'auto',padding:16,paddingBottom:90}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:600,letterSpacing:1}}>LIVE FEED</div>
-        <div style={{fontSize:10,color:'var(--text-tertiary)'}}>{feed.length} berichten · {photos.length} foto's</div>
+    <div style={{height:'100%',overflowY:'auto',padding:'var(--sp-5)',paddingBottom:'var(--sp-10)'}}>
+      <div className="row-between" style={{marginBottom:'var(--sp-3)'}}>
+        <div className="t-label">Live feed</div>
+        <div className="t-caption">{feed.length} berichten · {photos.length} foto's</div>
       </div>
 
-      {/* V5: filter pills */}
+      {/* Filter pills */}
       <div className="filter-pills">
         <button className={`filter-pill ${filter==='all'?'active':''}`} onClick={()=>setFilter('all')}>Alles</button>
         <button className={`filter-pill ${filter==='photos'?'active':''}`} onClick={()=>setFilter('photos')}>📸 Foto's</button>
         <button className={`filter-pill ${filter==='mine'?'active':''}`} onClick={()=>setFilter('mine')}>Mijn team</button>
       </div>
 
-      {/* V5: photo grid preview (top 9 most recent photos) */}
+      {/* Photo grid preview */}
       {filter==='all'&&photos.length>0&&(
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:10,color:'var(--text-tertiary)',fontWeight:600,marginBottom:6,letterSpacing:1}}>RECENTE FOTO'S</div>
+        <div style={{marginBottom:'var(--sp-5)'}}>
+          <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Recente foto's</div>
           <div className="photo-grid">
             {photos.slice(0,9).map((item,i)=>(
               <div key={i} className="photo-grid-item animate-in" onClick={()=>onPhoto&&onPhoto(item.photo)}>
@@ -2446,7 +2458,7 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
                   :<img src={item.photo} alt="submission"/>}
                 <div className="photo-grid-overlay">
                   <span>{item.team_emoji||'🎮'}</span>
-                  {item.points>0&&<span style={{color:'var(--accent)'}}>+{item.points}</span>}
+                  {item.points>0&&<span className="t-accent">+{item.points}</span>}
                 </div>
               </div>
             ))}
@@ -2455,10 +2467,10 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
       )}
 
       {filtered.length===0&&(
-        <div style={{textAlign:'center',padding:40,color:'var(--text-tertiary)'}}>
-          <div style={{fontSize:40,marginBottom:12}}>📢</div>
-          <div>Nog geen activiteit</div>
-          {filter!=='all'&&<button className="btn btn-ghost" onClick={()=>setFilter('all')} style={{marginTop:14,fontSize:12}}>Laat alles zien</button>}
+        <div className="panel text-center" style={{padding:'var(--sp-7)'}}>
+          <div style={{fontSize:40}}>📢</div>
+          <div className="t-card-label" style={{marginTop:'var(--sp-3)'}}>Nog geen activiteit</div>
+          {filter!=='all'&&<button className="btn btn-ghost btn-sm" onClick={()=>setFilter('all')} style={{marginTop:'var(--sp-4)'}}>Laat alles zien</button>}
         </div>
       )}
 
@@ -2467,26 +2479,25 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
         const key=entryKey(item,i);
         const rx=reactions[key]||{};
         const mine=myReactions[key]||new Set();
-        // V12: style system (Game Master / automated) messages differently
         const isSystem=!item.team_id||item.team_name==='Game Master'||item.team_name==='Systeem';
         return(
           <div key={i} className="activity-row animate-in" style={{
             borderLeft:item.team_color?`3px solid ${item.team_color}`:undefined,
-            background:isSystem?'rgba(212,160,84,0.04)':undefined,
+            background:isSystem?'rgba(228,178,92,0.04)':undefined,
             borderStyle:isSystem?'solid dashed dashed dashed':'solid'
           }}>
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{fontSize:20}}>{item.team_emoji||(isSystem?'👑':'🎮')}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:13,fontWeight:600}}>
+            <div className="row-3">
+              <div style={{fontSize:22}}>{item.team_emoji||(isSystem?'👑':'🎮')}</div>
+              <div className="flex-1">
+                <div className="t-body-emph row-2" style={{flexWrap:'wrap'}}>
                   {item.team_name||'Systeem'}
-                  {isSystem&&<span style={{fontSize:9,color:'var(--accent)',marginLeft:6,background:'rgba(212,160,84,0.15)',padding:'2px 6px',borderRadius:8,letterSpacing:0.5}}>SYSTEEM</span>}
-                  {isMe&&!isSystem&&<span style={{fontSize:9,color:'var(--foto)',marginLeft:6,background:'rgba(0,212,255,0.15)',padding:'2px 6px',borderRadius:8}}>JIJ</span>}
+                  {isSystem&&<span className="chip chip-gold" style={{padding:'2px 8px',fontSize:'var(--fs-10)'}}>SYSTEEM</span>}
+                  {isMe&&!isSystem&&<span className="chip chip-blue" style={{padding:'2px 8px',fontSize:'var(--fs-10)'}}>JIJ</span>}
                 </div>
-                <div style={{fontSize:12,color:'var(--text-secondary)'}}>{item.message}</div>
+                <div className="t-body" style={{marginTop:2}}>{item.message}</div>
               </div>
-              {item.points>0&&<div style={{fontSize:13,fontWeight:800,color:'var(--accent)'}}>+{item.points}</div>}
-              {item.points<0&&<div style={{fontSize:13,fontWeight:800,color:'#ff6b6b'}}>{item.points}</div>}
+              {item.points>0&&<div className="t-num t-accent" style={{fontSize:'var(--fs-14)'}}>+{item.points}</div>}
+              {item.points<0&&<div className="t-num t-danger" style={{fontSize:'var(--fs-14)'}}>{item.points}</div>}
             </div>
             {item.photo&&(
               isVideoData(item.photo)
@@ -2504,13 +2515,13 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
                     </button>
                   );
                 })}
-                <div style={{flex:1}}/>
-                <div style={{fontSize:10,color:'var(--text-tertiary)',marginTop:3}}>{fmtRelTime(item.created_at)}</div>
+                <div className="flex-1"/>
+                <div className="t-label-sm">{fmtRelTime(item.created_at)}</div>
               </div>
             )}
             {isSystem&&(
-              <div style={{display:'flex',justifyContent:'flex-end',marginTop:4}}>
-                <div style={{fontSize:10,color:'var(--text-tertiary)'}}>{fmtRelTime(item.created_at)}</div>
+              <div className="row" style={{justifyContent:'flex-end',marginTop:'var(--sp-1)'}}>
+                <div className="t-label-sm">{fmtRelTime(item.created_at)}</div>
               </div>
             )}
           </div>
@@ -2529,10 +2540,12 @@ function StoryModal({story,onClose}){
       <div className="story-card" onClick={e=>e.stopPropagation()}>
         <div className="story-chapter">{story.chapter}</div>
         <div className="story-title">{story.title}</div>
-        <div className="story-text">{story.text.split('\n\n').map((p,i)=>(
-          <p key={i} style={{marginBottom:10}}>{p}</p>
-        ))}</div>
-        <button className="btn btn-cyan" onClick={onClose} style={{width:'100%',padding:14}}>
+        <div style={{textAlign:'left',marginBottom:'var(--sp-6)'}}>
+          {story.text.split('\n\n').map((p,i)=>(
+            <p key={i} className="t-body" style={{marginBottom:'var(--sp-3)'}}>{p}</p>
+          ))}
+        </div>
+        <button className="btn btn-cyan" onClick={onClose} style={{width:'100%'}}>
           Verder →
         </button>
       </div>
@@ -2557,11 +2570,12 @@ function PhotoLightbox({media,onClose}){
 // ═══════════════════════════════════════════
 // V6: ADMIN REVIEW QUEUE
 // ═══════════════════════════════════════════
-function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,reviewUndo,onUndoReview}){
+function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,reviewUndo,onUndoReview,onBroadcast}){
   const[barChoice,setBarChoice]=React.useState('');
   const[barCustom,setBarCustom]=React.useState('');
   const[showTeamAdmin,setShowTeamAdmin]=React.useState(false);
   const[undoLeft,setUndoLeft]=React.useState(0);
+  const[broadcastMsg,setBroadcastMsg]=React.useState('');
   const barOptions=getBarOptions();
 
   // V12: countdown for the undo banner
@@ -2574,114 +2588,134 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
   },[reviewUndo]);
 
   return(
-    <div style={{height:'100%',overflowY:'auto',padding:16,paddingBottom:90}}>
-      {/* V12: review undo banner */}
+    <div style={{height:'100%',overflowY:'auto',padding:'var(--sp-5)',paddingBottom:'var(--sp-10)'}}>
+      {/* Review undo banner */}
       {reviewUndo&&undoLeft>0&&(
-        <div style={{position:'sticky',top:0,zIndex:20,marginBottom:10,padding:'8px 12px',borderRadius:10,background:reviewUndo.action==='approved'?'rgba(75,190,138,0.15)':'rgba(224,92,92,0.15)',border:`1px solid ${reviewUndo.action==='approved'?'rgba(75,190,138,0.35)':'rgba(224,92,92,0.35)'}`,display:'flex',alignItems:'center',gap:10}}>
-          <div style={{flex:1,fontSize:12,fontWeight:600,color:reviewUndo.action==='approved'?'var(--success)':'var(--danger)'}}>
+        <div className="row-3 panel-sm" style={{position:'sticky',top:0,zIndex:20,marginBottom:'var(--sp-3)',background:reviewUndo.action==='approved'?'rgba(95,216,165,0.15)':'rgba(255,107,107,0.15)',borderColor:reviewUndo.action==='approved'?'rgba(95,216,165,0.35)':'rgba(255,107,107,0.35)'}}>
+          <div className="flex-1 t-body-emph" style={{color:reviewUndo.action==='approved'?'var(--success)':'var(--danger)'}}>
             {reviewUndo.action==='approved'?'✓ Goedgekeurd':'✗ Afgekeurd'}: {reviewUndo.row.team_name} · {reviewUndo.row.challenge_title}
           </div>
-          <button onClick={onUndoReview} style={{padding:'6px 10px',borderRadius:8,background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.18)',color:'#fff',fontSize:11,fontWeight:700,cursor:'pointer'}}>↶ Ongedaan ({undoLeft}s)</button>
+          <button onClick={onUndoReview} className="btn btn-ghost btn-sm">↶ Ongedaan ({undoLeft}s)</button>
         </div>
       )}
-      {/* V10/V12: Game-master controls */}
-      <div className="glass-strong" style={{padding:14,marginBottom:16,borderColor:'rgba(255,215,0,0.25)'}}>
-        <div style={{fontSize:11,color:'var(--accent)',fontWeight:700,letterSpacing:1,marginBottom:10}}>🎛️ GAME MASTER CONTROLS</div>
+
+      {/* Game-master controls */}
+      <div className="panel stack-4" style={{marginBottom:'var(--sp-5)',borderColor:'rgba(228,178,92,0.28)',background:'linear-gradient(155deg,rgba(228,178,92,0.05),rgba(255,255,255,0.015))'}}>
+        <div className="t-label t-accent">🎛 Game Master controls</div>
 
         {/* Jorik tracker */}
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:6}}>
-            JORIK IS NU: {jorikTeamId==null?<span style={{color:'var(--text-secondary)'}}>loopt alleen</span>:(()=>{const t=teams.find(x=>x.id===jorikTeamId);return t?<span style={{color:t.color,fontWeight:700}}>{t.emoji} {t.name}</span>:<span>onbekend</span>;})()}
+        <div>
+          <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>
+            Jorik is nu: {jorikTeamId==null?<span className="t-muted">loopt alleen</span>:(()=>{const t=teams.find(x=>x.id===jorikTeamId);return t?<span style={{color:t.color,fontWeight:'var(--fw-bold)'}}>{t.emoji} {t.name}</span>:<span>onbekend</span>;})()}
           </div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6,overflowX:'auto'}}>
+          <div className="row-2" style={{flexWrap:'wrap',overflowX:'auto'}}>
             {teams.filter(t=>t.id>0).map(t=>(
               <button key={t.id} onClick={()=>onMoveJorik&&onMoveJorik(t.id)}
-                style={{padding:'8px 10px',borderRadius:10,border:jorikTeamId===t.id?`2px solid ${t.color}`:'1px solid rgba(255,255,255,0.1)',background:jorikTeamId===t.id?t.color+'22':'rgba(255,255,255,0.04)',color:'#fff',fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
+                className="t-body-emph"
+                style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:jorikTeamId===t.id?`2px solid ${t.color}`:'1px solid var(--border)',background:jorikTeamId===t.id?t.color+'22':'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)'}}>
                 {t.emoji} {t.name}
               </button>
             ))}
             <button onClick={()=>onMoveJorik&&onMoveJorik(null)}
-              style={{padding:'8px 10px',borderRadius:10,border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',color:'var(--text-secondary)',fontSize:12,cursor:'pointer',whiteSpace:'nowrap'}}>
+              className="t-body-emph t-muted"
+              style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)'}}>
               👤 alleen
             </button>
           </div>
         </div>
 
-        {/* V12: Bar-break trigger — dropdown of bar POIs + custom fallback */}
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:6}}>BAR BREAK {barBreakActive?<span style={{color:'var(--accent)'}}>· actief · {barBreakActive.name}</span>:''}</div>
+        {/* Bar break */}
+        <div>
+          <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Bar break {barBreakActive?<span className="t-accent">· actief · {barBreakActive.name}</span>:''}</div>
           {barBreakActive?(
-            <button onClick={()=>{if(confirm('Bar break nu beëindigen?'))onEndBarBreak&&onEndBarBreak()}} className="btn btn-danger" style={{width:'100%',padding:10,fontSize:12}}>
+            <button onClick={()=>{if(confirm('Bar break nu beëindigen?'))onEndBarBreak&&onEndBarBreak()}} className="btn btn-danger btn-sm" style={{width:'100%'}}>
               🛑 Bar break beëindigen
             </button>
           ):(
-            <>
-              <div style={{display:'flex',gap:6,marginBottom:6}}>
+            <div className="stack-2">
+              <div className="row-2">
                 <select value={barChoice} onChange={e=>setBarChoice(e.target.value)}
-                  style={{flex:1,padding:8,borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:13,outline:'none'}}>
+                  className="t-body-emph"
+                  style={{flex:1,padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:'var(--fs-13)',outline:'none'}}>
                   <option value="">— kies een bar —</option>
                   {barOptions.map(b=><option key={b.id} value={b.name}>{b.emoji} {b.name}</option>)}
                   <option value="__custom">✏️ Eigen naam typen…</option>
                 </select>
                 <button disabled={!barChoice||(barChoice==='__custom'&&!barCustom.trim())} onClick={()=>{const n=barChoice==='__custom'?barCustom.trim():barChoice;if(n){onTriggerBarBreak&&onTriggerBarBreak(n);setBarChoice('');setBarCustom('')}}}
-                  className="btn btn-gold" style={{padding:'8px 14px',fontSize:12}}>🍺 Start</button>
+                  className="btn btn-gold btn-sm">🍺 Start</button>
               </div>
               {barChoice==='__custom'&&(
                 <input value={barCustom} onChange={e=>setBarCustom(e.target.value)} placeholder="Bar naam"
-                  style={{width:'100%',padding:8,borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:13,outline:'none'}}/>
+                  className="t-body-emph"
+                  style={{width:'100%',padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',outline:'none'}}/>
               )}
-            </>
-          )}
-        </div>
-
-        {/* V12: Team admin — score override + delete */}
-        <div style={{marginBottom:14}}>
-          <button onClick={()=>setShowTeamAdmin(s=>!s)} style={{width:'100%',padding:8,borderRadius:8,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'var(--text-secondary)',fontSize:11,fontWeight:600,cursor:'pointer',textAlign:'left',letterSpacing:1}}>
-            {showTeamAdmin?'▾':'▸'} TEAM BEHEER ({teams.filter(t=>t.id>0).length})
-          </button>
-          {showTeamAdmin&&(
-            <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6}}>
-              {teams.filter(t=>t.id>0).map(t=>(
-                <div key={t.id} style={{display:'flex',alignItems:'center',gap:6,padding:8,borderRadius:10,background:'rgba(255,255,255,0.03)',borderLeft:`3px solid ${t.color}`}}>
-                  <div style={{fontSize:16}}>{t.emoji}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.name}</div>
-                    <div style={{fontSize:10,color:'var(--text-tertiary)'}}>{scores[t.id]||0} pts</div>
-                  </div>
-                  <button onClick={()=>onAdjustScore&&onAdjustScore(t.id,-5)} style={{padding:'4px 8px',borderRadius:6,background:'rgba(224,92,92,0.15)',border:'1px solid rgba(224,92,92,0.3)',color:'var(--danger)',fontSize:11,fontWeight:700,cursor:'pointer'}} title="−5 pts">−5</button>
-                  <button onClick={()=>onAdjustScore&&onAdjustScore(t.id,5)} style={{padding:'4px 8px',borderRadius:6,background:'rgba(75,190,138,0.15)',border:'1px solid rgba(75,190,138,0.3)',color:'var(--success)',fontSize:11,fontWeight:700,cursor:'pointer'}} title="+5 pts">+5</button>
-                  <button onClick={()=>onAdjustScore&&onAdjustScore(t.id,10)} style={{padding:'4px 8px',borderRadius:6,background:'rgba(212,160,84,0.15)',border:'1px solid rgba(212,160,84,0.3)',color:'var(--accent)',fontSize:11,fontWeight:700,cursor:'pointer'}} title="+10 pts">+10</button>
-                  <button onClick={()=>onRemoveTeam&&onRemoveTeam(t.id)} style={{padding:'4px 8px',borderRadius:6,background:'transparent',border:'1px dashed rgba(255,255,255,0.2)',color:'var(--text-tertiary)',fontSize:11,cursor:'pointer'}} title="Team verwijderen">🗑</button>
-                </div>
-              ))}
-              {teams.filter(t=>t.id>0).length===0&&<div style={{fontSize:11,color:'var(--text-tertiary)',textAlign:'center',padding:10}}>Nog geen teams</div>}
             </div>
           )}
         </div>
 
-        {/* V12: Finale trigger — gold styling (celebration, not destruction) */}
+        {/* V16: broadcast message to players */}
         <div>
-          <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:6}}>FINALE & UITSLAG</div>
+          <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Bericht naar alle teams</div>
+          <div className="row-2">
+            <input value={broadcastMsg} onChange={e=>setBroadcastMsg(e.target.value)}
+              placeholder="bijv. Iedereen naar Markthal nu!"
+              className="t-body-emph"
+              style={{flex:1,padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',outline:'none'}}/>
+            <button disabled={!broadcastMsg.trim()} onClick={()=>{if(onBroadcast){onBroadcast(broadcastMsg.trim());setBroadcastMsg('')}}}
+              className="btn btn-cyan btn-sm">📢 Stuur</button>
+          </div>
+        </div>
+
+        {/* Team admin */}
+        <div>
+          <button onClick={()=>setShowTeamAdmin(s=>!s)} className="t-label"
+            style={{width:'100%',padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.04)',border:'1px solid var(--border)',cursor:'pointer',textAlign:'left'}}>
+            {showTeamAdmin?'▾':'▸'} Team beheer ({teams.filter(t=>t.id>0).length})
+          </button>
+          {showTeamAdmin&&(
+            <div className="stack-2" style={{marginTop:'var(--sp-2)'}}>
+              {teams.filter(t=>t.id>0).map(t=>(
+                <div key={t.id} className="row-2" style={{padding:'var(--sp-2)',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.03)',borderLeft:`3px solid ${t.color}`}}>
+                  <div style={{fontSize:18}}>{t.emoji}</div>
+                  <div className="flex-1">
+                    <div className="t-body-emph truncate">{t.name}</div>
+                    <div className="t-caption">{scores[t.id]||0} pts</div>
+                  </div>
+                  <button onClick={()=>onAdjustScore&&onAdjustScore(t.id,-5)} className="t-body-emph" style={{padding:`var(--sp-1) var(--sp-2)`,borderRadius:'var(--r-sm)',background:'rgba(255,107,107,0.15)',border:'1px solid rgba(255,107,107,0.3)',color:'var(--danger)',cursor:'pointer',fontSize:'var(--fs-12)'}} title="−5 pts">−5</button>
+                  <button onClick={()=>onAdjustScore&&onAdjustScore(t.id,5)} className="t-body-emph" style={{padding:`var(--sp-1) var(--sp-2)`,borderRadius:'var(--r-sm)',background:'rgba(95,216,165,0.15)',border:'1px solid rgba(95,216,165,0.3)',color:'var(--success)',cursor:'pointer',fontSize:'var(--fs-12)'}} title="+5 pts">+5</button>
+                  <button onClick={()=>onAdjustScore&&onAdjustScore(t.id,10)} className="t-body-emph" style={{padding:`var(--sp-1) var(--sp-2)`,borderRadius:'var(--r-sm)',background:'rgba(228,178,92,0.15)',border:'1px solid rgba(228,178,92,0.3)',color:'var(--accent)',cursor:'pointer',fontSize:'var(--fs-12)'}} title="+10 pts">+10</button>
+                  <button onClick={()=>onRemoveTeam&&onRemoveTeam(t.id)} style={{padding:`var(--sp-1) var(--sp-2)`,borderRadius:'var(--r-sm)',background:'transparent',border:'1px dashed rgba(255,255,255,0.2)',color:'var(--text-tertiary)',cursor:'pointer'}} title="Team verwijderen">🗑</button>
+                </div>
+              ))}
+              {teams.filter(t=>t.id>0).length===0&&<div className="t-caption text-center" style={{padding:'var(--sp-3)'}}>Nog geen teams</div>}
+            </div>
+          )}
+        </div>
+
+        {/* Finale */}
+        <div>
+          <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Finale & uitslag</div>
           <button onClick={()=>{if(confirm('Spel beëindigen en naar de eindceremonie? Dit kan niet ongedaan worden gemaakt.'))onStartFinale&&onStartFinale()}}
-            className="btn btn-gold" disabled={phase>=5} style={{width:'100%',padding:10,fontSize:13,opacity:phase>=5?0.4:1}}>
-            🏆 {phase>=5?'Finale loopt':'Start Finale & Ceremonie'}
+            className="btn btn-gold" disabled={phase>=5} style={{width:'100%'}}>
+            🏆 {phase>=5?'Finale loopt':'Start finale & ceremonie'}
           </button>
         </div>
       </div>
 
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+      {/* Review queue header */}
+      <div className="row-between" style={{marginBottom:'var(--sp-4)'}}>
         <div>
-          <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:600,letterSpacing:1}}>BEOORDELEN</div>
-          <div style={{fontSize:18,fontWeight:800,marginTop:2}}>Wachtrij ({queue.length})</div>
+          <div className="t-label">Beoordelen</div>
+          <div className="t-section" style={{marginTop:'var(--sp-1)'}}>Wachtrij ({queue.length})</div>
         </div>
-        <div style={{fontSize:10,color:'var(--text-tertiary)',textAlign:'right'}}>Goedkeuren = punten blijven<br/>Afkeuren = punten worden ingetrokken</div>
+        <div className="t-caption" style={{textAlign:'right',lineHeight:'var(--lh-snug)'}}>Goedkeuren = punten blijven<br/>Afkeuren = punten worden ingetrokken</div>
       </div>
 
       {queue.length===0&&(
-        <div style={{textAlign:'center',padding:40,color:'var(--text-tertiary)'}}>
-          <div style={{fontSize:48,marginBottom:12}}>✅</div>
-          <div style={{fontWeight:600}}>Niets te beoordelen</div>
-          <div style={{fontSize:12,color:'var(--text-tertiary)',marginTop:6}}>Foto's verschijnen hier zodra teams ze indienen.</div>
+        <div className="panel text-center" style={{padding:'var(--sp-7)'}}>
+          <div style={{fontSize:48}}>✅</div>
+          <div className="t-card-label" style={{marginTop:'var(--sp-3)'}}>Niets te beoordelen</div>
+          <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Foto's verschijnen hier zodra teams ze indienen</div>
         </div>
       )}
 
@@ -2690,12 +2724,12 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
         const distClass=dist==null?'':dist<=PHOTO_GATE_RADIUS?'review-dist-good':dist<=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE?'review-dist-warn':'review-dist-bad';
         return(
           <div key={r.id} className="review-card" style={{borderLeft:r.team_color?`3px solid ${r.team_color}`:undefined}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'start'}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:14,fontWeight:700}}>{r.team_emoji||'🎮'} {r.team_name}</div>
-                <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:2}}>📍 {r.location_name}</div>
-                <div style={{fontSize:13,color:'#fff',fontWeight:600,marginTop:6}}>{r.challenge_title}</div>
-                <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>{r.challenge_type} · +{r.points_awarded} pts</div>
+            <div className="row-between" style={{alignItems:'flex-start'}}>
+              <div className="flex-1">
+                <div className="t-card-label">{r.team_emoji||'🎮'} {r.team_name}</div>
+                <div className="t-body" style={{marginTop:'var(--sp-1)'}}>📍 {r.location_name}</div>
+                <div className="t-body-emph" style={{marginTop:'var(--sp-2)'}}>{r.challenge_title}</div>
+                <div className="t-caption" style={{marginTop:'var(--sp-1)'}}>{r.challenge_type} · +{r.points_awarded} pts</div>
               </div>
               <span className="review-badge review-badge-pending">pending</span>
             </div>
@@ -2704,7 +2738,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
               ?(isVideoData(r.photo_url)
                 ?<video src={r.photo_url} className="review-photo" controls muted onClick={()=>onPhoto&&onPhoto(r.photo_url)}/>
                 :<img src={r.photo_url} className="review-photo" alt="submission" onClick={()=>onPhoto&&onPhoto(r.photo_url)}/>)
-              :<div style={{padding:20,textAlign:'center',color:'var(--text-tertiary)',background:'rgba(255,255,255,0.03)',borderRadius:10,marginTop:8,fontSize:12}}>
+              :<div className="panel-sm text-center t-caption" style={{marginTop:'var(--sp-2)',background:'rgba(255,255,255,0.03)'}}>
                   📷 Foto te groot voor cloud-sync · alleen bij team beschikbaar
                 </div>}
 
@@ -2714,8 +2748,8 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
             </div>
 
             <div className="review-actions">
-              <button className="btn btn-danger" onClick={()=>{if(confirm(`Foto van ${r.team_name} afkeuren? -${r.points_awarded} pts.`))onReject(r)}}>✗ Afkeuren</button>
-              <button className="btn btn-cyan" onClick={()=>onApprove(r)}>✓ Goedkeuren</button>
+              <button className="btn btn-danger btn-sm" onClick={()=>{if(confirm(`Foto van ${r.team_name} afkeuren? -${r.points_awarded} pts.`))onReject(r)}}>✗ Afkeuren</button>
+              <button className="btn btn-cyan btn-sm" onClick={()=>onApprove(r)}>✓ Goedkeuren</button>
             </div>
           </div>
         );
@@ -2822,13 +2856,26 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   const[quizAnswer,setQuizAnswer]=useState(null);
   const[quizFeedback,setQuizFeedback]=useState(null);
   const[processing,setProcessing]=useState(false);
-  // V7.1: synchronous quiz lock (refs beat React's async state race on mobile)
   const quizLockRef=useRef(false);
 
-  // V6: GPS gate — for media challenges only. Quizzes don't gate.
+  // V16: spectator admin (myTeam.id === -1) can't be credited scoring
+  const isSpectator=myTeam?.spectator||myTeam?.id===-1;
   const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
-  const gateRadius=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE; // 50 + 20 = 70m total
+  const gateRadius=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE;
   const tooFar=isMedia&&!isAdmin&&dist!=null&&dist>gateRadius;
+
+  // V16: spectator guard — disable challenge completion since the score wouldn't persist
+  if(isSpectator){
+    return(
+      <div className="gate-blocked" style={{background:'rgba(228,178,92,0.08)',borderColor:'rgba(228,178,92,0.25)'}}>
+        <div className="gate-icon">👑</div>
+        <div className="flex-1">
+          <div className="gate-text t-accent">Game Master kan geen punten scoren</div>
+          <div className="gate-hint">Join een team om mee te spelen</div>
+        </div>
+      </div>
+    );
+  }
 
   const handleFile=async(e)=>{
     const f=e.target.files[0];
@@ -2920,15 +2967,15 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
     );
   }
 
-  // V6: GPS gate UI when too far
+  // V6/V16: GPS gate UI — single-line distance, no duplication
   if(tooFar){
     const need=Math.round(dist-gateRadius);
     return(
       <div className="gate-blocked">
         <div className="gate-icon">📍</div>
-        <div style={{flex:1}}>
+        <div className="flex-1">
           <div className="gate-text">Loop dichterbij om de foto te maken</div>
-          <div className="gate-hint">Je staat {Math.round(dist)}m weg · max {gateRadius}m toegestaan</div>
+          <div className="gate-hint">Nog {need}m tot binnen range</div>
         </div>
         <div className="gate-distance">-{need}m</div>
       </div>
@@ -2958,7 +3005,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
 // ═══════════════════════════════════════════
 // WEDDING VIDEO MISSION
 // ═══════════════════════════════════════════
-function WeddingMission({onClose,onComplete,done}){
+function WeddingMission({onClose,onComplete,done,jorikInTeam}){
   const fileRef=useRef(null);
   const[uploaded,setUploaded]=useState(false);
 
@@ -2967,39 +3014,46 @@ function WeddingMission({onClose,onComplete,done}){
       <div className="sheet-overlay" onClick={onClose}/>
       <div className="sheet" style={{background:'linear-gradient(180deg,#1a0e30 0%,var(--bg) 100%)'}}>
         <div className="sheet-handle"/>
-        <div style={{textAlign:'center',marginBottom:20}}>
-          <div style={{fontSize:48,marginBottom:12}}>🤫🎬</div>
-          <h2 style={{fontSize:22,fontWeight:800,background:'linear-gradient(135deg,#a855f7,#ff6b35)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>GEHEIME MISSIE</h2>
-          <div style={{fontSize:14,color:'var(--text-secondary)',marginTop:8}}>Bruiloftsvideo voor Jorik</div>
+        <div style={{textAlign:'center',marginBottom:'var(--sp-5)'}}>
+          <div style={{fontSize:56}}>🤫🎬</div>
+          <h2 className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,var(--quiz-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Geheime missie</h2>
+          <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Bruiloftsvideo voor Jorik</div>
         </div>
 
-        <div className="glass" style={{padding:16,marginBottom:16}}>
-          <h3 style={{fontSize:14,fontWeight:700,color:'var(--quiz)',marginBottom:8}}>INSTRUCTIES</h3>
-          <p style={{fontSize:13,color:'#ccc',lineHeight:1.6}}>
-            Neem een video op met jullie team. Dit wordt onderdeel van een verrassingsvideo die op Jorik's bruiloft wordt vertoond.
-          </p>
-          <p style={{fontSize:13,color:'var(--video)',fontWeight:600,marginTop:12}}>
-            ⚠️ Doe dit ALLEEN wanneer Jorik NIET bij jullie team is!
-          </p>
-          <p style={{fontSize:13,color:'var(--text-secondary)',marginTop:12,fontStyle:'italic'}}>
-            Het script wordt later nog toegevoegd door de organisatie.
-          </p>
+        {/* V16: hard-gate when Jorik is in team */}
+        {jorikInTeam&&(
+          <div className="panel" style={{marginBottom:'var(--sp-4)',background:'linear-gradient(155deg,rgba(255,107,107,0.12),rgba(255,107,107,0.03))',borderColor:'rgba(255,107,107,0.35)'}}>
+            <div className="row-3">
+              <div style={{fontSize:28}}>🚫</div>
+              <div className="flex-1">
+                <div className="t-card-label t-danger">Jorik is NU bij jullie team</div>
+                <div className="t-body" style={{marginTop:'var(--sp-1)'}}>Geen opnames tot hij weg is — anders verklap je de verrassing.</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="panel" style={{marginBottom:'var(--sp-4)'}}>
+          <div className="t-label" style={{color:'var(--quiz-2)',marginBottom:'var(--sp-2)'}}>Instructies</div>
+          <div className="stack-3">
+            <p className="t-body">Neem een video op met jullie team. Dit wordt onderdeel van een verrassingsvideo die op Jorik's bruiloft wordt vertoond.</p>
+            <p className="t-body-emph" style={{color:'var(--video-2)'}}>⚠️ Doe dit ALLEEN wanneer Jorik NIET bij jullie team is.</p>
+            <p className="t-body" style={{fontStyle:'italic'}}>Het script wordt later nog toegevoegd door de organisatie.</p>
+          </div>
         </div>
 
-        <div style={{padding:16}}>
-          {!done&&!uploaded&&(
-            <>
-              <input ref={fileRef} type="file" accept="video/*" capture="environment" style={{display:'none'}}
-                onChange={e=>{if(e.target.files[0]){setUploaded(true);onComplete()}}}/>
-              <button className="btn btn-cyan" onClick={()=>fileRef.current?.click()} style={{width:'100%',padding:16}}>
-                🎬 Video Opnemen (+{WEDDING_VIDEO_BONUS} pts)
-              </button>
-            </>
-          )}
-          {(done||uploaded)&&<div style={{textAlign:'center',fontSize:16,color:'var(--success)',fontWeight:700}}>✅ Video opgenomen! Dankjewel!</div>}
-        </div>
+        {!done&&!uploaded&&(
+          <>
+            <input ref={fileRef} type="file" accept="video/*" capture="environment" style={{display:'none'}}
+              onChange={e=>{if(e.target.files[0]){setUploaded(true);onComplete()}}}/>
+            <button className="btn btn-cyan btn-lg" onClick={()=>!jorikInTeam&&fileRef.current?.click()} disabled={jorikInTeam} style={{width:'100%'}}>
+              {jorikInTeam?'🚫 Wacht tot Jorik weg is':`🎬 Video opnemen (+${WEDDING_VIDEO_BONUS} pts)`}
+            </button>
+          </>
+        )}
+        {(done||uploaded)&&<div className="panel-sm text-center t-success t-body-emph" style={{background:'rgba(95,216,165,0.1)',borderColor:'rgba(95,216,165,0.3)'}}>✅ Video opgenomen! Dankjewel!</div>}
 
-        <button className="btn btn-ghost" onClick={onClose} style={{width:'100%',marginTop:8}}>Sluiten</button>
+        <button className="btn btn-ghost" onClick={onClose} style={{width:'100%',marginTop:'var(--sp-3)'}}>Sluiten</button>
       </div>
     </>
   );
@@ -3010,50 +3064,62 @@ function WeddingMission({onClose,onComplete,done}){
 // ═══════════════════════════════════════════
 function BarBreakOverlay({info,onClose,onComplete}){
   const[done,setDone]=useState(new Set());
-  const[selected,setSelected]=useState(null);
   const[nowTs,setNowTs]=useState(Date.now());
-  // V14 (B1b): live countdown to auto-end of bar break
-  useEffect(()=>{
-    const i=setInterval(()=>setNowTs(Date.now()),1000);
-    return()=>clearInterval(i);
-  },[]);
+  const fileRefs=useRef({}); // V16: per-mini file input refs for photo upload
+  useEffect(()=>{const i=setInterval(()=>setNowTs(Date.now()),1000);return()=>clearInterval(i);},[]);
   const endsAt=(info.started||Date.now())+BAR_BREAK_DURATION_MS;
   const msLeft=Math.max(0,endsAt-nowTs);
   const secLeft=Math.floor(msLeft/1000);
   const urgent=secLeft<=60;
-  const complete=(m,i)=>{
-    if(done.has(i))return;
-    setDone(prev=>new Set([...prev,i]));
-    onComplete&&onComplete(m,m.pts);
+
+  // V16: bar-break minis now require a photo/video upload, not honor-system "Klaar"
+  const handleUpload=(m,i,file)=>{
+    if(done.has(i)||!file)return;
+    const r=new FileReader();
+    r.onload=async(ev)=>{
+      const raw=ev.target.result;
+      let shareable=raw;
+      if(!isVideoData(raw))shareable=await compressPhoto(raw,640,0.6);
+      else if(raw.length>700000)shareable=null;
+      setDone(prev=>new Set([...prev,i]));
+      onComplete&&onComplete(m,m.pts,shareable);
+    };
+    r.readAsDataURL(file);
   };
+
   return(
     <div className="barbreak-overlay" onClick={()=>{}}>
-      <div className="barbreak-card" style={{maxWidth:500,width:'92%'}}>
-        <div style={{fontSize:11,color:'var(--accent)',fontWeight:800,letterSpacing:2,marginBottom:6}}>🍻 BAR BREAK</div>
-        <div style={{fontSize:26,fontWeight:900,marginBottom:6,background:'linear-gradient(135deg,#ffd700,#ff6b35)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
-        {/* V14: countdown pill */}
-        <div className="chip" style={{margin:'0 auto 14px',fontSize:12,fontWeight:800,color:urgent?'var(--danger)':'var(--accent-2)',borderColor:urgent?'rgba(255,107,107,0.4)':'rgba(228,178,92,0.35)',background:urgent?'rgba(255,107,107,0.12)':'var(--accent-glow)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>⏱ {secLeft>=60?`${Math.floor(secLeft/60)}m ${secLeft%60}s`:`${secLeft}s`} over</div>
-        <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:20,fontStyle:'italic'}}>Drie bonus-opdrachten · alle drie mogen</div>
-        <div style={{display:'grid',gap:10,marginBottom:18}}>
+      <div className="barbreak-card" style={{maxWidth:460,width:'92%'}}>
+        <div className="t-label t-accent" style={{textAlign:'center'}}>🍻 Bar break</div>
+        <div className="t-title" style={{marginTop:'var(--sp-2)',background:'linear-gradient(135deg,var(--accent-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
+        <div className="chip" style={{margin:`var(--sp-4) auto var(--sp-5)`,color:urgent?'var(--danger)':'var(--accent-2)',borderColor:urgent?'rgba(255,107,107,0.4)':'rgba(228,178,92,0.35)',background:urgent?'rgba(255,107,107,0.12)':'var(--accent-glow)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>⏱ {secLeft>=60?`${Math.floor(secLeft/60)}m ${secLeft%60}s`:`${secLeft}s`} over</div>
+        <div className="t-body" style={{textAlign:'center',fontStyle:'italic',marginBottom:'var(--sp-5)'}}>Drie bonus-opdrachten · alle drie mogen</div>
+        <div className="stack-3" style={{textAlign:'left'}}>
           {info.mini.map((m,i)=>{
             const isDone=done.has(i);
+            const accept=m.title.toLowerCase().includes('karaoke')||m.title.toLowerCase().includes('roulette')?'video/*':'image/*,video/*';
             return(
-              <div key={i} style={{padding:14,borderRadius:12,background:isDone?'rgba(0,255,136,0.08)':'rgba(255,255,255,0.06)',border:`1px solid ${isDone?'rgba(0,255,136,0.3)':'rgba(255,255,255,0.12)'}`,textAlign:'left'}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-                  <div style={{fontSize:24}}>{m.emoji}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:14}}>{m.title}</div>
-                    <div style={{fontSize:12,color:'var(--text-secondary)'}}>{m.desc}</div>
+              <div key={i} className="panel" style={{background:isDone?'linear-gradient(155deg,rgba(95,216,165,0.1),rgba(95,216,165,0.02))':undefined,borderColor:isDone?'rgba(95,216,165,0.3)':undefined}}>
+                <div className="row-3" style={{marginBottom:'var(--sp-3)'}}>
+                  <div style={{fontSize:28}}>{m.emoji}</div>
+                  <div className="flex-1">
+                    <div className="t-card-label">{m.title}</div>
+                    <div className="t-body" style={{marginTop:'var(--sp-1)'}}>{m.desc}</div>
                   </div>
-                  <div style={{fontSize:13,fontWeight:800,color:'var(--accent)'}}>+{m.pts}</div>
+                  <div className="t-num t-accent" style={{fontSize:'var(--fs-17)'}}>+{m.pts}</div>
                 </div>
-                {!isDone&&<button className="btn btn-cyan" onClick={()=>complete(m,i)} style={{width:'100%',padding:10,fontSize:12}}>✓ Klaar — {m.pts} pts</button>}
-                {isDone&&<div style={{fontSize:12,color:'var(--success)',fontWeight:700,textAlign:'center',padding:8}}>✓ Voltooid</div>}
+                {!isDone&&<>
+                  <input ref={el=>{fileRefs.current[i]=el}} type="file" accept={accept} capture="environment" style={{display:'none'}} onChange={e=>handleUpload(m,i,e.target.files[0])}/>
+                  <button className="btn btn-cyan btn-sm" style={{width:'100%'}} onClick={()=>fileRefs.current[i]?.click()}>
+                    📸 Foto of video — +{m.pts} pts
+                  </button>
+                </>}
+                {isDone&&<div className="t-body-emph t-success text-center" style={{padding:'var(--sp-2)'}}>✓ Voltooid</div>}
               </div>
             );
           })}
         </div>
-        <button className="btn btn-ghost" onClick={onClose} style={{width:'100%',padding:12}}>Door met spelen</button>
+        <button className="btn btn-ghost" onClick={onClose} style={{width:'100%',marginTop:'var(--sp-5)'}}>Door met spelen</button>
       </div>
     </div>
   );
@@ -3069,54 +3135,52 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
   const totalChallenges=(activityFeed||[]).filter(a=>a.points>0).length;
 
   return(
-    <div style={{position:'fixed',inset:0,zIndex:10010,overflow:'auto',background:'radial-gradient(circle at 50% 20%,rgba(255,215,0,0.15),transparent 60%),radial-gradient(circle at 30% 80%,rgba(168,85,247,0.12),transparent 50%),var(--bg)'}}>
-      <div style={{padding:'40px 24px 80px',textAlign:'center',maxWidth:640,margin:'0 auto'}}>
-        <div style={{fontSize:12,color:'var(--accent)',letterSpacing:4,fontWeight:800,marginBottom:8}}>━━━  DE UITSLAG  ━━━</div>
-        <div style={{fontSize:42,fontWeight:900,marginBottom:6,background:'linear-gradient(135deg,#ffd700,#ff6b35,#a855f7)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>EINDSTAND</div>
-        <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:32}}>{fmtHM(elapsed)} gespeeld · {teams.length} teams · {totalChallenges} voltooide uitdagingen</div>
+    <div style={{position:'fixed',inset:0,zIndex:10010,overflow:'auto',background:'radial-gradient(circle at 50% 20%,rgba(228,178,92,0.15),transparent 60%),radial-gradient(circle at 30% 80%,rgba(178,155,255,0.12),transparent 50%),var(--bg)'}}>
+      <div style={{padding:`var(--sp-8) var(--sp-6) var(--sp-10)`,textAlign:'center',maxWidth:640,margin:'0 auto'}}>
+        <div className="t-label t-accent" style={{letterSpacing:'var(--ls-widest)'}}>━━━  De uitslag  ━━━</div>
+        <h1 className="t-hero" style={{marginTop:'var(--sp-2)',background:'linear-gradient(135deg,var(--accent-2),var(--video-2),var(--quiz-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Eindstand</h1>
+        <div className="t-body" style={{marginTop:'var(--sp-3)',marginBottom:'var(--sp-7)'}}>{fmtHM(elapsed)} gespeeld · {teams.length} teams · {totalChallenges} voltooide uitdagingen</div>
 
         {winner&&(
-          <div className="glass-strong" style={{padding:28,marginBottom:24,borderColor:winner.color+'88',background:`linear-gradient(135deg,${winner.color}15,rgba(10,14,39,0.9))`,animation:'fadeInUp .6s ease both'}}>
-            <div style={{fontSize:11,color:'var(--accent)',fontWeight:800,letterSpacing:3,marginBottom:4}}>🏆 WINNAAR</div>
-            <div style={{fontSize:64,marginBottom:4,animation:'float 3s ease-in-out infinite'}}>{winner.emoji}</div>
-            <div style={{fontSize:30,fontWeight:900,marginBottom:6,color:winner.color}}>{winner.name}</div>
-            <div style={{fontSize:14,color:'var(--text-secondary)',marginBottom:12}}>Vriend van de Bruidegom · Eeuwige Roem</div>
-            <div style={{fontSize:48,fontWeight:900,color:'var(--accent)'}}>{winner.score}<span style={{fontSize:16,color:'var(--text-secondary)',fontWeight:600}}> pts</span></div>
+          <div className="glass-strong animate-in" style={{padding:'var(--sp-7)',marginBottom:'var(--sp-6)',borderColor:winner.color+'88',background:`linear-gradient(135deg,${winner.color}20,rgba(10,14,39,0.9))`}}>
+            <div className="t-label t-accent">🏆 Winnaar</div>
+            <div style={{fontSize:64,marginTop:'var(--sp-2)',animation:'float 3s ease-in-out infinite'}}>{winner.emoji}</div>
+            <div className="t-title" style={{color:winner.color,marginTop:'var(--sp-2)'}}>{winner.name}</div>
+            <div className="t-body" style={{marginTop:'var(--sp-2)',marginBottom:'var(--sp-3)'}}>Vriend van de Bruidegom · Eeuwige Roem</div>
+            <div className="t-num t-accent" style={{fontSize:'var(--fs-48)'}}>{winner.score}<span className="t-body" style={{marginLeft:6}}>pts</span></div>
           </div>
         )}
 
-        <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,letterSpacing:2,marginBottom:10}}>VOLLEDIGE RANGSCHIKKING</div>
+        <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>Volledige rangschikking</div>
         {sorted.map((t,i)=>(
-          <div key={t.id} className="glass" style={{padding:14,marginBottom:8,display:'flex',alignItems:'center',gap:12,borderLeft:`4px solid ${t.color}`,animation:`fadeInUp .5s ease ${i*0.1}s both`,opacity:i>0?0.95:1}}>
-            <div style={{fontSize:22,fontWeight:900,minWidth:36,color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'#555'}}>#{i+1}</div>
+          <div key={t.id} className="panel animate-in row-3" style={{marginBottom:'var(--sp-2)',borderLeft:`4px solid ${t.color}`,animationDelay:`${i*0.1}s`,opacity:i>0?0.95:1}}>
+            <div className="t-num" style={{minWidth:36,color:i===0?'var(--accent-2)':i===1?'#c0c0c0':i===2?'#cd7f32':'var(--text-tertiary)'}}>#{i+1}</div>
             <div style={{fontSize:28}}>{t.emoji}</div>
-            <div style={{flex:1,textAlign:'left'}}>
-              <div style={{fontWeight:700,fontSize:15}}>{t.name}{t.id===jorikTeamId&&<span style={{marginLeft:8,fontSize:11,color:'var(--accent)'}}>· met Jorik</span>}</div>
-              <div style={{fontSize:11,color:'var(--text-secondary)'}}>{t.id===myTeam?.id?'Jouw team':'Team'}</div>
+            <div className="flex-1" style={{textAlign:'left'}}>
+              <div className="t-card-label">{t.name}{t.id===jorikTeamId&&<span className="t-label-sm t-accent" style={{marginLeft:'var(--sp-2)'}}>· met Jorik</span>}</div>
+              <div className="t-caption">{t.id===myTeam?.id?'Jouw team':'Team'}</div>
             </div>
-            <div style={{fontSize:22,fontWeight:900,color:t.color}}>{t.score}</div>
+            <div className="t-num" style={{fontSize:'var(--fs-20)',color:t.color}}>{t.score}</div>
           </div>
         ))}
 
         {photos.length>0&&(
-          <div style={{marginTop:32}}>
-            <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,letterSpacing:2,marginBottom:10}}>📸 MOMENTEN VAN DE DAG</div>
+          <div style={{marginTop:'var(--sp-7)'}}>
+            <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>📸 Momenten van de dag</div>
             <div className="photo-grid">
               {photos.map((p,i)=>(
-                <div key={i} className="photo-grid-item" style={{animation:`fadeInUp .4s ease ${i*0.05}s both`}}>
+                <div key={i} className="photo-grid-item" style={{animationDelay:`${i*0.05}s`}}>
                   {isVideoData(p.photo)?<video src={p.photo} muted/>:<img src={p.photo} alt=""/>}
-                  <div className="photo-grid-overlay"><span>{p.team_emoji||'🎮'}</span>{p.points>0&&<span style={{color:'var(--accent)'}}>+{p.points}</span>}</div>
+                  <div className="photo-grid-overlay"><span>{p.team_emoji||'🎮'}</span>{p.points>0&&<span className="t-accent">+{p.points}</span>}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        <div style={{marginTop:40,padding:20,borderRadius:16,background:'linear-gradient(135deg,rgba(168,85,247,0.1),rgba(255,107,53,0.08))',border:'1px solid rgba(168,85,247,0.3)'}}>
-          <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>🥂 Proost op Jorik</div>
-          <div style={{fontSize:13,color:'var(--text-secondary)',lineHeight:1.5}}>
-            De ring is terug. De bruiloft kan door. Al jullie foto's, video's en roasts zijn vastgelegd en worden samengevoegd tot een verrassingsvideo die Jorik pas op 14 juni te zien krijgt. Bedankt voor jullie energie vandaag.
-          </div>
+        <div className="panel" style={{marginTop:'var(--sp-8)',background:'linear-gradient(135deg,rgba(178,155,255,0.1),rgba(255,123,123,0.08))',borderColor:'rgba(178,155,255,0.3)'}}>
+          <div className="t-card-title">🥂 Proost op Jorik</div>
+          <div className="t-body" style={{marginTop:'var(--sp-2)'}}>De ring is terug. De bruiloft kan door. Al jullie foto's, video's en roasts zijn vastgelegd en worden samengevoegd tot een verrassingsvideo die Jorik pas op 14 juni te zien krijgt. Bedankt voor jullie energie vandaag.</div>
         </div>
       </div>
     </div>
