@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V13 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V15 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Inter+Tight:wght@500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -34,6 +34,17 @@
       --video-2:#ff9a9a;
       --success:#5fd8a5;
       --danger:#ff6b6b;
+      /* V15: spacing scale — 4px base grid, used everywhere */
+      --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-7:32px;--sp-8:40px;--sp-9:56px;--sp-10:72px;
+      /* V15: type scale — tight hierarchy, only these sizes allowed */
+      --fs-10:10px;--fs-11:11px;--fs-12:12px;--fs-13:13px;--fs-14:14px;--fs-15:15px;--fs-17:17px;--fs-20:20px;--fs-24:24px;--fs-30:30px;--fs-36:36px;--fs-48:48px;
+      /* V15: font weight — semantic */
+      --fw-regular:500;--fw-medium:600;--fw-semi:700;--fw-bold:800;--fw-black:900;
+      /* V15: letter-spacing — semantic */
+      --ls-tight:-0.035em;--ls-snug:-0.02em;--ls-normal:-0.01em;--ls-wide:0.04em;--ls-wider:0.08em;--ls-widest:0.14em;
+      /* V15: line height */
+      --lh-tight:1.1;--lh-snug:1.25;--lh-normal:1.5;--lh-relaxed:1.65;
+
       /* V13: radius scale */
       --r-xs:8px;--r-sm:12px;--r-md:16px;--r-lg:22px;--r-xl:28px;--r-2xl:36px;--r-pill:999px;
       /* V13: shadow scale */
@@ -57,7 +68,54 @@
     body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at 20% 15%,rgba(228,178,92,0.05),transparent 45%),radial-gradient(circle at 85% 85%,rgba(110,163,255,0.045),transparent 50%)}
     /* V13: desktop frame */
     @media (min-width:560px){#root{max-width:420px;margin:0 auto;box-shadow:0 0 120px rgba(0,0,0,0.55),inset 0 0 0 1px rgba(255,255,255,0.03);background:var(--bg)}}
-    h1,h2,h3{font-family:var(--font-display);letter-spacing:-0.025em}
+    h1,h2,h3{font-family:var(--font-display);letter-spacing:var(--ls-tight)}
+
+    /* V15: utility system — strict typography tokens */
+    .t-display{font-family:var(--font-display);font-weight:var(--fw-black);letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+    .t-hero{font-family:var(--font-display);font-size:var(--fs-48);font-weight:var(--fw-black);letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+    .t-title{font-family:var(--font-display);font-size:var(--fs-30);font-weight:var(--fw-black);letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+    .t-section{font-family:var(--font-display);font-size:var(--fs-20);font-weight:var(--fw-bold);letter-spacing:var(--ls-snug);line-height:var(--lh-snug)}
+    .t-card-title{font-family:var(--font-display);font-size:var(--fs-17);font-weight:var(--fw-bold);letter-spacing:var(--ls-snug);line-height:var(--lh-snug)}
+    .t-card-label{font-family:var(--font-display);font-size:var(--fs-15);font-weight:var(--fw-semi);letter-spacing:var(--ls-snug);line-height:var(--lh-snug)}
+    .t-body{font-family:var(--font-body);font-size:var(--fs-14);font-weight:var(--fw-regular);letter-spacing:var(--ls-normal);line-height:var(--lh-normal);color:var(--text-secondary)}
+    .t-body-emph{font-family:var(--font-body);font-size:var(--fs-14);font-weight:var(--fw-semi);letter-spacing:var(--ls-normal);line-height:var(--lh-normal);color:var(--text-primary)}
+    .t-caption{font-family:var(--font-body);font-size:var(--fs-12);font-weight:var(--fw-regular);letter-spacing:var(--ls-normal);line-height:var(--lh-snug);color:var(--text-tertiary)}
+    .t-label{font-family:var(--font-display);font-size:var(--fs-11);font-weight:var(--fw-bold);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--text-secondary)}
+    .t-label-sm{font-family:var(--font-display);font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--text-tertiary)}
+    .t-num{font-family:var(--font-display);font-variant-numeric:tabular-nums;font-weight:var(--fw-black);letter-spacing:var(--ls-tight);line-height:1}
+
+    .t-accent{color:var(--accent)!important}
+    .t-accent-2{color:var(--accent-2)!important}
+    .t-muted{color:var(--text-secondary)!important}
+    .t-dim{color:var(--text-tertiary)!important}
+    .t-danger{color:var(--danger)!important}
+    .t-success{color:var(--success)!important}
+
+    /* V15: layout utilities — consistent spacing using the scale */
+    .stack-1>*+*{margin-top:var(--sp-1)}
+    .stack-2>*+*{margin-top:var(--sp-2)}
+    .stack-3>*+*{margin-top:var(--sp-3)}
+    .stack-4>*+*{margin-top:var(--sp-4)}
+    .stack-5>*+*{margin-top:var(--sp-5)}
+    .stack-6>*+*{margin-top:var(--sp-6)}
+    .stack-7>*+*{margin-top:var(--sp-7)}
+    .row{display:flex;align-items:center}
+    .row-2{display:flex;align-items:center;gap:var(--sp-2)}
+    .row-3{display:flex;align-items:center;gap:var(--sp-3)}
+    .row-4{display:flex;align-items:center;gap:var(--sp-4)}
+    .row-between{display:flex;align-items:center;justify-content:space-between}
+    .flex-1{flex:1;min-width:0}
+    .text-center{text-align:center}
+    .truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    /* V15: canonical panel — replaces ad-hoc padding on 20+ places */
+    .panel{padding:var(--sp-5);border-radius:var(--r-lg);background:linear-gradient(155deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015));border:1px solid var(--border);box-shadow:var(--sh-ring)}
+    .panel-sm{padding:var(--sp-4);border-radius:var(--r-md)}
+    .panel-lg{padding:var(--sp-6);border-radius:var(--r-xl)}
+
+    /* V15: screen wrapper — consistent outer padding on every screen */
+    .screen{height:100%;overflow-y:auto;padding:var(--sp-6);padding-top:var(--sp-7);padding-bottom:var(--sp-9);position:relative;z-index:1}
+    .screen-hero{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:var(--sp-6);position:relative;z-index:1}
     .leaflet-div-icon{background:none!important;border:none!important}
 
     /* V13: Glass morphism — richer, layered */
@@ -65,8 +123,8 @@
     .glass-strong{backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3);background:rgba(10,11,16,0.82);border:1px solid var(--border-strong);border-radius:var(--r-lg);box-shadow:var(--sh-md),var(--sh-ring)}
     .glass-card{position:relative;backdrop-filter:blur(22px) saturate(1.2);-webkit-backdrop-filter:blur(22px) saturate(1.2);background:linear-gradient(155deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025));border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-md),var(--sh-ring)}
 
-    /* V13: Buttons — premium pill, 56px default, spring press */
-    .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:16px 24px;min-height:52px;border:none;border-radius:var(--r-pill);font-family:var(--font-display);font-weight:700;cursor:pointer;transition:transform .18s var(--spring),box-shadow .25s var(--ease-out),opacity .2s;font-size:15px;letter-spacing:-0.015em;color:#fff;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+    /* V15: Buttons — consistent size scale */
+    .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);padding:var(--sp-4) var(--sp-6);min-height:52px;border:none;border-radius:var(--r-pill);font-family:var(--font-display);font-weight:var(--fw-semi);cursor:pointer;transition:transform .18s var(--spring),box-shadow .25s var(--ease-out),opacity .2s;font-size:var(--fs-15);letter-spacing:var(--ls-snug);color:#fff;white-space:nowrap;-webkit-tap-highlight-color:transparent}
     .btn::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 1px 0 rgba(255,255,255,0.22),inset 0 -1px 0 rgba(0,0,0,0.15);pointer-events:none}
     .btn:active{transform:scale(0.96) translateY(1px)}
     .btn:hover{transform:translateY(-1px)}
@@ -79,8 +137,8 @@
     .btn-danger{background:linear-gradient(135deg,#ff8787,#c94d4d);box-shadow:0 10px 28px rgba(255,107,107,0.3)}
     .btn-danger:hover{box-shadow:0 14px 34px rgba(255,107,107,0.38)}
     .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;pointer-events:none}
-    .btn-sm{padding:10px 16px;min-height:40px;font-size:13px;border-radius:var(--r-pill)}
-    .btn-lg{padding:20px 32px;min-height:60px;font-size:17px;font-weight:800}
+    .btn-sm{padding:var(--sp-2) var(--sp-4);min-height:40px;font-size:var(--fs-13)}
+    .btn-lg{padding:var(--sp-5) var(--sp-7);min-height:60px;font-size:var(--fs-17);font-weight:var(--fw-bold)}
 
     /* V13: Chip — compact pill used for tags, meta, filters */
     .chip{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:0.01em;transition:background .2s}
@@ -99,6 +157,32 @@
     @keyframes scoreFloat{0%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-80px) scale(1.35)}}
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     @keyframes breathing{0%,100%{opacity:0.6}50%{opacity:1}}
+    /* V14: celebration animations */
+    @keyframes confettiFall{0%{transform:translateY(-20vh) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+    @keyframes celebPop{0%{opacity:0;transform:translate(-50%,-50%) scale(0.4)}40%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+    @keyframes celebFade{0%{opacity:1}85%{opacity:1}100%{opacity:0}}
+    @keyframes levelRay{0%{transform:translate(-50%,-50%) scale(0.8) rotate(0);opacity:0}25%{opacity:0.9}100%{transform:translate(-50%,-50%) scale(3) rotate(60deg);opacity:0}}
+    @keyframes streakFire{0%,100%{transform:scale(1) rotate(-2deg)}50%{transform:scale(1.1) rotate(2deg)}}
+    /* V14: celebration overlay */
+    .celeb-overlay{position:fixed;inset:0;z-index:10006;pointer-events:none;animation:celebFade 2.2s ease forwards}
+    .celeb-burst{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);animation:celebPop 0.6s var(--spring) both;display:flex;flex-direction:column;align-items:center;gap:8px}
+    .celeb-emoji{font-size:96px;filter:drop-shadow(0 12px 40px rgba(228,178,92,0.6))}
+    .celeb-title{font-family:var(--font-display);font-size:34px;font-weight:900;color:#fff;letter-spacing:-0.03em;text-shadow:0 4px 24px rgba(0,0,0,0.6);text-align:center}
+    .celeb-sub{font-size:14px;font-weight:700;color:var(--accent-2);letter-spacing:0.06em;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,0.5)}
+    .celeb-breakdown{margin-top:10px;padding:10px 18px;border-radius:var(--r-pill);background:rgba(14,15,22,0.92);border:1px solid var(--border-strong);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);font-size:12px;font-weight:700;color:var(--text-secondary);display:flex;gap:10px;align-items:center}
+    .celeb-breakdown span{color:var(--accent-2)}
+    .confetti-piece{position:absolute;top:-20vh;width:8px;height:14px;border-radius:2px;animation:confettiFall 2.2s linear forwards}
+    /* V14: level ring */
+    .level-ray{position:absolute;top:50%;left:50%;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(228,178,92,0.9) 0%,rgba(228,178,92,0) 65%);animation:levelRay 1.4s ease forwards;pointer-events:none;z-index:-1}
+    /* V14: streak chip */
+    .streak-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:var(--r-pill);background:linear-gradient(135deg,rgba(255,123,123,0.22),rgba(228,178,92,0.22));border:1px solid rgba(255,123,123,0.4);color:#ffe4b8;font-size:11px;font-weight:800;letter-spacing:0.04em;animation:streakFire 1.4s ease-in-out infinite}
+    /* V14: XP progress bar in HUD */
+    .xp-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:var(--r-pill);margin-top:6px;overflow:hidden;position:relative}
+    .xp-fill{height:100%;background:linear-gradient(90deg,var(--foto),var(--accent));border-radius:var(--r-pill);transition:width .5s var(--ease-out);box-shadow:0 0 10px rgba(228,178,92,0.45)}
+    .xp-marker{position:absolute;top:-2px;font-size:9px;color:var(--text-tertiary);font-weight:700}
+    /* V14: countdown clock */
+    .game-clock{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:101;padding:5px 12px;border-radius:var(--r-pill);background:rgba(14,15,22,0.95);border:1px solid var(--border-strong);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);font-family:var(--font-display);font-size:11px;font-weight:800;color:var(--text-secondary);letter-spacing:0.04em;display:flex;align-items:center;gap:6px;box-shadow:var(--sh-md)}
+    .game-clock.urgent{color:var(--video-2);border-color:rgba(255,123,123,0.4);animation:breathing 1.5s ease-in-out infinite}
     .animate-in{animation:fadeInPop .45s var(--spring) both}
     .animate-in-1{animation-delay:.04s}.animate-in-2{animation-delay:.09s}.animate-in-3{animation-delay:.14s}.animate-in-4{animation-delay:.19s}.animate-in-5{animation-delay:.24s}.animate-in-6{animation-delay:.29s}
 
@@ -437,6 +521,41 @@ const PHOTO_GATE_RADIUS=50;        // meters — must be within this to take a p
 const PHOTO_GATE_GRACE=20;         // extra meters allowed (GPS noise tolerance)
 const REVIEW_REJECT_PENALTY=true;  // when admin rejects, deduct points awarded
 // Status enum for photo_reviews table: 'pending' | 'approved' | 'rejected'
+
+// V14: Global countdown — the diner at Markthal/Bokaal is 19:30 on game day
+// In dev we fall back to "now + 4h" so timers are visible during non-game-day previews
+const DINER_DATE='2026-06-06T19:30:00+02:00';
+function dinerTs(){
+  const t=new Date(DINER_DATE).getTime();
+  // If game day is more than 7 days away, use a rolling 4h-from-now clock for dev/testing.
+  return(t-Date.now()>7*86400000)?Date.now()+4*3600*1000:t;
+}
+
+// V14: Bar break duration — 15 min default; overlay shows countdown; auto-ends
+const BAR_BREAK_DURATION_MS=15*60*1000;
+
+// V14: Team level system (B2) — 6 levels during a 4-hour game
+// Thresholds are SCORE-based, not challenges. Balance: first level reachable in ~10 min.
+const TEAM_LEVELS=[
+  {level:1, min:0,   name:'Rekruut',    emoji:'🥚', unlock:null},
+  {level:2, min:25,  name:'Zoeker',     emoji:'🔍', unlock:'👁 Peek — zie 1 letter van volgende quiz-antwoord'},
+  {level:3, min:75,  name:'Ontdekker',  emoji:'🧭', unlock:'👻 Extra Ghost charge ontgrendeld'},
+  {level:4, min:150, name:'Jager',      emoji:'🏹', unlock:'⚡ Double Down — volgende opdracht telt dubbel'},
+  {level:5, min:250, name:'Veteraan',   emoji:'🛡️', unlock:'🎨 Eigen teamkleur-banner'},
+  {level:6, min:400, name:'Legende',    emoji:'👑', unlock:'🎯 Nominatie — kies een rival-team\'s shot-straf'},
+];
+function levelFor(score){
+  let cur=TEAM_LEVELS[0];
+  for(const l of TEAM_LEVELS){if(score>=l.min)cur=l;}
+  return cur;
+}
+function nextLevel(score){
+  return TEAM_LEVELS.find(l=>l.min>score)||null;
+}
+
+// V14: Hot-streak bonuses (B5) — consecutive correct quizzes
+const STREAK_REWARDS={3:20, 5:50}; // +bonus pts at these streak lengths
+const STREAK_GHOST_UNLOCK=7; // at 7 in a row → +1 ghost charge
 
 // V7 QUIZ RULE (Mike's design): one shot, wrong = 0 pts + marked done.
 // Knowledge rewarded, guessing doesn't pay. No retries, no mercy.
@@ -847,6 +966,12 @@ function App(){
   // V6: admin review queue
   const[reviewQueue,setReviewQueue]=useState([]); // pending photo_reviews for admin
   const[pendingMine,setPendingMine]=useState(0); // count of my team's pending reviews
+  // V14: engagement state
+  const[celebration,setCelebration]=useState(null); // {emoji,title,sub,breakdown,confetti}
+  const[quizStreak,setQuizStreak]=useState(0); // consecutive correct quizzes
+  const[lastLevelSeen,setLastLevelSeen]=useState(null); // for level-up detection
+  const[nowTs,setNowTs]=useState(Date.now()); // tick state for countdown clocks
+  const tapGuardRef=useRef(0); // V14: A4 — prevents repeated-click loss during re-render
 
   // Timer
   useEffect(()=>{
@@ -961,6 +1086,38 @@ function App(){
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),4000);return()=>clearTimeout(t)}},[toast]);
   useEffect(()=>{if(scorePopup){const t=setTimeout(()=>setScorePopup(null),1200);return()=>clearTimeout(t)}},[scorePopup]);
 
+  // V14: 1-second tick for countdown clocks (HUD + bar break)
+  useEffect(()=>{
+    const i=setInterval(()=>setNowTs(Date.now()),1000);
+    return()=>clearInterval(i);
+  },[]);
+
+  // V14: celebration auto-dismiss
+  useEffect(()=>{if(celebration){const t=setTimeout(()=>setCelebration(null),2400);return()=>clearTimeout(t)}},[celebration]);
+
+  // V14: trigger haptic + sound
+  const celebrate=useCallback((payload)=>{
+    setCelebration(payload);
+    // Haptic (works on mobile with user gesture already granted earlier in session)
+    try{if(navigator.vibrate)navigator.vibrate(payload.big?[30,40,30,40,100]:[60])}catch(e){}
+    // Audio tone (WebAudio — no external asset, no autoplay block since a user gesture opened this branch)
+    try{
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(AC){
+        const ctx=new AC();
+        const o=ctx.createOscillator(),g=ctx.createGain();
+        o.type='triangle';
+        o.frequency.setValueAtTime(payload.big?880:660,ctx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(payload.big?1320:990,ctx.currentTime+0.15);
+        g.gain.setValueAtTime(0.0001,ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.18,ctx.currentTime+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.5);
+        o.connect(g).connect(ctx.destination);
+        o.start();o.stop(ctx.currentTime+0.5);
+      }
+    }catch(e){}
+  },[]);
+
   // V12: Supabase real-time subscriptions — full multi-user sync
   useEffect(()=>{
     if(OFFLINE||!sb)return;
@@ -1025,8 +1182,22 @@ function App(){
       if(gs.phase>=1){
         setPhase(gs.phase);
         if(!gameStart&&gs.started_at)setGameStart(new Date(gs.started_at).getTime());
-        // Auto-move past lobby when admin starts the game
-        setScreen(s=>s==='lobby'?'game':s);
+        // V14 (A2): when a player transitions from lobby to game via admin broadcast,
+        // they miss the PROLOOG (only admin's local startGame() triggers it).
+        // Queue intro first so every phone gets the narrative setup.
+        setScreen(s=>{
+          if(s==='lobby'){
+            setStorySeen(prev=>{
+              if(!prev.has('intro')){
+                setStoryShown('intro');
+                return new Set([...prev,'intro']);
+              }
+              return prev;
+            });
+            return 'game';
+          }
+          return s;
+        });
       }
       if(gs.jorik_team_id!==undefined)setJorikTeamId(gs.jorik_team_id);
       if(gs.bar_break_active){
@@ -1144,13 +1315,36 @@ function App(){
 
     // V7: wrong-quiz → pts=0 path. Mark challenge done, no score change, no first-to-complete bonus.
     const isWrongZero=pts===0;
+    const loc=L_DATA.find(l=>l.id===locId);
+    const isQuiz=loc&&loc.ch[chIdx]?.t==='quiz';
 
-    let totalPts=pts;
-    if(!isDynamicBonus&&!isWrongZero)totalPts+=FIRST_BONUS; // first-to-complete bonus skipped when wrong
+    // V14: hot-streak logic (quizzes only)
+    let streakBonus=0;
+    let streakLabel='';
+    let ghostStreakUnlock=false;
+    let newStreak=quizStreak;
+    if(isQuiz){
+      if(isWrongZero){
+        newStreak=0;
+      }else{
+        newStreak=quizStreak+1;
+        if(STREAK_REWARDS[newStreak]){
+          streakBonus=STREAK_REWARDS[newStreak];
+          streakLabel=`🔥 ${newStreak} op rij`;
+        }
+        if(newStreak===STREAK_GHOST_UNLOCK){
+          ghostStreakUnlock=true;
+        }
+      }
+      setQuizStreak(newStreak);
+    }
+
+    const basePts=pts;
+    const firstBonus=(!isDynamicBonus&&!isWrongZero)?FIRST_BONUS:0;
+    let totalPts=basePts+firstBonus+streakBonus;
 
     if(!isDynamicBonus){
       setCompleted(prev=>({...prev,[locId]:{...prev[locId],[chIdx]:true}}));
-      // V10: remember awarded pts so the card can show wrong-vs-correct
       setCompletedPts(prev=>({...prev,[locId]:{...prev[locId],[chIdx]:totalPts}}));
     }
     if(locId>0)setVisitedLocs(prev=>new Set([...prev,locId]));
@@ -1158,13 +1352,30 @@ function App(){
       setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+totalPts}));
       setScorePopup(`+${totalPts}`);
     }
-    const loc=L_DATA.find(l=>l.id===locId);
+    if(ghostStreakUnlock){
+      setGhostMax(prev=>prev+1);
+    }
     if(loc){
       if(isWrongZero){
         setToast(`${loc.e} ❌ Fout · 0 pts`);
       }else{
-        setToast(`${loc.e} +${totalPts} pts!`);
+        setToast(`${loc.e} +${totalPts} pts!${streakLabel?' '+streakLabel:''}`);
       }
+    }
+
+    // V14: celebration on correct answer (A6)
+    if(!isWrongZero&&loc){
+      const big=streakBonus>0||ghostStreakUnlock;
+      const breakdownBits=[`+${basePts} basis`];
+      if(firstBonus>0)breakdownBits.push(`+${firstBonus} eerste`);
+      if(streakBonus>0)breakdownBits.push(`+${streakBonus} streak`);
+      celebrate({
+        emoji:ghostStreakUnlock?'👻':big?'🔥':loc.e,
+        title:ghostStreakUnlock?'Ghost ontgrendeld!':big?`${newStreak} op rij!`:'Goed zo!',
+        sub:`+${totalPts} pts`,
+        breakdown:breakdownBits,
+        big,
+      });
     }
 
     if(loc){
@@ -1173,29 +1384,48 @@ function App(){
         label=`zat ernaast bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · 0 pts`;
       }else if(isDynamicBonus){
         label=`🎲 Bonus quiz bij ${loc.n} gehaald!`;
+      }else if(streakBonus>0){
+        label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid! 🔥 ${newStreak} op rij · +${streakBonus} bonus`;
       }else{
         label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid!`;
       }
       addActivity(label,isWrongZero?0:totalPts,photoData);
     }
 
-    // V5: Mark this quiz as seen so the same one doesn't appear again
-    // (applies whether they got it right or wrong — they've now seen it)
     if(!isDynamicBonus&&loc&&loc.ch[chIdx]?.t==='quiz'){
       setSeenQuizzes(prev=>new Set([...prev,`${locId}_q_${chIdx}`]));
     }
 
     // Update Supabase
     if(!OFFLINE&&sb&&myTeam&&loc&&!isDynamicBonus){
-      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts});
+      // V14: catch errors so a failing insert doesn't poison subsequent writes
+      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts}).then(()=>{},(e)=>console.warn('completed_challenges insert failed',e));
       if(totalPts>0){
-        sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id);
+        sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id).then(()=>{},(e)=>console.warn('teams update failed',e));
       }
     }else if(!OFFLINE&&sb&&myTeam&&isDynamicBonus&&totalPts>0){
-      // Still persist the team score update, but don't create a completed_challenges row
-      sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id);
+      sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id).then(()=>{},(e)=>console.warn('teams update failed',e));
     }
   };
+
+  // V14: level-up watcher (B2)
+  useEffect(()=>{
+    const myScoreNow=scores[myTeam?.id]||0;
+    const lv=levelFor(myScoreNow);
+    if(lastLevelSeen==null){setLastLevelSeen(lv.level);return;}
+    if(lv.level>lastLevelSeen){
+      setLastLevelSeen(lv.level);
+      celebrate({
+        emoji:lv.emoji,
+        title:`Level ${lv.level} · ${lv.name}`,
+        sub:lv.unlock||'Nieuwe rang',
+        breakdown:null,
+        big:true,
+        levelUp:true,
+      });
+      addActivity(`is level ${lv.level} · ${lv.name} geworden!`,0);
+    }
+  },[scores,myTeam]);
 
   const activateGhost=()=>{
     if(ghost.used>=ghostMax)return;
@@ -1414,18 +1644,25 @@ function App(){
   // ═══════════ SPLASH ═══════════
   if(screen==='splash'){
     return(
-      <div style={{height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24,position:'relative',zIndex:1}}>
-        {isAdmin&&<div className="chip chip-gold animate-in" style={{position:'absolute',top:24,alignSelf:'center',fontSize:11,fontWeight:800,letterSpacing:'0.14em',padding:'7px 14px'}}>👑 GAME MASTER</div>}
-        <div style={{fontSize:84,marginBottom:18,animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.45))'}}>💍</div>
-        <h1 className="animate-in animate-in-1" style={{fontSize:48,fontWeight:900,background:'linear-gradient(135deg,#ffffff 0%,var(--accent-2) 50%,var(--foto-2) 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',letterSpacing:'-0.04em',lineHeight:1,marginBottom:4}}>Stadsspel</h1>
-        <div className="animate-in animate-in-2" style={{fontFamily:'var(--font-display)',fontSize:13,fontWeight:600,color:'var(--text-secondary)',marginBottom:8,letterSpacing:'0.4em',textTransform:'uppercase'}}>Rotterdam</div>
-        <div className="animate-in animate-in-3" style={{fontFamily:'var(--font-display)',fontSize:12,color:'var(--text-tertiary)',marginBottom:6,fontWeight:600}}>Jorik's Bachelor Party · 6 Juni 2026</div>
-        <div className="animate-in animate-in-4" style={{fontSize:13,color:'var(--quiz-2)',marginBottom:40,fontWeight:600,fontStyle:'italic',textAlign:'center'}}>"Acht dagen voor de bruiloft — de ring is zoek."</div>
-        <button className="btn btn-gold btn-lg animate-in animate-in-5" onClick={()=>setScreen('setup')} style={{minWidth:220}}>
-          {isAdmin?'Start als Game Master':'Speel mee'} <span style={{fontSize:18}}>→</span>
+      <div className="screen-hero">
+        {isAdmin&&<div className="chip chip-gold animate-in" style={{position:'absolute',top:'var(--sp-6)'}}>👑 Game Master</div>}
+        <div style={{fontSize:96,animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
+        <div style={{height:'var(--sp-6)'}}/>
+        <h1 className="t-hero animate-in animate-in-1 text-center" style={{background:'linear-gradient(135deg,#ffffff 0%,var(--accent-2) 50%,var(--foto-2) 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Stadsspel</h1>
+        <div className="t-label animate-in animate-in-2" style={{marginTop:'var(--sp-2)',letterSpacing:'0.5em'}}>Rotterdam</div>
+        <div style={{height:'var(--sp-5)'}}/>
+        <div className="t-caption animate-in animate-in-3 text-center">Jorik's Bachelor Party · 6 juni 2026</div>
+        <div className="t-body animate-in animate-in-4 text-center" style={{marginTop:'var(--sp-2)',color:'var(--quiz-2)',fontStyle:'italic'}}>"Acht dagen voor de bruiloft — de ring is zoek."</div>
+        <div style={{height:'var(--sp-8)'}}/>
+        <button className="btn btn-gold btn-lg animate-in animate-in-5" onClick={()=>{
+          const now=Date.now();if(now-tapGuardRef.current<250)return;tapGuardRef.current=now;
+          setScreen('setup');
+        }} style={{minWidth:240}}>
+          {isAdmin?'Start als Game Master':'Speel mee'} <span>→</span>
         </button>
-        <div className="animate-in animate-in-6" style={{marginTop:28,fontSize:12,color:'var(--text-tertiary)',textAlign:'center',lineHeight:1.7,maxWidth:320,fontWeight:500}}>
-          {teams.length>0?<><span style={{color:'var(--accent-2)',fontWeight:800}}>{teams.length} team{teams.length===1?'':'s'}</span> in de lobby · </>:''}≈4 uur buiten spelen<br/><span style={{opacity:0.7}}>Neem een power bank mee</span>
+        <div style={{height:'var(--sp-7)'}}/>
+        <div className="t-caption animate-in animate-in-6 text-center" style={{maxWidth:320,lineHeight:'var(--lh-relaxed)'}}>
+          {teams.length>0?<><span className="t-accent-2" style={{fontWeight:'var(--fw-bold)'}}>{teams.length} team{teams.length===1?'':'s'}</span> in de lobby · </>:''}≈4 uur buiten<br/>Neem een power bank mee
         </div>
       </div>
     );
@@ -1440,53 +1677,61 @@ function App(){
   if(screen==='lobby'){
     const teamCount=teams.length;
     return(
-      <div style={{height:'100%',display:'flex',flexDirection:'column',padding:24,paddingTop:48,overflowY:'auto',position:'relative',zIndex:1}}>
-        <div style={{textAlign:'center',marginBottom:28}}>
-          <div className="chip chip-blue animate-in" style={{margin:'0 auto',fontSize:10,letterSpacing:'0.18em'}}>LOBBY</div>
-          <h1 className="animate-in animate-in-1" style={{fontSize:32,fontWeight:900,marginTop:14,lineHeight:1.1}}>{isAdmin?'Klaar om te starten?':'Verzamelen in Rotterdam'}</h1>
-          <p className="animate-in animate-in-2" style={{fontSize:13,color:'var(--text-tertiary)',marginTop:10,fontWeight:500}}>📍 Startlocatie: Maritiem Museum, Leuvehaven</p>
+      <div className="screen">
+        <div className="text-center">
+          <div className="chip chip-blue animate-in" style={{margin:'0 auto'}}>Lobby</div>
+          <h1 className="t-title animate-in animate-in-1" style={{marginTop:'var(--sp-4)'}}>{isAdmin?'Klaar om te starten?':'Verzamelen in Rotterdam'}</h1>
+          <p className="t-body animate-in animate-in-2" style={{marginTop:'var(--sp-2)'}}>📍 Maritiem Museum · Leuvehaven</p>
         </div>
+        <div style={{height:'var(--sp-7)'}}/>
 
-        {/* V13: live team roster */}
-        <div style={{marginBottom:24}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-            <div className="section-label" style={{margin:0}}>Teams in de lobby</div>
-            <div className="chip chip-gold" style={{fontSize:11,padding:'4px 10px'}}>{teamCount} {teamCount===1?'team':'teams'}</div>
-          </div>
-          {teamCount===0?(
-            <div style={{textAlign:'center',padding:32,color:'var(--text-tertiary)',fontSize:13,borderRadius:'var(--r-lg)',border:'1.5px dashed var(--border-strong)',fontWeight:500}}>
-              <div style={{fontSize:32,marginBottom:8,opacity:0.5}}>👥</div>
-              Nog geen teams — wacht tot iedereen joint
-            </div>
-          ):(
-            <div style={{display:'grid',gridTemplateColumns:teamCount>=3?'1fr 1fr':'1fr',gap:12}}>
-              {teams.map((t,i)=>(
-                <div key={t.id||i} className="glass-card animate-in" style={{padding:18,textAlign:'center',animationDelay:`${i*0.08}s`,borderTop:`4px solid ${t.color}`,background:t.id===myTeam?.id?`linear-gradient(155deg,${t.color}22,${t.color}08)`:'linear-gradient(155deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))'}}>
-                  <div style={{fontSize:38,marginBottom:8,filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.35))'}}>{t.emoji}</div>
-                  <div style={{fontFamily:'var(--font-display)',fontWeight:800,fontSize:15,letterSpacing:'-0.02em'}}>{t.name}</div>
-                  {t.id===myTeam?.id&&<div className="chip chip-gold" style={{fontSize:9,marginTop:8,padding:'3px 9px',letterSpacing:'0.14em'}}>★ JIJ</div>}
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Teams roster */}
+        <div className="row-between" style={{marginBottom:'var(--sp-3)'}}>
+          <div className="t-label">Teams in de lobby</div>
+          <div className="chip chip-gold">{teamCount} {teamCount===1?'team':'teams'}</div>
         </div>
+        {teamCount===0?(
+          <div className="panel text-center" style={{borderStyle:'dashed'}}>
+            <div style={{fontSize:32,opacity:0.5}}>👥</div>
+            <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Nog geen teams — wacht tot iedereen joint</div>
+          </div>
+        ):(
+          <div style={{display:'grid',gridTemplateColumns:teamCount>=3?'1fr 1fr':'1fr',gap:'var(--sp-3)'}}>
+            {teams.map((t,i)=>(
+              <div key={t.id||i} className="panel animate-in text-center" style={{animationDelay:`${i*0.08}s`,borderTop:`4px solid ${t.color}`,background:t.id===myTeam?.id?`linear-gradient(155deg,${t.color}22,${t.color}08)`:undefined,minHeight:148,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start'}}>
+                <div style={{fontSize:40,filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.35))'}}>{t.emoji}</div>
+                <div className="t-card-title" style={{marginTop:'var(--sp-2)'}}>{t.name}</div>
+                {Array.isArray(t.members)&&t.members.length>0&&(
+                  <div style={{display:'flex',flexWrap:'wrap',gap:'var(--sp-1)',justifyContent:'center',marginTop:'var(--sp-2)'}}>
+                    {t.members.slice(0,4).map((m,idx)=>(
+                      <span key={idx} className="t-caption" style={{background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'var(--r-pill)',color:'var(--text-secondary)',fontWeight:'var(--fw-medium)'}}>{m}</span>
+                    ))}
+                    {t.members.length>4&&<span className="t-caption" style={{padding:'2px 4px'}}>+{t.members.length-4}</span>}
+                  </div>
+                )}
+                {t.id===myTeam?.id&&<div className="chip chip-gold" style={{marginTop:'auto',letterSpacing:'0.14em'}}>★ Jij</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{height:'var(--sp-7)'}}/>
 
         {isAdmin?(
-          <>
+          <div className="stack-3">
             <button className="btn btn-gold btn-lg" onClick={()=>{
               if(teamCount<2){if(!confirm(`Slechts ${teamCount} team${teamCount===1?'':'s'} in de lobby. Toch starten?`))return;}
               startGame();
             }} style={{width:'100%'}}>🎮 Start het spel{teamCount>0?` (${teamCount})`:''}</button>
-            <div style={{textAlign:'center',marginTop:12,fontSize:12,color:'var(--text-tertiary)',fontWeight:500}}>Jij bent de Game Master — druk zodra iedereen er is</div>
-          </>
+            <div className="t-caption text-center">Jij bent de Game Master — druk zodra iedereen er is</div>
+          </div>
         ):(
-          <div className="glass-card" style={{textAlign:'center',padding:20,background:'linear-gradient(155deg,rgba(110,163,255,0.08),rgba(110,163,255,0.02))',borderColor:'rgba(110,163,255,0.25)'}}>
-            <div style={{fontSize:32,marginBottom:10}}>⏳</div>
-            <div style={{fontFamily:'var(--font-display)',fontSize:15,color:'var(--foto-2)',fontWeight:800,letterSpacing:'-0.01em'}}>Wachten op de Game Master</div>
-            <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:8,lineHeight:1.55,fontWeight:500}}>Pak vast een drankje bij het Maritiem Museum.<br/>Het spel start automatisch.</div>
+          <div className="panel text-center" style={{background:'linear-gradient(155deg,rgba(110,163,255,0.08),rgba(110,163,255,0.02))',borderColor:'rgba(110,163,255,0.25)'}}>
+            <div style={{fontSize:36}}>⏳</div>
+            <div className="t-card-label" style={{color:'var(--foto-2)',marginTop:'var(--sp-2)'}}>Wachten op de Game Master</div>
+            <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Pak vast een drankje bij het Maritiem Museum.<br/>Het spel start automatisch.</div>
           </div>
         )}
-        {OFFLINE&&<div style={{textAlign:'center',marginTop:14}}><button className="btn btn-ghost btn-sm" onClick={startGame}>Demo: start zelf</button></div>}
+        {OFFLINE&&<div className="text-center" style={{marginTop:'var(--sp-4)'}}><button className="btn btn-ghost btn-sm" onClick={startGame}>Demo: start zelf</button></div>}
       </div>
     );
   }
@@ -1506,39 +1751,91 @@ function App(){
         </div>
       )}
 
-      {/* V13: Premium HUD */}
-      <div style={{padding:'14px 18px',paddingTop:OFFLINE?32:14,background:'linear-gradient(180deg,rgba(10,11,16,0.92) 0%,rgba(10,11,16,0.85) 100%)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:100,backdropFilter:'blur(20px) saturate(1.4)',WebkitBackdropFilter:'blur(20px) saturate(1.4)',position:'relative'}}>
-        <div onClick={leaveTeam} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:10}} title="Tik om team te verlaten">
-          <div style={{fontSize:24,filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.4))'}}>{myTeam?.emoji}</div>
-          <div>
-            <div style={{fontFamily:'var(--font-display)',fontSize:14,fontWeight:800,letterSpacing:'-0.02em'}}>{myTeam?.name}</div>
-            <div style={{fontSize:10,color:'var(--text-tertiary)',fontWeight:600,marginTop:1}}>{PHASE_LABELS[phase]||`Fase ${phase}/4`} · {fmtHM(elapsed)}</div>
+      {/* V14 (A6): full-screen celebration with confetti */}
+      {celebration&&(
+        <div className="celeb-overlay">
+          {/* confetti */}
+          {celebration.big&&[...Array(36)].map((_,i)=>{
+            const left=Math.random()*100;
+            const delay=Math.random()*0.5;
+            const dur=1.6+Math.random()*0.8;
+            const colors=['#e4b25c','#6ea3ff','#b29bff','#5fd8a5','#ff7b7b','#f0c373'];
+            const c=colors[i%colors.length];
+            return <div key={i} className="confetti-piece" style={{left:`${left}%`,background:c,animationDelay:`${delay}s`,animationDuration:`${dur}s`,transform:`rotate(${Math.random()*360}deg)`}}/>;
+          })}
+          {celebration.levelUp&&<div className="level-ray"/>}
+          <div className="celeb-burst">
+            <div className="celeb-emoji">{celebration.emoji}</div>
+            <div className="celeb-title">{celebration.title}</div>
+            {celebration.sub&&<div className="celeb-sub">{celebration.sub}</div>}
+            {celebration.breakdown&&celebration.breakdown.length>1&&(
+              <div className="celeb-breakdown">
+                {celebration.breakdown.map((b,i)=><span key={i}>{b}</span>)}
+              </div>
+            )}
           </div>
         </div>
-        <div style={{textAlign:'center'}}>
-          <div style={{fontFamily:'var(--font-display)',fontSize:24,fontWeight:900,color:'var(--accent-2)',letterSpacing:'-0.04em',lineHeight:1,textShadow:'0 0 20px rgba(228,178,92,0.35)'}}>{myScore}</div>
-          <div style={{fontSize:9,color:'var(--text-tertiary)',fontWeight:700,marginTop:3,letterSpacing:'0.06em',textTransform:'uppercase'}}>{myChallenges} · {visitedLocs.size} loc</div>
+      )}
+
+      {/* V14: Global countdown to diner */}
+      {phase>=1&&phase<5&&(()=>{
+        const ms=Math.max(0,dinerTs()-nowTs);
+        const mins=Math.floor(ms/60000);
+        const urgent=mins<=20;
+        const label=mins>=60?`${Math.floor(mins/60)}u ${mins%60}m tot diner`:`${mins}m tot diner`;
+        return <div className={`game-clock ${urgent?'urgent':''}`}>⏰ {label}</div>;
+      })()}
+
+      {/* V15: HUD — consistent padding + type */}
+      <div style={{padding:`var(--sp-4) var(--sp-5)`,paddingTop:OFFLINE?'var(--sp-7)':phase>=1&&phase<5?'var(--sp-9)':'var(--sp-4)',background:'linear-gradient(180deg,rgba(10,11,16,0.92) 0%,rgba(10,11,16,0.85) 100%)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'var(--sp-3)',zIndex:100,backdropFilter:'blur(20px) saturate(1.4)',WebkitBackdropFilter:'blur(20px) saturate(1.4)',position:'relative'}}>
+        <div onClick={leaveTeam} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:'var(--sp-3)',flex:1,minWidth:0}} title="Tik om team te verlaten">
+          <div style={{fontSize:28,filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.4))'}}>{myTeam?.emoji}</div>
+          <div style={{minWidth:0}}>
+            <div className="t-card-label truncate">{myTeam?.name}</div>
+            <div className="row-2" style={{marginTop:2,flexWrap:'wrap'}}>
+              {(()=>{const lv=levelFor(myScore);const nxt=nextLevel(myScore);return <>
+                <span className="t-label-sm t-accent">{lv.emoji} L{lv.level}</span>
+                {nxt?<span className="t-label-sm">{nxt.min-myScore} tot L{nxt.level}</span>:<span className="t-label-sm t-accent-2">Max</span>}
+              </>;})()}
+              {quizStreak>=2&&<span className="streak-chip">🔥 {quizStreak}</span>}
+            </div>
+          </div>
         </div>
-        <div style={{textAlign:'right'}}>
+        <div style={{textAlign:'center',minWidth:56}}>
+          <div className="t-num" style={{fontSize:'var(--fs-24)',color:'var(--accent-2)',textShadow:'0 0 20px rgba(228,178,92,0.35)'}}>{myScore}</div>
+          <div className="t-label-sm" style={{marginTop:2}}>{myChallenges} · {visitedLocs.size} loc</div>
+        </div>
+        <div style={{textAlign:'right',minWidth:56}}>
           {ghost.active?(
-            <div className="chip" style={{fontSize:11,color:'var(--quiz-2)',background:'rgba(178,155,255,0.18)',borderColor:'rgba(178,155,255,0.4)',fontWeight:800}}>👻 {fmtTime(ghost.timeLeft)}</div>
+            <div className="chip" style={{color:'var(--quiz-2)',background:'rgba(178,155,255,0.18)',borderColor:'rgba(178,155,255,0.4)'}}>👻 {fmtTime(ghost.timeLeft)}</div>
           ):(
-            <div className="chip" style={{fontSize:10,fontWeight:700,padding:'4px 10px'}}>👻 {ghostMax-ghost.used}/{ghostMax}</div>
+            <div className="chip">👻 {ghostMax-ghost.used}/{ghostMax}</div>
           )}
-          <div style={{fontSize:9,color:'var(--text-tertiary)',marginTop:4,fontWeight:600}}>{visitedLocs.size}/102</div>
+          <div className="t-label-sm" style={{marginTop:'var(--sp-1)'}}>{visitedLocs.size}/102</div>
         </div>
       </div>
 
-      {/* V13: Phase progress with labels */}
-      <div style={{padding:'6px 18px 10px'}}>
+      {/* XP progress bar */}
+      {(()=>{
+        const lv=levelFor(myScore);const nxt=nextLevel(myScore);
+        if(!nxt)return <div style={{height:4,background:'linear-gradient(90deg,var(--accent),var(--video))',boxShadow:'0 0 12px rgba(228,178,92,0.5)'}}/>;
+        const pct=((myScore-lv.min)/(nxt.min-lv.min))*100;
+        return(
+          <div style={{height:4,background:'rgba(255,255,255,0.06)',overflow:'hidden'}}>
+            <div style={{height:'100%',width:`${Math.max(2,Math.min(100,pct))}%`,background:'linear-gradient(90deg,var(--foto),var(--accent))',transition:'width .5s var(--ease-out)',boxShadow:'0 0 10px rgba(228,178,92,0.45)'}}/>
+          </div>
+        );
+      })()}
+
+      {/* Phase progress */}
+      <div style={{padding:`var(--sp-2) var(--sp-5) var(--sp-3)`}}>
         <div className="phase-bar">
           {[1,2,3,4].map(p=><div key={p} className={`phase-dot ${phase>p?'done':phase===p?'active':''}`}/>)}
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',fontSize:9,color:'var(--text-tertiary)',marginTop:6,letterSpacing:'0.1em',textTransform:'uppercase',fontWeight:700,fontFamily:'var(--font-display)'}}>
-          <span style={{color:phase>=1?'var(--accent-2)':'var(--text-tertiary)',transition:'color .4s'}}>Zoektocht</span>
-          <span style={{color:phase>=2?'var(--accent-2)':'var(--text-tertiary)',transition:'color .4s'}}>Geruchten</span>
-          <span style={{color:phase>=3?'var(--accent-2)':'var(--text-tertiary)',transition:'color .4s'}}>Cirkel</span>
-          <span style={{color:phase>=4?'var(--accent-2)':'var(--text-tertiary)',transition:'color .4s'}}>Finale</span>
+        <div className="row-between" style={{marginTop:'var(--sp-2)'}}>
+          {['Zoektocht','Geruchten','Cirkel','Finale'].map((l,i)=>(
+            <span key={l} className="t-label-sm" style={{color:phase>=i+1?'var(--accent-2)':'var(--text-tertiary)',transition:'color .4s',letterSpacing:'var(--ls-wider)'}}>{l}</span>
+          ))}
         </div>
       </div>
 
@@ -1605,6 +1902,9 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
   const[color,setColor]=useState('');
   const[err,setErr]=useState('');
   const[busy,setBusy]=useState(false);
+  // V14 (A3): team members — a single textarea, one name per line
+  const[membersText,setMembersText]=useState('');
+  const parseMembers=()=>membersText.split(/[,\n]/).map(s=>s.trim()).filter(Boolean).slice(0,10);
   // V12: editable name on a starter pack
   const[packNameOverride,setPackNameOverride]=useState({});
   const usedEmojis=teams.map(t=>t.emoji);
@@ -1621,6 +1921,17 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
     }catch(e){return false;}
   };
 
+  // V14: insert a team with graceful fallback if the members column doesn't exist yet
+  const insertTeam=async(row,members)=>{
+    // Try with members first
+    let res=await sb.from('teams').insert({...row,members}).select().single();
+    if(res.error&&String(res.error.message||'').includes('members')){
+      // Column missing — DB schema not migrated. Retry without it.
+      res=await sb.from('teams').insert(row).select().single();
+    }
+    return res;
+  };
+
   const createFromPack=async(pack)=>{
     if(busy)return;
     const finalName=(packNameOverride[pack.name]||pack.name).trim();
@@ -1628,16 +1939,18 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
     if(usedEmojis.includes(pack.emoji)){setErr(`${pack.emoji} is al gekozen door een ander team`);return;}
     setBusy(true);
     if(await nameConflict(finalName)){setErr(`"${finalName}" is al in gebruik door een ander team`);setBusy(false);return;}
+    const members=parseMembers();
     if(!OFFLINE&&sb){
-      const res=await sb.from('teams').insert({name:finalName,emoji:pack.emoji,color:pack.color}).select().single();
+      const res=await insertTeam({name:finalName,emoji:pack.emoji,color:pack.color},members);
       if(res.error){
         setErr('Team aanmaken mislukt — probeer een andere naam');setBusy(false);return;
       }
       const team={...res.data};
+      if(!team.members||team.members.length===0)team.members=members; // client-side fallback for chip rendering
       setTeams(prev=>prev.some(t=>t.id===team.id)?prev:[...prev,team]);
       onJoin(team);
     }else{
-      const team={id:Date.now(),name:finalName,emoji:pack.emoji,color:pack.color,score:0};
+      const team={id:Date.now(),name:finalName,emoji:pack.emoji,color:pack.color,score:0,members};
       setTeams(prev=>[...prev,team]);
       onJoin(team);
     }
@@ -1651,14 +1964,16 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
     if(usedEmojis.includes(emoji)){setErr(`${emoji} is al gekozen door een ander team`);return;}
     setBusy(true);
     if(await nameConflict(finalName)){setErr(`"${finalName}" is al in gebruik door een ander team`);setBusy(false);return;}
+    const members=parseMembers();
     if(!OFFLINE&&sb){
-      const res=await sb.from('teams').insert({name:finalName,emoji,color}).select().single();
+      const res=await insertTeam({name:finalName,emoji,color},members);
       if(res.error){setErr('Team aanmaken mislukt — probeer een andere naam');setBusy(false);return;}
       const team={...res.data};
+      if(!team.members||team.members.length===0)team.members=members;
       setTeams(prev=>prev.some(t=>t.id===team.id)?prev:[...prev,team]);
       onJoin(team);
     }else{
-      const team={id:Date.now(),name:finalName,emoji,color,score:0};
+      const team={id:Date.now(),name:finalName,emoji,color,score:0,members};
       setTeams(prev=>[...prev,team]);
       onJoin(team);
     }
@@ -1666,22 +1981,43 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
   };
 
   return(
-    <div style={{height:'100%',overflow:'auto',padding:24,paddingTop:48,paddingBottom:40,position:'relative',zIndex:1}}>
-      <div style={{textAlign:'center',marginBottom:28}}>
-        <div style={{fontSize:56,marginBottom:14,filter:'drop-shadow(0 6px 16px rgba(110,163,255,0.35))'}}>🎮</div>
-        <h1 className="animate-in" style={{fontSize:30,fontWeight:900,letterSpacing:'-0.03em'}}>Kies je team</h1>
-        <p className="animate-in animate-in-1" style={{fontSize:13,color:'var(--text-secondary)',marginTop:8,fontWeight:500}}>Tik op een starter pack of maak je eigen</p>
+    <div className="screen">
+      <div className="text-center">
+        <div style={{fontSize:64,filter:'drop-shadow(0 6px 16px rgba(110,163,255,0.35))'}}>🎮</div>
+        <h1 className="t-title animate-in" style={{marginTop:'var(--sp-3)'}}>Kies je team</h1>
+        <p className="t-body animate-in animate-in-1" style={{marginTop:'var(--sp-2)'}}>Tik op een starter pack of maak je eigen</p>
       </div>
+      <div style={{height:'var(--sp-6)'}}/>
 
-      {/* V13: Mode toggle — segment */}
-      <div style={{display:'flex',gap:6,marginBottom:18,padding:5,background:'rgba(255,255,255,0.04)',borderRadius:'var(--r-pill)',border:'1px solid var(--border)'}}>
-        <button onClick={()=>setMode('quick')} style={{flex:1,padding:12,borderRadius:'var(--r-pill)',border:'none',background:mode==='quick'?'linear-gradient(135deg,rgba(110,163,255,0.22),rgba(110,163,255,0.1))':'transparent',color:mode==='quick'?'var(--foto-2)':'var(--text-secondary)',fontWeight:800,fontSize:13,cursor:'pointer',transition:'all .25s var(--spring)',fontFamily:'var(--font-display)',letterSpacing:'0.02em',boxShadow:mode==='quick'?'inset 0 0 0 1px rgba(110,163,255,0.35)':'none'}}>⚡ Snel</button>
-        <button onClick={()=>setMode('custom')} style={{flex:1,padding:12,borderRadius:'var(--r-pill)',border:'none',background:mode==='custom'?'linear-gradient(135deg,rgba(110,163,255,0.22),rgba(110,163,255,0.1))':'transparent',color:mode==='custom'?'var(--foto-2)':'var(--text-secondary)',fontWeight:800,fontSize:13,cursor:'pointer',transition:'all .25s var(--spring)',fontFamily:'var(--font-display)',letterSpacing:'0.02em',boxShadow:mode==='custom'?'inset 0 0 0 1px rgba(110,163,255,0.35)':'none'}}>✏️ Eigen</button>
+      {/* Mode toggle — segment */}
+      <div style={{display:'flex',gap:'var(--sp-1)',padding:'var(--sp-1)',background:'rgba(255,255,255,0.04)',borderRadius:'var(--r-pill)',border:'1px solid var(--border)'}}>
+        {[{k:'quick',l:'⚡ Snel'},{k:'custom',l:'✏️ Eigen'}].map(o=>(
+          <button key={o.k} onClick={()=>setMode(o.k)} className="t-card-label" style={{flex:1,padding:'var(--sp-3)',borderRadius:'var(--r-pill)',border:'none',background:mode===o.k?'linear-gradient(135deg,rgba(110,163,255,0.22),rgba(110,163,255,0.1))':'transparent',color:mode===o.k?'var(--foto-2)':'var(--text-secondary)',fontSize:'var(--fs-13)',cursor:'pointer',transition:'all .25s var(--spring)',boxShadow:mode===o.k?'inset 0 0 0 1px rgba(110,163,255,0.35)':'none'}}>{o.l}</button>
+        ))}
       </div>
+      <div style={{height:'var(--sp-5)'}}/>
+
+      {/* Team members input */}
+      <div className="panel">
+        <div className="row-between" style={{marginBottom:'var(--sp-3)'}}>
+          <div className="t-label">Wie speelt mee?</div>
+          <div className="t-caption">optioneel · max 10</div>
+        </div>
+        <textarea value={membersText} onChange={e=>setMembersText(e.target.value)}
+          placeholder={"Jan\nPiet\nHenk"} rows={3}
+          className="t-body-emph"
+          style={{width:'100%',padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',outline:'none',fontFamily:'var(--font-body)',resize:'vertical',minHeight:72}}/>
+        {parseMembers().length>0&&(
+          <div style={{display:'flex',flexWrap:'wrap',gap:'var(--sp-1)',marginTop:'var(--sp-3)'}}>
+            {parseMembers().map((m,i)=><span key={i} className="chip">{m}</span>)}
+          </div>
+        )}
+      </div>
+      <div style={{height:'var(--sp-5)'}}/>
 
       {mode==='quick'&&(
         <div>
-          <div className="section-label">Starter packs</div>
+          <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>Starter packs</div>
           <div className="starter-grid">
             {STARTER_PACKS.map((p,i)=>{
               const taken=usedEmojis.includes(p.emoji)||usedNames.includes(p.name.toLowerCase());
@@ -1692,61 +2028,58 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
                   <div className="starter-emoji">{p.emoji}</div>
                   <div className="starter-name">{p.name}</div>
                   <div className="starter-color" style={{background:p.color}}/>
-                  {taken&&<div style={{fontSize:10,color:'var(--text-tertiary)',marginTop:6,fontWeight:700,letterSpacing:'0.08em',textTransform:'uppercase'}}>bezet</div>}
+                  {taken&&<div className="t-label-sm" style={{marginTop:'var(--sp-2)'}}>Bezet</div>}
                 </button>
               );
             })}
           </div>
-          {err&&<div style={{marginTop:12,padding:'10px 14px',borderRadius:'var(--r-md)',background:'rgba(255,107,107,0.12)',border:'1px solid rgba(255,107,107,0.35)',color:'var(--danger)',fontSize:12,fontWeight:700,textAlign:'center'}}>⚠ {err}</div>}
-          {busy&&<div style={{marginTop:12,textAlign:'center',fontSize:12,color:'var(--text-secondary)',fontWeight:600}}>⏳ Team aanmaken…</div>}
-          <div style={{textAlign:'center',marginTop:18,fontSize:12,color:'var(--text-tertiary)',fontWeight:500}}>Liever zelf een naam verzinnen? <a onClick={()=>setMode('custom')} style={{color:'var(--foto-2)',cursor:'pointer',fontWeight:700}}>Eigen team maken</a></div>
+          {err&&<div className="panel-sm t-body-emph t-danger text-center" style={{marginTop:'var(--sp-3)',background:'rgba(255,107,107,0.12)',borderColor:'rgba(255,107,107,0.35)'}}>⚠ {err}</div>}
+          {busy&&<div className="t-caption text-center" style={{marginTop:'var(--sp-3)'}}>⏳ Team aanmaken…</div>}
+          <div className="t-caption text-center" style={{marginTop:'var(--sp-5)'}}>Liever zelf een naam verzinnen? <a onClick={()=>setMode('custom')} style={{color:'var(--foto-2)',cursor:'pointer',fontWeight:'var(--fw-semi)'}}>Eigen team maken</a></div>
         </div>
       )}
 
       {mode==='custom'&&(
-        <>
-          <div className="glass" style={{padding:16,marginBottom:12}}>
-            <label style={{fontSize:12,color:'var(--text-secondary)',fontWeight:600,display:'block',marginBottom:8}}>TEAMNAAM</label>
+        <div className="stack-3">
+          <div className="panel">
+            <div className="t-label" style={{marginBottom:'var(--sp-2)'}}>Teamnaam</div>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="Bijv. De Maffiosi"
-              style={{width:'100%',padding:12,borderRadius:10,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:16,outline:'none'}}/>
+              className="t-body-emph"
+              style={{width:'100%',padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',outline:'none'}}/>
           </div>
-
-          <div className="glass" style={{padding:16,marginBottom:12}}>
-            <label style={{fontSize:12,color:'var(--text-secondary)',fontWeight:600,display:'block',marginBottom:8}}>TEAM ICOON</label>
-            <div className="emoji-grid">
+          <div className="panel">
+            <div className="t-label" style={{marginBottom:'var(--sp-2)'}}>Team icoon</div>
+            <div className="emoji-grid" style={{margin:0}}>
               {TEAM_EMOJIS.map(e=>(
                 <button key={e} className={`emoji-btn ${emoji===e?'selected':''} ${usedEmojis.includes(e)&&emoji!==e?'taken':''}`}
                   onClick={()=>!usedEmojis.includes(e)&&setEmoji(e)} disabled={usedEmojis.includes(e)&&emoji!==e}>{e}</button>
               ))}
             </div>
           </div>
-
-          <div className="glass" style={{padding:16,marginBottom:16}}>
-            <label style={{fontSize:12,color:'var(--text-secondary)',fontWeight:600,display:'block',marginBottom:8}}>TEAM KLEUR</label>
-            <div className="color-grid">
+          <div className="panel">
+            <div className="t-label" style={{marginBottom:'var(--sp-2)'}}>Team kleur</div>
+            <div className="color-grid" style={{margin:0}}>
               {TEAM_COLORS.map(c=>(
                 <button key={c.hex} className={`color-btn ${color===c.hex?'selected':''}`}
                   style={{background:c.hex}} onClick={()=>setColor(c.hex)}/>
               ))}
             </div>
           </div>
-
-          <button className="btn btn-cyan" onClick={createCustom} disabled={!name||!emoji||!color||busy}
-            style={{width:'100%',padding:16,fontSize:16,borderRadius:14}}>
-            {busy?'⏳ Aanmaken…':'Team Aanmaken & Joinen'}
+          <button className="btn btn-cyan btn-lg" onClick={createCustom} disabled={!name||!emoji||!color||busy}
+            style={{width:'100%'}}>
+            {busy?'⏳ Aanmaken…':'Team aanmaken & joinen'}
           </button>
-          {err&&<div style={{marginTop:10,padding:'8px 12px',borderRadius:10,background:'rgba(224,92,92,0.1)',border:'1px solid rgba(224,92,92,0.3)',color:'var(--danger)',fontSize:12,fontWeight:600,textAlign:'center'}}>⚠ {err}</div>}
-        </>
+          {err&&<div className="panel-sm t-body-emph t-danger text-center" style={{background:'rgba(255,107,107,0.12)',borderColor:'rgba(255,107,107,0.35)'}}>⚠ {err}</div>}
+        </div>
       )}
 
-      {/* V12: admin spectator path — no team needed */}
+      {/* Spectator admin path */}
       {isAdmin&&(
-        <div style={{marginTop:24,padding:14,borderRadius:12,background:'rgba(212,160,84,0.06)',border:'1px dashed rgba(212,160,84,0.3)',textAlign:'center'}}>
-          <div style={{fontSize:11,color:'var(--accent)',fontWeight:700,letterSpacing:1,marginBottom:4}}>GAME MASTER</div>
-          <div style={{fontSize:12,color:'var(--text-secondary)',marginBottom:10}}>Liever alleen observeren zonder mee te spelen?</div>
-          <button className="btn btn-ghost" onClick={()=>onJoin({id:-1,name:'Game Master',emoji:'👑',color:'#d4a054',score:0,spectator:true})}
-            style={{fontSize:12,padding:'8px 16px'}}>
-            👑 Alleen als GM observeren
+        <div className="panel text-center" style={{marginTop:'var(--sp-6)',borderStyle:'dashed',borderColor:'rgba(228,178,92,0.3)',background:'rgba(228,178,92,0.04)'}}>
+          <div className="t-label t-accent">Game Master</div>
+          <div className="t-body" style={{marginTop:'var(--sp-2)',marginBottom:'var(--sp-3)'}}>Liever alleen observeren zonder mee te spelen?</div>
+          <button className="btn btn-ghost btn-sm" onClick={()=>onJoin({id:-1,name:'Game Master',emoji:'👑',color:'#d4a054',score:0,spectator:true})}>
+            👑 Observeren als GM
           </button>
         </div>
       )}
@@ -1771,29 +2104,30 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
   const phaseStory=phaseKey?NARRATIVE[phaseKey]:null;
 
   return(
-    <div style={{height:'100%',overflowY:'auto',padding:16,paddingBottom:90}}>
-      {/* V5: narrative ticker */}
+    <div style={{height:'100%',overflowY:'auto',padding:'var(--sp-5)',paddingBottom:'var(--sp-10)'}}>
+      {/* Narrative ticker */}
       {phaseStory&&(
-        <div className="story-ticker" onClick={()=>onShowStory&&onShowStory(phaseKey)} style={{cursor:'pointer'}}>
-          <div style={{fontSize:10,fontWeight:800,color:'var(--quiz)',letterSpacing:1,marginBottom:4}}>{phaseStory.chapter}</div>
-          <div style={{fontWeight:700,color:'#fff',marginBottom:3,fontStyle:'normal'}}>{phaseStory.title}</div>
-          <div style={{fontSize:11,color:'var(--text-secondary)',fontStyle:'italic'}}>Tik voor verhaal →</div>
+        <div className="story-ticker" onClick={()=>onShowStory&&onShowStory(phaseKey)} style={{cursor:'pointer',marginBottom:'var(--sp-3)'}}>
+          <div className="t-label-sm" style={{color:'var(--quiz)',marginBottom:'var(--sp-1)',letterSpacing:'var(--ls-widest)'}}>{phaseStory.chapter}</div>
+          <div className="t-card-label" style={{marginBottom:'var(--sp-1)'}}>{phaseStory.title}</div>
+          <div className="t-caption" style={{fontStyle:'italic'}}>Tik voor verhaal →</div>
         </div>
       )}
-      {/* V9: next reward banner — shows whichever milestone is closest */}
+
+      {/* Next reward banner */}
       {(myNextTier||nextGhost)&&(
-        <div className="reward-card">
+        <div className="reward-card" style={{marginBottom:'var(--sp-3)'}}>
           <div className="reward-icon">{myNextTier?myNextTier.badge:'👻'}</div>
           <div className="reward-info">
-            <div className="reward-label">VOLGENDE BELONING</div>
-            <div className="reward-target">
+            <div className="t-label-sm" style={{marginBottom:'var(--sp-1)'}}>Volgende beloning</div>
+            <div className="t-card-label">
               {myNextTier?
                 `${myNextTier.name} bij ${myNextTier.min} challenges (${myChallengesDone}/${myNextTier.min})`
                 :
                 `${nextGhost.label} (${myScore}/${nextGhost.score} pts)`
               }
             </div>
-            <div className="reward-progress">
+            <div className="reward-progress" style={{marginTop:'var(--sp-2)'}}>
               <div className="reward-progress-fill" style={{
                 width: myNextTier?
                   `${Math.min(100, (myChallengesDone/myNextTier.min)*100)}%`
@@ -1805,47 +2139,48 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         </div>
       )}
 
-      {/* V9: own current tier banner (if you have one) */}
+      {/* Max tier banner */}
       {myTier&&!myNextTier&&(
-        <div className="reward-card" style={{borderColor:'rgba(255,215,0,0.4)'}}>
+        <div className="reward-card" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(228,178,92,0.4)'}}>
           <div className="reward-icon">{myTier.badge}</div>
           <div className="reward-info">
-            <div className="reward-label">MAX TIER BEHAALD</div>
-            <div className="reward-target">{myTier.name} · jullie zijn legendes</div>
+            <div className="t-label-sm t-accent" style={{marginBottom:'var(--sp-1)'}}>Max tier behaald</div>
+            <div className="t-card-label">{myTier.name} · jullie zijn legendes</div>
           </div>
         </div>
       )}
 
-      {/* V6: pending review badge for own team */}
+      {/* Pending review */}
       {pendingMine>0&&(
-        <div className="glass" style={{padding:10,marginBottom:10,borderColor:'rgba(255,215,0,0.3)',display:'flex',alignItems:'center',gap:10}}>
-          <div style={{fontSize:18}}>⏳</div>
-          <div style={{flex:1}}>
-            <div style={{fontSize:12,color:'var(--accent)',fontWeight:700}}>{pendingMine} foto{pendingMine===1?'':"'s"} in beoordeling</div>
-            <div style={{fontSize:10,color:'var(--text-secondary)',marginTop:2}}>Punten zijn voorlopig toegekend · game master kan ze afkeuren</div>
+        <div className="panel-sm panel row-3" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(228,178,92,0.3)'}}>
+          <div style={{fontSize:22}}>⏳</div>
+          <div className="flex-1">
+            <div className="t-card-label t-accent">{pendingMine} foto{pendingMine===1?'':"'s"} in beoordeling</div>
+            <div className="t-caption" style={{marginTop:2}}>Punten zijn voorlopig toegekend · game master kan ze afkeuren</div>
           </div>
         </div>
       )}
 
-      {/* Bar break countdown */}
+      {/* Bar break banner */}
       {barBreak&&(
-        <div className="glass" style={{padding:14,marginBottom:14,textAlign:'center',borderColor:'rgba(255,215,0,0.3)'}}>
-          <div style={{fontSize:11,color:'var(--accent)',fontWeight:700}}>🍺 VOLGENDE BAR BREAK</div>
-          <div style={{fontSize:16,fontWeight:700,marginTop:4}}>{barBreak.name}</div>
+        <div className="panel-sm panel text-center" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(228,178,92,0.3)'}}>
+          <div className="t-label t-accent">🍺 Volgende bar break</div>
+          <div className="t-card-title" style={{marginTop:'var(--sp-1)'}}>{barBreak.name}</div>
         </div>
       )}
 
-      {/* Wedding video mission - only when Jorik is NOT in team */}
+      {/* Wedding video mission */}
       {!jorikInTeam&&!weddingDone&&(
-        <div className="secret-banner" onClick={onShowWedding}>
-          <div className="secret-badge">🤫 GEHEIME MISSIE</div>
-          <div style={{fontWeight:700,fontSize:14}}>Bruiloftsvideo opnemen</div>
-          <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:4}}>Tik hier voor instructies · +{WEDDING_VIDEO_BONUS} pts</div>
+        <div className="secret-banner" onClick={onShowWedding} style={{marginBottom:'var(--sp-3)',marginTop:0}}>
+          <div className="secret-badge">🤫 Geheime missie</div>
+          <div className="t-card-label" style={{marginTop:'var(--sp-2)'}}>Bruiloftsvideo opnemen</div>
+          <div className="t-body" style={{marginTop:'var(--sp-1)'}}>Tik hier voor instructies · +{WEDDING_VIDEO_BONUS} pts</div>
         </div>
       )}
       {weddingDone&&(
-        <div className="glass" style={{padding:14,marginBottom:14,borderColor:'rgba(0,255,136,0.3)'}}>
-          <div style={{fontSize:12,color:'var(--success)',fontWeight:700}}>✅ Geheime missie voltooid!</div>
+        <div className="panel-sm panel row-3" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(95,216,165,0.3)'}}>
+          <div style={{fontSize:20}}>✅</div>
+          <div className="t-card-label t-success">Geheime missie voltooid</div>
         </div>
       )}
 
@@ -1871,6 +2206,10 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
                 )}
               </div>
               <div className="lb-stats">{teamChallenges} challenges · {t.locations_visited||0} locaties{isMine&&ghostMax>GHOST_MAX_USES?` · 👻×${ghostMax}`:''}</div>
+              {/* V14 (A3): member names on leaderboard row */}
+              {Array.isArray(t.members)&&t.members.length>0&&(
+                <div style={{fontSize:10,color:'var(--text-tertiary)',marginTop:3,fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{t.members.slice(0,4).join(' · ')}{t.members.length>4?' · …':''}</div>
+              )}
             </div>
             <div className="lb-score" style={{color:t.color}}>{t.score}</div>
           </div>
@@ -2409,19 +2748,18 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
       <div className="sheet-overlay" onClick={onClose}/>
       <div className="sheet">
         <div className="sheet-handle"/>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:16}}>
+        <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-5)'}}>
           <div>
-            <div style={{fontSize:28,marginBottom:4}}>{loc.e}</div>
-            <h2 style={{fontSize:20,fontWeight:800}}>{loc.n}</h2>
-            <div style={{display:'flex',gap:8,marginTop:6,alignItems:'center',flexWrap:'wrap'}}>
-              <span style={{fontSize:11,padding:'2px 8px',borderRadius:6,background:'rgba(0,212,255,0.15)',color:'var(--foto)'}}>{loc.c}</span>
-              {dist!=null&&<span style={{fontSize:12,color:'var(--text-secondary)'}}>{fmtDist(dist)}</span>}
-              {/* V12: directions link — opens native maps app */}
+            <div style={{fontSize:32,marginBottom:'var(--sp-2)',filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.35))'}}>{loc.e}</div>
+            <h2 className="t-section">{loc.n}</h2>
+            <div className="row-2" style={{marginTop:'var(--sp-2)',flexWrap:'wrap'}}>
+              <span className="chip chip-blue">{loc.c}</span>
+              {dist!=null&&<span className="t-caption">{fmtDist(dist)}</span>}
               <a href={`https://www.google.com/maps/dir/?api=1&destination=${loc.la},${loc.lo}&travelmode=walking`} target="_blank" rel="noopener noreferrer"
-                style={{fontSize:11,padding:'2px 8px',borderRadius:6,background:'rgba(75,190,138,0.12)',color:'var(--creatief)',textDecoration:'none',fontWeight:600}}>🧭 Route</a>
+                className="chip" style={{background:'rgba(95,216,165,0.14)',borderColor:'rgba(95,216,165,0.3)',color:'var(--creatief-2)',textDecoration:'none'}}>🧭 Route</a>
             </div>
           </div>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-tertiary)',fontSize:28,cursor:'pointer',padding:4}}>✕</button>
+          <button onClick={onClose} aria-label="Sluiten" style={{background:'none',border:'none',color:'var(--text-tertiary)',fontSize:26,cursor:'pointer',padding:'var(--sp-1)',lineHeight:1}}>✕</button>
         </div>
 
         {loc.ch.map((ch,idx)=>{
@@ -2434,19 +2772,19 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
 
           return(
             <div key={idx} className={`ch-card ${done&&!wasWrong?'completed':''} ${wasWrong?'wrong-done':''} ${locked?'locked':''}`} style={{position:'relative'}}>
-              {locked&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1,fontSize:14,color:'var(--accent)',fontWeight:700}}>🔒 Eerst een foto-opdracht!</div>}
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:8}}>
-                <div style={{flex:1}}>
+              {locked&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1}} className="t-card-label t-accent">🔒 Eerst een foto-opdracht!</div>}
+              <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-2)'}}>
+                <div className="flex-1">
                   <span className={`ch-type ch-type-${ch.t}`}>{ch.t}</span>
-                  <h3 style={{fontSize:15,fontWeight:700,marginTop:6}}>{ch.ti}</h3>
+                  <h3 className="t-card-label" style={{marginTop:'var(--sp-2)'}}>{ch.ti}</h3>
                 </div>
                 <div className="points-badge">+{ch.p}</div>
               </div>
-              <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.4}}>{ch.d}</p>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <p className="t-body" style={{marginBottom:'var(--sp-3)'}}>{ch.d}</p>
+              <div className="row-between">
                 <div className="difficulty"><span className="star">{stars(ch.df)}</span> {ch.df}</div>
-                {done&&!wasWrong&&<div style={{fontSize:13,color:'var(--success)',fontWeight:700}}>✓ Voltooid {ptsEarned>0&&`(+${ptsEarned} pts)`}</div>}
-                {wasWrong&&<div style={{fontSize:13,color:'var(--danger)',fontWeight:700}}>✗ Fout gegokt · 0 pts{isQuiz&&ch.a?` · antwoord: ${ch.a}`:''}</div>}
+                {done&&!wasWrong&&<div className="t-body-emph t-success">✓ Voltooid {ptsEarned>0&&`(+${ptsEarned} pts)`}</div>}
+                {wasWrong&&<div className="t-body-emph t-danger">✗ Fout gegokt · 0 pts{isQuiz&&ch.a?` · antwoord: ${ch.a}`:''}</div>}
               </div>
               {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam}/>}
             </div>
@@ -2553,10 +2891,10 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
 
   if(ch.t==='quiz'){
     // V12: advertise stakes clearly before the tap
-    const stakes=ch.df==='hard'?'⚡ EÉN KANS · hard — 4 opties, weinig ruimte voor geluk':ch.df==='medium'?'⚡ EÉN KANS · medium — denk goed na':'⚡ EÉN KANS · easy — fout = 0 pts, geen herkansing';
+    const stakes=ch.df==='hard'?'⚡ Eén kans · hard — 4 opties, weinig ruimte voor geluk':ch.df==='medium'?'⚡ Eén kans · medium — denk goed na':'⚡ Eén kans · easy — fout = 0 pts, geen herkansing';
     return(
-      <div style={{marginTop:12}}>
-        <div style={{fontSize:11,padding:'6px 10px',borderRadius:8,background:'rgba(224,92,92,0.08)',border:'1px solid rgba(224,92,92,0.2)',color:'var(--danger)',marginBottom:10,fontWeight:700,letterSpacing:0.2}}>
+      <div style={{marginTop:'var(--sp-3)'}}>
+        <div className="t-body-emph t-danger" style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-sm)',background:'rgba(255,107,107,0.1)',border:'1px solid rgba(255,107,107,0.25)',marginBottom:'var(--sp-3)'}}>
           {stakes}
         </div>
         {ch.o.map((opt,i)=>{
@@ -2576,8 +2914,8 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
             </button>
           );
         })}
-        {quizFeedback==='wrong'&&<div style={{fontSize:13,color:'var(--danger)',marginTop:8,fontWeight:600}}>❌ Helaas. Het juiste antwoord was: {ch.a} · 0 pts</div>}
-        {quizFeedback==='correct'&&<div style={{fontSize:13,color:'var(--success)',marginTop:8,fontWeight:600}}>✅ Correct! +{ch.p} pts</div>}
+        {quizFeedback==='wrong'&&<div className="t-body-emph t-danger" style={{marginTop:'var(--sp-3)'}}>❌ Helaas. Het juiste antwoord was: {ch.a} · 0 pts</div>}
+        {quizFeedback==='correct'&&<div className="t-body-emph t-success" style={{marginTop:'var(--sp-3)'}}>✅ Correct! +{ch.p} pts</div>}
       </div>
     );
   }
@@ -2673,6 +3011,16 @@ function WeddingMission({onClose,onComplete,done}){
 function BarBreakOverlay({info,onClose,onComplete}){
   const[done,setDone]=useState(new Set());
   const[selected,setSelected]=useState(null);
+  const[nowTs,setNowTs]=useState(Date.now());
+  // V14 (B1b): live countdown to auto-end of bar break
+  useEffect(()=>{
+    const i=setInterval(()=>setNowTs(Date.now()),1000);
+    return()=>clearInterval(i);
+  },[]);
+  const endsAt=(info.started||Date.now())+BAR_BREAK_DURATION_MS;
+  const msLeft=Math.max(0,endsAt-nowTs);
+  const secLeft=Math.floor(msLeft/1000);
+  const urgent=secLeft<=60;
   const complete=(m,i)=>{
     if(done.has(i))return;
     setDone(prev=>new Set([...prev,i]));
@@ -2683,7 +3031,9 @@ function BarBreakOverlay({info,onClose,onComplete}){
       <div className="barbreak-card" style={{maxWidth:500,width:'92%'}}>
         <div style={{fontSize:11,color:'var(--accent)',fontWeight:800,letterSpacing:2,marginBottom:6}}>🍻 BAR BREAK</div>
         <div style={{fontSize:26,fontWeight:900,marginBottom:6,background:'linear-gradient(135deg,#ffd700,#ff6b35)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
-        <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:20,fontStyle:'italic'}}>Kies een mini-opdracht voor extra punten. Jullie kunnen ze alle drie doen.</div>
+        {/* V14: countdown pill */}
+        <div className="chip" style={{margin:'0 auto 14px',fontSize:12,fontWeight:800,color:urgent?'var(--danger)':'var(--accent-2)',borderColor:urgent?'rgba(255,107,107,0.4)':'rgba(228,178,92,0.35)',background:urgent?'rgba(255,107,107,0.12)':'var(--accent-glow)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>⏱ {secLeft>=60?`${Math.floor(secLeft/60)}m ${secLeft%60}s`:`${secLeft}s`} over</div>
+        <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:20,fontStyle:'italic'}}>Drie bonus-opdrachten · alle drie mogen</div>
         <div style={{display:'grid',gap:10,marginBottom:18}}>
           {info.mini.map((m,i)=>{
             const isDone=done.has(i);
