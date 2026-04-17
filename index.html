@@ -3,26 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V10 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V11 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    :root{--bg:#08090d;--surface:rgba(255,255,255,0.035);--surface-hover:rgba(255,255,255,0.06);--border:rgba(255,255,255,0.06);--text-primary:rgba(255,255,255,0.92);--text-secondary:rgba(255,255,255,0.45);--text-tertiary:rgba(255,255,255,0.25);--accent:#d4a054;--accent-glow:rgba(212,160,84,0.12);--foto:#5b8dee;--quiz:#9b7bea;--creatief:#4bbe8a;--video:#e05c5c;--success:#4bbe8a;--danger:#e05c5c}
     *{margin:0;padding:0;box-sizing:border-box}
     html,body,#root{width:100%;height:100%;overflow:hidden}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0e27;color:#fff}
+    body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text-primary);-webkit-font-smoothing:antialiased}
     .leaflet-div-icon{background:none!important;border:none!important}
 
     /* Glass morphism */
-    .glass{backdrop-filter:blur(14px);background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:16px}
-    .glass-strong{backdrop-filter:blur(20px);background:rgba(10,14,39,0.85);border:1px solid rgba(255,255,255,0.15);border-radius:16px}
+    .glass{backdrop-filter:blur(14px);background:var(--surface);border:1px solid var(--border);border-radius:14px}
+    .glass-strong{backdrop-filter:blur(20px);background:rgba(8,9,13,0.88);border:1px solid rgba(255,255,255,0.08);border-radius:14px}
 
     /* Buttons */
-    .btn{padding:12px 24px;border:none;border-radius:12px;font-weight:700;cursor:pointer;transition:all .2s;font-size:14px}
-    .btn:active{transform:scale(0.96)}
-    .btn-cyan{background:linear-gradient(135deg,#00d4ff,#0099cc);color:#0a0e27}
-    .btn-gold{background:linear-gradient(135deg,#ffd700,#ffaa00);color:#0a0e27}
-    .btn-ghost{background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2)}
-    .btn-danger{background:linear-gradient(135deg,#ff4444,#cc0000);color:#fff}
-    .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+    .btn{padding:12px 24px;border:none;border-radius:10px;font-weight:600;cursor:pointer;transition:all .15s;font-size:13px;letter-spacing:-0.1px}
+    .btn:active{transform:scale(0.97)}
+    .btn-cyan{background:linear-gradient(135deg,var(--foto),#4a7bd4);color:#fff}
+    .btn-gold{background:linear-gradient(135deg,var(--accent),#b8863a);color:#fff}
+    .btn-ghost{background:var(--surface);color:var(--text-secondary);border:1px solid var(--border)}
+    .btn-danger{background:linear-gradient(135deg,var(--danger),#b84040);color:#fff}
+    .btn:disabled{opacity:0.35;cursor:not-allowed;transform:none}
 
     /* Animations */
     @keyframes fadeInUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
@@ -38,70 +40,81 @@
 
     /* Toast */
     .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:10002;animation:slideDown .3s ease}
-    .toast-inner{padding:14px 24px;border-radius:14px;backdrop-filter:blur(20px);background:rgba(0,212,255,0.15);border:1px solid rgba(0,212,255,0.4);font-weight:600;font-size:14px;white-space:nowrap;text-align:center}
+    .toast-inner{padding:10px 20px;border-radius:10px;backdrop-filter:blur(16px);background:rgba(212,160,84,0.12);border:1px solid rgba(212,160,84,0.25);font-weight:600;font-size:13px;white-space:nowrap;text-align:center;color:var(--text-primary)}
 
     /* Score popup */
-    .score-popup{position:fixed;top:40%;left:50%;transform:translateX(-50%);z-index:10003;font-size:42px;font-weight:900;color:#ffd700;animation:scoreFloat 1.2s ease forwards;pointer-events:none;text-shadow:0 2px 20px rgba(255,215,0,0.6)}
+    .score-popup{position:fixed;top:40%;left:50%;transform:translateX(-50%);z-index:10003;font-size:38px;font-weight:900;color:var(--accent);animation:scoreFloat 1.2s ease forwards;pointer-events:none;text-shadow:0 2px 20px rgba(212,160,84,0.5)}
 
     /* Offline banner */
-    .offline-banner{position:fixed;top:0;left:0;right:0;padding:6px;text-align:center;font-size:11px;font-weight:600;color:#ff6b35;background:rgba(255,107,53,0.15);border-bottom:1px solid rgba(255,107,53,0.3);z-index:10001}
+    .offline-banner{position:fixed;top:0;left:0;right:0;padding:5px;text-align:center;font-size:10px;font-weight:600;color:var(--danger);background:rgba(224,92,92,0.1);border-bottom:1px solid rgba(224,92,92,0.2);z-index:10001}
 
     /* Bottom tab bar */
-    .tab-bar{position:fixed;bottom:0;left:0;right:0;z-index:10000;backdrop-filter:blur(20px);background:rgba(10,14,39,0.9);border-top:1px solid rgba(255,255,255,0.1);display:flex;padding:8px 0 max(8px,env(safe-area-inset-bottom))}
-    .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;background:none;border:none;color:#555;font-size:10px;font-weight:600;cursor:pointer;transition:color .2s}
-    .tab-btn.active{color:#00d4ff}
-    .tab-btn .tab-icon{font-size:22px;transition:transform .2s}
-    .tab-btn.active .tab-icon{transform:scale(1.15)}
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;z-index:10000;backdrop-filter:blur(16px);background:rgba(8,9,13,0.96);border-top:1px solid var(--border);display:flex;padding:6px 0 max(6px,env(safe-area-inset-bottom))}
+    .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 0;background:none;border:none;color:var(--text-tertiary);font-size:9px;font-weight:500;cursor:pointer;transition:all .15s;opacity:0.4}
+    .tab-btn.active{color:var(--accent);opacity:1}
+    .tab-btn .tab-icon{font-size:18px;transition:transform .15s}
+    .tab-btn.active .tab-icon{transform:scale(1.05)}
 
     /* Bottom sheet */
-    .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;animation:fadeInUp .2s ease}
-    .sheet{position:fixed;bottom:0;left:0;right:0;max-height:85vh;overflow-y:auto;z-index:10001;background:#0f1335;border-top:1px solid rgba(255,255,255,0.15);border-radius:24px 24px 0 0;padding:20px 20px 100px;animation:slideUp .3s ease}
-    .sheet-handle{width:40px;height:4px;background:rgba(255,255,255,0.3);border-radius:2px;margin:0 auto 16px}
+    .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;animation:fadeInUp .2s ease}
+    .sheet{position:fixed;bottom:0;left:0;right:0;max-height:85vh;overflow-y:auto;z-index:10001;background:var(--bg);border-top:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px 20px 100px;animation:slideUp .3s ease}
+    .sheet-handle{width:28px;height:3px;background:rgba(255,255,255,0.1);border-radius:2px;margin:0 auto 16px}
 
     /* Challenge card */
-    .ch-card{padding:16px;margin-bottom:12px;border-radius:14px;backdrop-filter:blur(10px);background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);transition:border-color .2s}
-    .ch-card.completed{border-color:rgba(0,255,136,0.4);background:rgba(0,255,136,0.05)}
-    .ch-card.wrong-done{border-color:rgba(255,68,68,0.35);background:rgba(255,68,68,0.04)}
-    .ch-card.locked{opacity:0.5;filter:blur(1px);pointer-events:none;position:relative}
-    .ch-type{display:inline-block;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-    .ch-type-photo{background:rgba(0,212,255,0.2);color:#00d4ff}
-    .ch-type-video{background:rgba(255,107,53,0.2);color:#ff6b35}
-    .ch-type-creative{background:rgba(168,85,247,0.2);color:#a855f7}
-    .ch-type-quiz{background:rgba(255,215,0,0.2);color:#ffd700}
-    .difficulty{color:#666;font-size:11px}.difficulty .star{color:#ffd700}
-    .points-badge{font-size:13px;font-weight:800;color:#ffd700}
+    .ch-card{padding:14px;margin-bottom:10px;border-radius:12px;background:var(--surface);border:1px solid var(--border);transition:border-color .15s}
+    .ch-card.completed{border-color:rgba(75,190,138,0.25);background:rgba(75,190,138,0.04)}
+    .ch-card.wrong-done{border-color:rgba(224,92,92,0.2);background:rgba(224,92,92,0.03)}
+    .ch-card.locked{opacity:0.4;filter:blur(1px);pointer-events:none;position:relative}
+    .ch-type{display:inline-block;padding:2px 7px;border-radius:5px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+    .ch-type-photo{background:rgba(91,141,238,0.12);color:var(--foto)}
+    .ch-type-video{background:rgba(224,92,92,0.12);color:var(--video)}
+    .ch-type-creative{background:rgba(75,190,138,0.12);color:var(--creatief)}
+    .ch-type-quiz{background:rgba(155,123,234,0.12);color:var(--quiz)}
+    .difficulty{color:var(--text-tertiary);font-size:10px}.difficulty .star{color:var(--accent)}
+    .points-badge{font-size:12px;font-weight:700;color:var(--accent)}
 
     /* Quiz */
     .quiz-option:disabled{pointer-events:none;cursor:not-allowed}
-    .quiz-option{display:block;width:100%;padding:12px;margin-bottom:8px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;font-size:14px;cursor:pointer;text-align:left;transition:all .2s}
-    .quiz-option:hover{background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.3)}
-    .quiz-option.correct{background:rgba(0,255,136,0.2);border-color:#00ff88;color:#00ff88}
-    .quiz-option.wrong{background:rgba(255,68,68,0.2);border-color:#ff4444;color:#ff4444}
+    .quiz-option{display:block;width:100%;padding:11px 14px;margin-bottom:6px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text-primary);font-size:13px;cursor:pointer;text-align:left;transition:all .15s;font-family:inherit}
+    .quiz-option:hover{background:var(--surface-hover);border-color:rgba(155,123,234,0.25)}
+    .quiz-option.correct{background:rgba(75,190,138,0.15);border-color:var(--success);color:var(--success)}
+    .quiz-option.wrong{background:rgba(224,92,92,0.15);border-color:var(--danger);color:var(--danger)}
 
     /* Leaderboard */
-    .lb-card{padding:16px;margin-bottom:12px;border-radius:16px;display:flex;align-items:center;gap:14px;transition:all .3s;position:relative;overflow:hidden}
-    .lb-rank{font-size:22px;font-weight:900;min-width:36px;text-align:center}
-    .lb-rank-1{color:#ffd700;text-shadow:0 0 20px rgba(255,215,0,0.5)}.lb-rank-2{color:#c0c0c0}.lb-rank-3{color:#cd7f32}.lb-rank-other{color:#555}
-    .lb-emoji{font-size:32px}
+    .lb-card{padding:14px;margin-bottom:8px;border-radius:12px;display:flex;align-items:center;gap:12px;transition:all .2s;position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
+    .lb-rank{font-size:18px;font-weight:800;min-width:30px;text-align:center;letter-spacing:-0.5px}
+    .lb-rank-1{color:var(--accent)}.lb-rank-2{color:#a0a0a0}.lb-rank-3{color:#9b7b5a}.lb-rank-other{color:var(--text-tertiary)}
+    .lb-emoji{font-size:26px}
     .lb-info{flex:1}
-    .lb-name{font-weight:700;font-size:15px;margin-bottom:2px}
-    .lb-stats{font-size:11px;color:#888}
-    .lb-score{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums}
-    .lb-first{background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.25)}
+    .lb-name{font-weight:600;font-size:14px;margin-bottom:2px;letter-spacing:-0.2px}
+    .lb-stats{font-size:10px;color:var(--text-secondary)}
+    .lb-score{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-0.5px}
+    .lb-first{background:var(--accent-glow);border-color:rgba(212,160,84,0.15)}
 
-    /* Nearby challenges */
-    .nearby-panel{position:absolute;bottom:80px;left:10px;right:10px;z-index:1000}
-    .nearby-card{padding:12px;margin-bottom:8px;border-radius:12px;display:flex;align-items:center;gap:12px;cursor:pointer;backdrop-filter:blur(12px);background:rgba(10,14,39,0.85);border:1px solid rgba(255,255,255,0.12)}
-    .nearby-card:active{background:rgba(0,212,255,0.1)}
-    .nearby-emoji{font-size:28px}.nearby-dist{font-size:12px;color:#00d4ff;font-weight:700}
+    /* V11: Compact nearby challenges */
+    .nearby-panel{position:absolute;bottom:72px;left:10px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:3px}
+    .nearby-card{padding:10px 12px;border-radius:10px;display:flex;align-items:center;gap:10px;cursor:pointer;backdrop-filter:blur(12px);background:rgba(8,9,13,0.88);border:1px solid var(--border);transition:background .15s}
+    .nearby-card:active{background:var(--surface-hover)}
+    .nearby-card:first-child{border-color:rgba(212,160,84,0.12);background:rgba(212,160,84,0.04)}
+    .nearby-indicator{width:3px;height:28px;border-radius:2px;flex-shrink:0}
+    .nearby-indicator.foto{background:var(--foto)}.nearby-indicator.quiz{background:var(--quiz)}.nearby-indicator.creatief{background:var(--creatief)}.nearby-indicator.video{background:var(--video)}
+    .nearby-info{flex:1;min-width:0}
+    .nearby-name{font-size:13px;font-weight:600;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .nearby-tags{display:flex;gap:4px;margin-top:2px}
+    .nearby-tag{font-size:8px;font-weight:500;padding:1px 5px;border-radius:4px;letter-spacing:0.3px;text-transform:uppercase}
+    .nearby-tag.t-foto{background:rgba(91,141,238,0.1);color:var(--foto)}.nearby-tag.t-quiz{background:rgba(155,123,234,0.1);color:var(--quiz)}.nearby-tag.t-creatief{background:rgba(75,190,138,0.1);color:var(--creatief)}.nearby-tag.t-video{background:rgba(224,92,92,0.1);color:var(--video)}
+    .nearby-end{text-align:right;flex-shrink:0}
+    .nearby-dist{font-size:12px;font-weight:600;color:var(--text-secondary);letter-spacing:-0.2px}
+    .nearby-pts{font-size:9px;font-weight:500;color:var(--accent);letter-spacing:0.3px}
+    .nearby-chevron{font-size:14px;color:var(--text-tertiary);flex-shrink:0;margin-left:2px}
 
     /* Secret mission */
-    .secret-banner{margin:12px 0;padding:16px;border-radius:14px;background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(255,107,53,0.1));border:1px solid rgba(168,85,247,0.3);cursor:pointer}
-    .secret-badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;background:rgba(168,85,247,0.3);color:#a855f7;margin-bottom:8px}
+    .secret-banner{margin:10px 0;padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(155,123,234,0.08),rgba(224,92,92,0.05));border:1px solid rgba(155,123,234,0.15);cursor:pointer}
+    .secret-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:9px;font-weight:600;background:rgba(155,123,234,0.2);color:var(--quiz);margin-bottom:8px}
 
     /* Bar break overlay */
-    .barbreak-overlay{position:fixed;inset:0;z-index:10005;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);background:rgba(10,14,39,0.9)}
-    .barbreak-card{max-width:360px;padding:32px;text-align:center;border-radius:24px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,215,0,0.3)}
+    .barbreak-overlay{position:fixed;inset:0;z-index:10005;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);background:rgba(8,9,13,0.92)}
+    .barbreak-card{max-width:360px;padding:28px;text-align:center;border-radius:16px;background:rgba(255,255,255,0.04);border:1px solid rgba(212,160,84,0.2)}
 
     /* Team setup */
     .emoji-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
@@ -114,10 +127,10 @@
     .color-btn.selected{border-color:#fff;transform:scale(1.1)}
 
     /* Phase indicator */
-    .phase-bar{display:flex;gap:4px;margin:12px 0}
-    .phase-dot{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,0.1)}
-    .phase-dot.active{background:#00d4ff}
-    .phase-dot.done{background:#00ff88}
+    .phase-bar{display:flex;gap:4px;margin:8px 0}
+    .phase-dot{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.06)}
+    .phase-dot.active{background:var(--accent)}
+    .phase-dot.done{background:var(--success)}
 
     /* Photo preview */
     .photo-preview{width:100%;max-height:150px;object-fit:cover;border-radius:10px;margin-top:10px}
@@ -125,11 +138,11 @@
     /* === V5 ADDITIONS === */
 
     /* Narrative modal */
-    .story-overlay{position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);background:rgba(10,14,39,0.95);animation:fadeInUp .3s ease;padding:20px}
-    .story-card{max-width:420px;width:100%;padding:28px;border-radius:20px;background:linear-gradient(135deg,rgba(168,85,247,0.12),rgba(0,212,255,0.08));border:1px solid rgba(168,85,247,0.3);text-align:center}
-    .story-chapter{display:inline-block;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:800;background:rgba(168,85,247,0.3);color:#d8b4fe;letter-spacing:1.5px;margin-bottom:16px}
-    .story-title{font-size:22px;font-weight:900;margin-bottom:12px;background:linear-gradient(135deg,#00d4ff,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    .story-text{font-size:14px;line-height:1.6;color:#d0d4e4;margin-bottom:20px;text-align:left}
+    .story-overlay{position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);background:rgba(8,9,13,0.95);animation:fadeInUp .3s ease;padding:20px}
+    .story-card{max-width:420px;width:100%;padding:28px;border-radius:16px;background:linear-gradient(135deg,rgba(155,123,234,0.08),rgba(91,141,238,0.05));border:1px solid rgba(155,123,234,0.2);text-align:center}
+    .story-chapter{display:inline-block;padding:4px 12px;border-radius:20px;font-size:9px;font-weight:700;background:rgba(155,123,234,0.2);color:#c4b5fd;letter-spacing:1.5px;margin-bottom:16px}
+    .story-title{font-size:20px;font-weight:800;margin-bottom:12px;background:linear-gradient(135deg,var(--foto),var(--quiz));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.3px}
+    .story-text{font-size:13px;line-height:1.6;color:var(--text-secondary);margin-bottom:20px;text-align:left}
 
     /* Photo grid for activity feed */
     .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
@@ -141,51 +154,51 @@
     .photo-lightbox-close{position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.15);border:none;color:#fff;width:40px;height:40px;border-radius:50%;font-size:20px;cursor:pointer}
 
     /* Starter packs */
-    .starter-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
-    .starter-card{padding:14px;border-radius:14px;background:rgba(255,255,255,0.06);border:2px solid transparent;cursor:pointer;transition:all .2s;text-align:center}
-    .starter-card:hover{background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.3)}
-    .starter-card.taken{opacity:0.3;pointer-events:none}
-    .starter-emoji{font-size:34px;margin-bottom:6px}
-    .starter-name{font-size:13px;font-weight:700;color:#fff}
-    .starter-color{width:20px;height:4px;border-radius:2px;margin:6px auto 0}
+    .starter-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+    .starter-card{padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .15s;text-align:center}
+    .starter-card:hover{background:var(--surface-hover);border-color:rgba(212,160,84,0.2)}
+    .starter-card.taken{opacity:0.25;pointer-events:none}
+    .starter-emoji{font-size:30px;margin-bottom:6px}
+    .starter-name{font-size:12px;font-weight:600;color:var(--text-primary);letter-spacing:-0.1px}
+    .starter-color{width:16px;height:3px;border-radius:2px;margin:6px auto 0}
 
     /* GPS status pill */
-    .gps-pill{position:absolute;top:10px;left:10px;z-index:1000;padding:6px 10px;border-radius:20px;backdrop-filter:blur(8px);background:rgba(10,14,39,0.75);border:1px solid rgba(255,255,255,0.15);font-size:10px;font-weight:600;color:#aaa;display:flex;align-items:center;gap:6px}
-    .gps-dot{width:8px;height:8px;border-radius:50%}
-    .gps-dot.good{background:#00ff88;box-shadow:0 0 8px rgba(0,255,136,0.8);animation:pulse 2s infinite}
-    .gps-dot.weak{background:#ffd700;box-shadow:0 0 8px rgba(255,215,0,0.8)}
-    .gps-dot.sleep{background:#666}
-    .gps-pill .snap-btn{margin-left:4px;padding:2px 8px;border-radius:10px;background:rgba(0,212,255,0.2);border:1px solid rgba(0,212,255,0.4);color:#00d4ff;font-size:9px;font-weight:700;cursor:pointer}
+    .gps-pill{position:absolute;top:12px;left:12px;z-index:1000;padding:4px 10px;border-radius:12px;backdrop-filter:blur(8px);background:rgba(0,0,0,0.5);border:none;font-size:9px;font-weight:500;color:var(--text-secondary);display:flex;align-items:center;gap:5px;letter-spacing:0.3px}
+    .gps-dot{width:4px;height:4px;border-radius:50%}
+    .gps-dot.good{background:var(--creatief);animation:pulse 2s infinite}
+    .gps-dot.weak{background:var(--accent)}
+    .gps-dot.sleep{background:var(--text-tertiary)}
+    .gps-pill .snap-btn{margin-left:4px;padding:2px 8px;border-radius:8px;background:rgba(91,141,238,0.15);border:1px solid rgba(91,141,238,0.3);color:var(--foto);font-size:8px;font-weight:600;cursor:pointer}
 
     /* Story progression ticker */
-    .story-ticker{padding:10px 14px;margin:0 0 14px 0;border-radius:12px;background:linear-gradient(135deg,rgba(168,85,247,0.1),rgba(0,212,255,0.08));border-left:3px solid #a855f7;font-size:12px;line-height:1.5;color:#d0d4e4;font-style:italic}
+    .story-ticker{padding:10px 14px;margin:0 0 12px 0;border-radius:10px;background:linear-gradient(135deg,rgba(155,123,234,0.06),rgba(91,141,238,0.04));border-left:3px solid var(--quiz);font-size:12px;line-height:1.5;color:var(--text-secondary);font-style:italic}
 
     /* Activity row with photo */
-    .activity-row{padding:14px;margin-bottom:10px;border-radius:14px;backdrop-filter:blur(10px);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08)}
+    .activity-row{padding:12px;margin-bottom:8px;border-radius:10px;background:var(--surface);border:1px solid var(--border)}
     .activity-photo{width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-top:10px;cursor:pointer}
 
     /* === V6 ADDITIONS === */
 
     /* Photo gate (when too far) */
-    .gate-blocked{margin-top:12px;padding:14px;border-radius:12px;background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.3);display:flex;align-items:center;gap:12px}
-    .gate-icon{font-size:24px}
-    .gate-text{flex:1;font-size:13px;color:#ff6b35;font-weight:600}
-    .gate-distance{font-size:18px;font-weight:900;color:#ff6b35;font-variant-numeric:tabular-nums}
-    .gate-hint{font-size:11px;color:#888;font-weight:400;margin-top:2px}
+    .gate-blocked{margin-top:12px;padding:12px;border-radius:10px;background:rgba(224,92,92,0.06);border:1px solid rgba(224,92,92,0.15);display:flex;align-items:center;gap:10px}
+    .gate-icon{font-size:20px}
+    .gate-text{flex:1;font-size:12px;color:var(--danger);font-weight:600}
+    .gate-distance{font-size:16px;font-weight:800;color:var(--danger);font-variant-numeric:tabular-nums}
+    .gate-hint{font-size:10px;color:var(--text-secondary);font-weight:400;margin-top:2px}
 
     /* Admin review queue */
-    .review-card{padding:14px;margin-bottom:12px;border-radius:14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,215,0,0.2)}
-    .review-photo{width:100%;max-height:280px;object-fit:cover;border-radius:10px;margin:8px 0}
-    .review-meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:12px;color:#888}
-    .review-actions{display:flex;gap:8px;margin-top:10px}
-    .review-actions .btn{flex:1;padding:10px;font-size:13px}
-    .review-dist-good{color:#00ff88;font-weight:700}
-    .review-dist-warn{color:#ffd700;font-weight:700}
-    .review-dist-bad{color:#ff4444;font-weight:700}
-    .review-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
-    .review-badge-pending{background:rgba(255,215,0,0.2);color:#ffd700}
-    .review-badge-approved{background:rgba(0,255,136,0.2);color:#00ff88}
-    .review-badge-rejected{background:rgba(255,68,68,0.2);color:#ff4444}
+    .review-card{padding:14px;margin-bottom:10px;border-radius:12px;background:var(--surface);border:1px solid rgba(212,160,84,0.12)}
+    .review-photo{width:100%;max-height:260px;object-fit:cover;border-radius:8px;margin:8px 0}
+    .review-meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:var(--text-secondary)}
+    .review-actions{display:flex;gap:6px;margin-top:10px}
+    .review-actions .btn{flex:1;padding:10px;font-size:12px}
+    .review-dist-good{color:var(--success);font-weight:700}
+    .review-dist-warn{color:var(--accent);font-weight:700}
+    .review-dist-bad{color:var(--danger);font-weight:700}
+    .review-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+    .review-badge-pending{background:rgba(212,160,84,0.15);color:var(--accent)}
+    .review-badge-approved{background:rgba(75,190,138,0.15);color:var(--success)}
+    .review-badge-rejected{background:rgba(224,92,92,0.15);color:var(--danger)}
 
     /* Provisional score badge */
     .provisional-badge{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:700;background:rgba(255,215,0,0.2);color:#ffd700}
@@ -205,34 +218,34 @@
     /* === V9 ADDITIONS === */
 
     /* Tier badge on leaderboard cards */
-    .tier-badge{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
-    .tier-badge .tier-emoji{font-size:14px}
-    .tier-unlock-popup{position:fixed;top:30%;left:50%;transform:translateX(-50%);z-index:10004;padding:24px 32px;border-radius:20px;backdrop-filter:blur(20px);background:rgba(10,14,39,0.95);border:2px solid #ffd700;text-align:center;animation:fadeInUp .4s ease;box-shadow:0 8px 40px rgba(255,215,0,0.4)}
-    .tier-unlock-emoji{font-size:64px;margin-bottom:12px;animation:float 2s ease-in-out infinite}
-    .tier-unlock-title{font-size:14px;color:#ffd700;font-weight:800;letter-spacing:2px;margin-bottom:4px}
-    .tier-unlock-name{font-size:22px;font-weight:900;background:linear-gradient(135deg,#ffd700,#ff6b35);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .tier-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:2px 6px;border-radius:8px;background:var(--surface);border:1px solid var(--border);font-size:9px;font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+    .tier-badge .tier-emoji{font-size:12px}
+    .tier-unlock-popup{position:fixed;top:30%;left:50%;transform:translateX(-50%);z-index:10004;padding:24px 32px;border-radius:16px;backdrop-filter:blur(16px);background:rgba(8,9,13,0.95);border:1px solid rgba(212,160,84,0.3);text-align:center;animation:fadeInUp .4s ease;box-shadow:0 8px 32px rgba(212,160,84,0.2)}
+    .tier-unlock-emoji{font-size:56px;margin-bottom:12px;animation:float 2s ease-in-out infinite}
+    .tier-unlock-title{font-size:12px;color:var(--accent);font-weight:700;letter-spacing:2px;margin-bottom:4px}
+    .tier-unlock-name{font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--video));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.3px}
 
     /* Next-reward mini banner on leaderboard */
-    .reward-card{margin:10px 0 14px;padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(168,85,247,0.06));border:1px solid rgba(0,212,255,0.2);display:flex;align-items:center;gap:12px}
-    .reward-icon{font-size:24px}
+    .reward-card{margin:8px 0 12px;padding:10px 12px;border-radius:10px;background:linear-gradient(135deg,rgba(91,141,238,0.05),rgba(155,123,234,0.04));border:1px solid rgba(91,141,238,0.12);display:flex;align-items:center;gap:10px}
+    .reward-icon{font-size:20px}
     .reward-info{flex:1;min-width:0}
-    .reward-label{font-size:10px;color:#888;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
-    .reward-target{font-size:13px;color:#fff;font-weight:600}
-    .reward-progress{width:100%;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;margin-top:6px;overflow:hidden}
-    .reward-progress-fill{height:100%;background:linear-gradient(90deg,#00d4ff,#a855f7);border-radius:2px;transition:width .4s ease}
+    .reward-label{font-size:9px;color:var(--text-tertiary);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
+    .reward-target{font-size:12px;color:var(--text-primary);font-weight:600;letter-spacing:-0.1px}
+    .reward-progress{width:100%;height:3px;background:rgba(255,255,255,0.04);border-radius:2px;margin-top:5px;overflow:hidden}
+    .reward-progress-fill{height:100%;background:linear-gradient(90deg,var(--foto),var(--quiz));border-radius:2px;transition:width .4s ease}
 
     /* V10: emoji reactions bar */
-    .reactions{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
-    .reaction-btn{padding:3px 8px;border-radius:14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#ccc;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .15s}
-    .reaction-btn:hover{background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.3)}
-    .reaction-btn.my{background:rgba(0,212,255,0.15);border-color:rgba(0,212,255,0.4);color:#00d4ff}
-    .reaction-count{font-size:11px;color:#888;font-weight:700}
+    .reactions{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+    .reaction-btn{padding:2px 7px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:3px;transition:all .15s;font-family:inherit}
+    .reaction-btn:hover{background:var(--surface-hover);border-color:rgba(212,160,84,0.2)}
+    .reaction-btn.my{background:var(--accent-glow);border-color:rgba(212,160,84,0.25);color:var(--accent)}
+    .reaction-count{font-size:10px;color:var(--text-tertiary);font-weight:700}
 
     /* Filter pills */
-    .filter-pills{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+    .filter-pills{display:flex;gap:5px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
     .filter-pills::-webkit-scrollbar{display:none}
-    .filter-pill{padding:6px 12px;border-radius:18px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#aaa;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
-    .filter-pill.active{background:rgba(0,212,255,0.2);border-color:#00d4ff;color:#00d4ff}
+    .filter-pill{padding:5px 10px;border-radius:16px;background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);font-size:10px;font-weight:500;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit}
+    .filter-pill.active{background:var(--accent-glow);border-color:rgba(212,160,84,0.25);color:var(--accent)}
   </style>
 </head>
 <body>
@@ -276,11 +289,11 @@ const TEAM_COLORS=[
 // V5 FEATURE 4: STARTER PACKS (one-tap team creation)
 // ═══════════════════════════════════════════
 const STARTER_PACKS=[
-  {name:'De Maffiosi',emoji:'🦁',color:'#ffd700'},
-  {name:'Haven Helden',emoji:'🦈',color:'#00d4ff'},
-  {name:'Rotterdam Rakkers',emoji:'🐉',color:'#ff6b35'},
-  {name:'De Kubus Kids',emoji:'🦊',color:'#a855f7'},
-  {name:'Erasmus Elite',emoji:'🦅',color:'#00ff88'},
+  {name:'De Maffiosi',emoji:'🦁',color:'var(--accent)'},
+  {name:'Haven Helden',emoji:'🦈',color:'var(--foto)'},
+  {name:'Rotterdam Rakkers',emoji:'🐉',color:'var(--video)'},
+  {name:'De Kubus Kids',emoji:'🦊',color:'var(--quiz)'},
+  {name:'Erasmus Elite',emoji:'🦅',color:'var(--success)'},
   {name:'Markthal Monsters',emoji:'🐙',color:'#ec4899'},
 ];
 
@@ -355,8 +368,8 @@ const GHOST_BONUS_THRESHOLDS=[
 ];
 // Tier badges based on completed challenges
 const TIER_BADGES=[
-  {min:20, badge:'🏆', name:'Legende', color:'#ffd700'},
-  {min:15, badge:'🥇', name:'Goud',    color:'#ffd700'},
+  {min:20, badge:'🏆', name:'Legende', color:'var(--accent)'},
+  {min:15, badge:'🥇', name:'Goud',    color:'var(--accent)'},
   {min:10, badge:'🥈', name:'Zilver',  color:'#c0c0c0'},
   {min:5,  badge:'🥉', name:'Brons',   color:'#cd7f32'},
 ];
@@ -981,20 +994,20 @@ function App(){
     if(!OFFLINE&&sb){
       const team=teams.find(t=>t.id===targetTeamId);
       sb.from('activity_feed').insert({
-        team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#ffd700',
+        team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#d4a054',
         message:`[JORIK] team=${targetTeamId==null?'null':targetTeamId}`,
         points:0, created_at:new Date().toISOString(),
       });
       // Plus a human-readable announcement
       if(team){
         sb.from('activity_feed').insert({
-          team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#ffd700',
+          team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#d4a054',
           message:`Jorik gaat mee met ${team.emoji} ${team.name}!`,
           points:0, created_at:new Date().toISOString(),
         });
       }else{
         sb.from('activity_feed').insert({
-          team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#ffd700',
+          team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#d4a054',
           message:'Jorik loopt nu alleen tussen de teams door...',
           points:0, created_at:new Date().toISOString(),
         });
@@ -1015,7 +1028,7 @@ function App(){
     setBarBreak({name:barName,time:Date.now()});
     if(!OFFLINE&&sb){
       sb.from('activity_feed').insert({
-        team_id:null, team_name:'Game Master', team_emoji:'🍻', team_color:'#ffd700',
+        team_id:null, team_name:'Game Master', team_emoji:'🍻', team_color:'#d4a054',
         message:`🍺 BAR BREAK → ${barName}! Alle teams naar deze locatie.`,
         points:0, created_at:new Date().toISOString(),
       });
@@ -1028,7 +1041,7 @@ function App(){
     setPhase(5);
     if(!OFFLINE&&sb){
       sb.from('activity_feed').insert({
-        team_id:null, team_name:'Game Master', team_emoji:'🏆', team_color:'#ffd700',
+        team_id:null, team_name:'Game Master', team_emoji:'🏆', team_color:'#d4a054',
         message:'🏆 EINDE VAN HET SPEL — naar Markthal/Bokaal voor de uitslag!',
         points:0, created_at:new Date().toISOString(),
       });
@@ -1121,16 +1134,16 @@ function App(){
   // ═══════════ SPLASH ═══════════
   if(screen==='splash'){
     return(
-      <div style={{height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24,background:'radial-gradient(circle at 30% 40%,rgba(0,212,255,0.15),transparent 50%),radial-gradient(circle at 70% 60%,rgba(255,215,0,0.1),transparent 50%),#0a0e27'}}>
-        <div style={{fontSize:64,marginBottom:16,animation:'float 3s ease-in-out infinite'}}>🏙️</div>
-        <h1 style={{fontSize:32,fontWeight:900,background:'linear-gradient(135deg,#00d4ff,#ffd700)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:8}}>STADSSPEL</h1>
-        <h2 style={{fontSize:20,fontWeight:300,color:'#888',marginBottom:4}}>ROTTERDAM</h2>
-        <div style={{fontSize:14,color:'#555',marginBottom:8}}>Jorik's Bachelor Party · 6 Juni 2026</div>
-        <div style={{fontSize:10,color:'#a855f7',letterSpacing:2,marginBottom:40,fontWeight:800}}>V10 · DE VERLOREN RING</div>
-        <button className="btn btn-cyan" onClick={()=>setScreen('setup')} style={{padding:'16px 48px',fontSize:16,borderRadius:16}}>
+      <div style={{height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24,background:'radial-gradient(circle at 30% 40%,rgba(212,160,84,0.08),transparent 50%),radial-gradient(circle at 70% 60%,rgba(155,123,234,0.06),transparent 50%),var(--bg)'}}>
+        <div style={{fontSize:56,marginBottom:16,animation:'float 3s ease-in-out infinite'}}>🏙️</div>
+        <h1 style={{fontSize:28,fontWeight:800,background:'linear-gradient(135deg,var(--accent),var(--foto))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',marginBottom:6,letterSpacing:'-0.5px'}}>STADSSPEL</h1>
+        <h2 style={{fontSize:18,fontWeight:300,color:'var(--text-secondary)',marginBottom:4,letterSpacing:'3px'}}>ROTTERDAM</h2>
+        <div style={{fontSize:12,color:'var(--text-tertiary)',marginBottom:6}}>Jorik's Bachelor Party · 6 Juni 2026</div>
+        <div style={{fontSize:9,color:'var(--quiz)',letterSpacing:2,marginBottom:40,fontWeight:700}}>V11 · DE VERLOREN RING</div>
+        <button className="btn btn-gold" onClick={()=>setScreen('setup')} style={{padding:'14px 48px',fontSize:15,borderRadius:12}}>
           START
         </button>
-        <div style={{marginTop:40,fontSize:12,color:'#333'}}>102 locaties · 4 teams · 1 winnend team</div>
+        <div style={{marginTop:40,fontSize:11,color:'var(--text-tertiary)'}}>102 locaties · 4 teams · 1 winnend team</div>
       </div>
     );
   }
@@ -1145,21 +1158,21 @@ function App(){
     return(
       <div style={{height:'100%',display:'flex',flexDirection:'column',padding:24,paddingTop:48}}>
         <div style={{textAlign:'center',marginBottom:32}}>
-          <div style={{fontSize:14,color:'#00d4ff',fontWeight:600,marginBottom:4}}>LOBBY</div>
+          <div style={{fontSize:14,color:'var(--foto)',fontWeight:600,marginBottom:4}}>LOBBY</div>
           <h1 style={{fontSize:24,fontWeight:800}}>Wachten op Game Master...</h1>
-          <p style={{fontSize:13,color:'#666',marginTop:8}}>Startlocatie: Maritiem Museum, Leuvehaven</p>
+          <p style={{fontSize:13,color:'var(--text-tertiary)',marginTop:8}}>Startlocatie: Maritiem Museum, Leuvehaven</p>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:32}}>
           {teams.map((t,i)=>(
             <div key={i} className="glass animate-in" style={{padding:20,textAlign:'center',animationDelay:`${i*0.1}s`,borderLeft:`3px solid ${t.color}`}}>
               <div style={{fontSize:36,marginBottom:8}}>{t.emoji}</div>
               <div style={{fontWeight:700,fontSize:14}}>{t.name}</div>
-              {t.id===myTeam?.id&&<div style={{fontSize:10,color:'#00d4ff',marginTop:4}}>Jouw team</div>}
+              {t.id===myTeam?.id&&<div style={{fontSize:10,color:'var(--foto)',marginTop:4}}>Jouw team</div>}
             </div>
           ))}
         </div>
         {isAdmin&&<button className="btn btn-gold" onClick={startGame} style={{padding:16,fontSize:16}}>🎮 START HET SPEL</button>}
-        {!isAdmin&&<div style={{textAlign:'center',fontSize:13,color:'#555'}}>De game master start het spel...</div>}
+        {!isAdmin&&<div style={{textAlign:'center',fontSize:13,color:'var(--text-tertiary)'}}>De game master start het spel...</div>}
         {OFFLINE&&<div style={{textAlign:'center',marginTop:12}}><button className="btn btn-ghost" onClick={startGame} style={{fontSize:12}}>Demo: start zelf</button></div>}
       </div>
     );
@@ -1180,19 +1193,19 @@ function App(){
         </div>
       )}
 
-      {/* Game HUD */}
-      <div style={{padding:'12px 16px',paddingTop:OFFLINE?28:12,background:'rgba(10,14,39,0.95)',borderBottom:'1px solid rgba(255,255,255,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:100}}>
+      {/* V11: Premium HUD */}
+      <div style={{padding:'10px 16px',paddingTop:OFFLINE?26:10,background:'rgba(8,9,13,0.96)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:100,backdropFilter:'blur(16px)'}}>
         <div>
-          <div style={{fontSize:13,fontWeight:700}}>{myTeam?.emoji} {myTeam?.name}</div>
-          <div style={{fontSize:11,color:'#888'}}>Fase {phase}/4 · {fmtHM(elapsed)}</div>
+          <div style={{fontSize:13,fontWeight:600,letterSpacing:'-0.2px'}}>{myTeam?.emoji} {myTeam?.name}</div>
+          <div style={{fontSize:10,color:'var(--text-tertiary)'}}>Fase {phase}/4 · {fmtHM(elapsed)}</div>
         </div>
         <div style={{textAlign:'center'}}>
-          <div style={{fontSize:22,fontWeight:900,color:'#ffd700'}}>{myScore}</div>
-          <div style={{fontSize:10,color:'#888'}}>{myChallenges} challenges</div>
+          <div style={{fontSize:20,fontWeight:800,color:'var(--accent)',letterSpacing:'-0.5px'}}>{myScore}</div>
+          <div style={{fontSize:9,color:'var(--text-tertiary)'}}>{myChallenges} challenges</div>
         </div>
         <div style={{textAlign:'right'}}>
-          <div style={{fontSize:11,color:'#888'}}>{visitedLocs.size}/102 locaties</div>
-          {ghost.active&&<div style={{fontSize:10,color:'#a855f7'}}>👻 {fmtTime(ghost.timeLeft)}</div>}
+          <div style={{fontSize:10,color:'var(--text-tertiary)'}}>{visitedLocs.size}/102</div>
+          {ghost.active&&<div style={{fontSize:10,color:'var(--quiz)'}}>👻 {fmtTime(ghost.timeLeft)}</div>}
         </div>
       </div>
 
@@ -1286,7 +1299,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
       <div style={{textAlign:'center',marginBottom:24}}>
         <div style={{fontSize:48,marginBottom:12}}>🎮</div>
         <h1 style={{fontSize:24,fontWeight:800}}>Kies je team</h1>
-        <p style={{fontSize:13,color:'#666',marginTop:8}}>Tik op een starter pack of maak eigen team</p>
+        <p style={{fontSize:13,color:'var(--text-tertiary)',marginTop:8}}>Tik op een starter pack of maak eigen team</p>
       </div>
 
       {/* Mode toggle */}
@@ -1297,7 +1310,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
 
       {mode==='quick'&&(
         <div>
-          <div style={{fontSize:11,color:'#888',fontWeight:600,marginBottom:8,letterSpacing:1}}>STARTER PACKS</div>
+          <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:600,marginBottom:8,letterSpacing:1}}>STARTER PACKS</div>
           <div className="starter-grid">
             {STARTER_PACKS.map((p,i)=>{
               const taken=usedEmojis.includes(p.emoji)||usedNames.includes(p.name.toLowerCase());
@@ -1308,25 +1321,25 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
                   <div className="starter-emoji">{p.emoji}</div>
                   <div className="starter-name">{p.name}</div>
                   <div className="starter-color" style={{background:p.color}}/>
-                  {taken&&<div style={{fontSize:9,color:'#666',marginTop:4}}>bezet</div>}
+                  {taken&&<div style={{fontSize:9,color:'var(--text-tertiary)',marginTop:4}}>bezet</div>}
                 </button>
               );
             })}
           </div>
-          <div style={{textAlign:'center',marginTop:8,fontSize:11,color:'#555'}}>of ga naar <a onClick={()=>setMode('custom')} style={{color:'#00d4ff',cursor:'pointer',textDecoration:'underline'}}>eigen team</a></div>
+          <div style={{textAlign:'center',marginTop:8,fontSize:11,color:'var(--text-tertiary)'}}>of ga naar <a onClick={()=>setMode('custom')} style={{color:'var(--foto)',cursor:'pointer',textDecoration:'underline'}}>eigen team</a></div>
         </div>
       )}
 
       {mode==='custom'&&(
         <>
           <div className="glass" style={{padding:16,marginBottom:12}}>
-            <label style={{fontSize:12,color:'#888',fontWeight:600,display:'block',marginBottom:8}}>TEAMNAAM</label>
+            <label style={{fontSize:12,color:'var(--text-secondary)',fontWeight:600,display:'block',marginBottom:8}}>TEAMNAAM</label>
             <input value={name} onChange={e=>setName(e.target.value)} placeholder="Bijv. De Maffiosi"
               style={{width:'100%',padding:12,borderRadius:10,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:16,outline:'none'}}/>
           </div>
 
           <div className="glass" style={{padding:16,marginBottom:12}}>
-            <label style={{fontSize:12,color:'#888',fontWeight:600,display:'block',marginBottom:8}}>TEAM ICOON</label>
+            <label style={{fontSize:12,color:'var(--text-secondary)',fontWeight:600,display:'block',marginBottom:8}}>TEAM ICOON</label>
             <div className="emoji-grid">
               {TEAM_EMOJIS.map(e=>(
                 <button key={e} className={`emoji-btn ${emoji===e?'selected':''} ${usedEmojis.includes(e)&&emoji!==e?'taken':''}`}
@@ -1336,7 +1349,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
           </div>
 
           <div className="glass" style={{padding:16,marginBottom:16}}>
-            <label style={{fontSize:12,color:'#888',fontWeight:600,display:'block',marginBottom:8}}>TEAM KLEUR</label>
+            <label style={{fontSize:12,color:'var(--text-secondary)',fontWeight:600,display:'block',marginBottom:8}}>TEAM KLEUR</label>
             <div className="color-grid">
               {TEAM_COLORS.map(c=>(
                 <button key={c.hex} className={`color-btn ${color===c.hex?'selected':''}`}
@@ -1376,9 +1389,9 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       {/* V5: narrative ticker */}
       {phaseStory&&(
         <div className="story-ticker" onClick={()=>onShowStory&&onShowStory(phaseKey)} style={{cursor:'pointer'}}>
-          <div style={{fontSize:10,fontWeight:800,color:'#a855f7',letterSpacing:1,marginBottom:4}}>{phaseStory.chapter}</div>
+          <div style={{fontSize:10,fontWeight:800,color:'var(--quiz)',letterSpacing:1,marginBottom:4}}>{phaseStory.chapter}</div>
           <div style={{fontWeight:700,color:'#fff',marginBottom:3,fontStyle:'normal'}}>{phaseStory.title}</div>
-          <div style={{fontSize:11,color:'#888',fontStyle:'italic'}}>Tik voor verhaal →</div>
+          <div style={{fontSize:11,color:'var(--text-secondary)',fontStyle:'italic'}}>Tik voor verhaal →</div>
         </div>
       )}
       {/* V9: next reward banner — shows whichever milestone is closest */}
@@ -1422,8 +1435,8 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         <div className="glass" style={{padding:10,marginBottom:10,borderColor:'rgba(255,215,0,0.3)',display:'flex',alignItems:'center',gap:10}}>
           <div style={{fontSize:18}}>⏳</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:12,color:'#ffd700',fontWeight:700}}>{pendingMine} foto{pendingMine===1?'':"'s"} in beoordeling</div>
-            <div style={{fontSize:10,color:'#888',marginTop:2}}>Punten zijn voorlopig toegekend · game master kan ze afkeuren</div>
+            <div style={{fontSize:12,color:'var(--accent)',fontWeight:700}}>{pendingMine} foto{pendingMine===1?'':"'s"} in beoordeling</div>
+            <div style={{fontSize:10,color:'var(--text-secondary)',marginTop:2}}>Punten zijn voorlopig toegekend · game master kan ze afkeuren</div>
           </div>
         </div>
       )}
@@ -1431,7 +1444,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       {/* Bar break countdown */}
       {barBreak&&(
         <div className="glass" style={{padding:14,marginBottom:14,textAlign:'center',borderColor:'rgba(255,215,0,0.3)'}}>
-          <div style={{fontSize:11,color:'#ffd700',fontWeight:700}}>🍺 VOLGENDE BAR BREAK</div>
+          <div style={{fontSize:11,color:'var(--accent)',fontWeight:700}}>🍺 VOLGENDE BAR BREAK</div>
           <div style={{fontSize:16,fontWeight:700,marginTop:4}}>{barBreak.name}</div>
         </div>
       )}
@@ -1441,12 +1454,12 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         <div className="secret-banner" onClick={onShowWedding}>
           <div className="secret-badge">🤫 GEHEIME MISSIE</div>
           <div style={{fontWeight:700,fontSize:14}}>Bruiloftsvideo opnemen</div>
-          <div style={{fontSize:12,color:'#888',marginTop:4}}>Tik hier voor instructies · +{WEDDING_VIDEO_BONUS} pts</div>
+          <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:4}}>Tik hier voor instructies · +{WEDDING_VIDEO_BONUS} pts</div>
         </div>
       )}
       {weddingDone&&(
         <div className="glass" style={{padding:14,marginBottom:14,borderColor:'rgba(0,255,136,0.3)'}}>
-          <div style={{fontSize:12,color:'#00ff88',fontWeight:700}}>✅ Geheime missie voltooid!</div>
+          <div style={{fontSize:12,color:'var(--success)',fontWeight:700}}>✅ Geheime missie voltooid!</div>
         </div>
       )}
 
@@ -1479,7 +1492,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       })}
 
       {sorted.length===0&&(
-        <div style={{textAlign:'center',padding:40,color:'#555'}}>
+        <div style={{textAlign:'center',padding:40,color:'var(--text-tertiary)'}}>
           <div style={{fontSize:48,marginBottom:16}}>🏆</div>
           <div>Nog geen scores</div>
         </div>
@@ -1503,20 +1516,38 @@ function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,ghostMax=GHOS
     const m=L.map(mapRef.current).setView([START_POS.lat,START_POS.lng],15);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'',maxZoom:19}).addTo(m);
 
-    // Add all location markers
+    // V11: Add color-dot markers (category-colored, not emojis)
+    const catColor=(loc)=>{
+      const types=loc.ch.map(c=>c.t);
+      if(types.includes('photo'))return 'var(--foto)';
+      if(types.includes('video'))return 'var(--video)';
+      if(types.includes('creative'))return 'var(--creatief)';
+      if(types.includes('quiz'))return 'var(--quiz)';
+      return 'var(--accent)';
+    };
+    const catColorHex=(loc)=>{
+      const types=loc.ch.map(c=>c.t);
+      if(types.includes('photo'))return '#5b8dee';
+      if(types.includes('video'))return '#e05c5c';
+      if(types.includes('creative'))return '#4bbe8a';
+      if(types.includes('quiz'))return '#9b7bea';
+      return '#d4a054';
+    };
     L_DATA.forEach(loc=>{
+      const col=catColorHex(loc);
       const mk=L.marker([loc.la,loc.lo],{
-        icon:L.divIcon({className:'',iconAnchor:[18,18],interactive:true,
-          html:`<div style="font-size:28px;display:flex;align-items:center;justify-content:center;width:36px;height:36px;cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${loc.e}</div>`
+        icon:L.divIcon({className:'',iconAnchor:[5,5],interactive:true,
+          html:`<div style="width:10px;height:10px;border-radius:50%;background:${col};border:1.5px solid rgba(255,255,255,0.25);cursor:pointer;box-shadow:0 0 6px ${col}44;transition:all .2s"></div>`
         })
       }).addTo(m);
       mk.on('click',()=>onSelect(loc.id));
       mk._locId=loc.id;
+      mk._color=col;
       markersRef.current.push(mk);
     });
 
     // Dinner zone circle (phase 4)
-    L.circle([DINNER_ZONE.lat,DINNER_ZONE.lng],{radius:DINNER_ZONE.r,color:'#ffd700',fillColor:'#ffd700',fillOpacity:0.05,weight:2,dashArray:'8 4'}).addTo(m);
+    L.circle([DINNER_ZONE.lat,DINNER_ZONE.lng],{radius:DINNER_ZONE.r,color:'#d4a054',fillColor:'#d4a054',fillOpacity:0.03,weight:1.5,dashArray:'6 4'}).addTo(m);
 
     mapInst.current=m;
   },[]);
@@ -1526,8 +1557,8 @@ function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,ghostMax=GHOS
     if(!mapInst.current||!pos)return;
     if(userMarkerRef.current)mapInst.current.removeLayer(userMarkerRef.current);
     userMarkerRef.current=L.marker([pos.lat,pos.lng],{
-      icon:L.divIcon({className:'',iconAnchor:[12,12],
-        html:'<div style="width:24px;height:24px;border-radius:50%;background:#00d4ff;border:3px solid white;box-shadow:0 0 15px rgba(0,212,255,0.8);animation:pulse 2s infinite"></div>'
+      icon:L.divIcon({className:'',iconAnchor:[6,6],
+        html:'<div style="position:relative"><div style="width:12px;height:12px;border-radius:50%;background:#d4a054;border:2px solid rgba(255,255,255,0.9);box-shadow:0 0 12px rgba(212,160,84,0.5);z-index:5;position:relative"></div><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;border:1px solid rgba(212,160,84,0.15);animation:pulse 3s ease-in-out infinite"></div></div>'
       })
     }).addTo(mapInst.current);
   },[pos]);
@@ -1543,33 +1574,45 @@ function MapView({pos,completed,visitedLocs,onSelect,ghost,onGhost,ghostMax=GHOS
       <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer'}} title="Tik om GPS te wekken">
         <span className={`gps-dot ${gpsStatus||'weak'}`}/>
         {gpsStatus==='good'?'GPS goed':gpsStatus==='sleep'?'GPS rust':'GPS zwak'}
-        {gpsSnap&&<span style={{color:'#00d4ff'}}>· op {gpsSnap}</span>}
+        {gpsSnap&&<span style={{color:'var(--foto)'}}>· op {gpsSnap}</span>}
         {gpsStatus==='sleep'&&<span className="snap-btn">tik om te wekken</span>}
       </div>
 
       {/* Ghost mode button */}
-      <div style={{position:'absolute',top:10,right:10,zIndex:1000}}>
+      <div style={{position:'absolute',top:12,right:12,zIndex:1000}}>
         <button className={`btn ${ghost.active?'btn-danger':'btn-ghost'}`} onClick={onGhost} disabled={ghost.used>=ghostMax&&!ghost.active}
-          style={{fontSize:12,padding:'8px 14px',borderRadius:10}}>
-          {ghost.active?`👻 ${fmtTime(ghost.timeLeft)}`:`👻 Ghost (${ghostMax-ghost.used} over)`}
+          style={{fontSize:10,padding:'6px 12px',borderRadius:8,backdropFilter:'blur(8px)'}}>
+          {ghost.active?`👻 ${fmtTime(ghost.timeLeft)}`:`👻 Ghost (${ghostMax-ghost.used})`}
         </button>
       </div>
 
-      {/* Nearby challenges panel */}
+      {/* V11: Compact nearby panel — max 3 cards */}
       <div className="nearby-panel">
-        <div style={{fontSize:11,color:'#888',fontWeight:600,marginBottom:6,padding:'0 4px'}}>
-          DICHTBIJ
-        </div>
-        {nearby.map(loc=>(
-          <div key={loc.id} className="nearby-card" onClick={()=>onSelect(loc.id)}>
-            <div className="nearby-emoji">{loc.e}</div>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:13}}>{loc.n}</div>
-              <div style={{fontSize:11,color:'#888'}}>{loc.ch.length} challenges · {loc.ch.reduce((s,c)=>s+c.p,0)} pts</div>
+        {nearby.slice(0,3).map(loc=>{
+          const primaryType=loc.ch[0]?.t||'photo';
+          const typeClass=primaryType==='photo'?'foto':primaryType==='creative'?'creatief':primaryType;
+          const types=[...new Set(loc.ch.map(c=>c.t))];
+          return(
+            <div key={loc.id} className="nearby-card" onClick={()=>onSelect(loc.id)}>
+              <div className={`nearby-indicator ${typeClass}`}/>
+              <div className="nearby-info">
+                <div className="nearby-name">{loc.n}</div>
+                <div className="nearby-tags">
+                  {types.map(t=>{
+                    const tc=t==='photo'?'t-foto':t==='creative'?'t-creatief':t==='quiz'?'t-quiz':'t-video';
+                    const label=t==='photo'?'Foto':t==='creative'?'Creatief':t==='quiz'?'Quiz':'Video';
+                    return <span key={t} className={`nearby-tag ${tc}`}>{label}</span>;
+                  })}
+                </div>
+              </div>
+              <div className="nearby-end">
+                <div className="nearby-dist">{fmtDist(loc.dist)}</div>
+                <div className="nearby-pts">+{loc.ch.reduce((s,c)=>s+c.p,0)}</div>
+              </div>
+              <div className="nearby-chevron">›</div>
             </div>
-            <div className="nearby-dist">{fmtDist(loc.dist)}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1607,8 +1650,8 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
   return(
     <div style={{height:'100%',overflowY:'auto',padding:16,paddingBottom:90}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-        <div style={{fontSize:11,color:'#888',fontWeight:600,letterSpacing:1}}>LIVE FEED</div>
-        <div style={{fontSize:10,color:'#555'}}>{feed.length} berichten · {photos.length} foto's</div>
+        <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:600,letterSpacing:1}}>LIVE FEED</div>
+        <div style={{fontSize:10,color:'var(--text-tertiary)'}}>{feed.length} berichten · {photos.length} foto's</div>
       </div>
 
       {/* V5: filter pills */}
@@ -1621,7 +1664,7 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
       {/* V5: photo grid preview (top 9 most recent photos) */}
       {filter==='all'&&photos.length>0&&(
         <div style={{marginBottom:16}}>
-          <div style={{fontSize:10,color:'#666',fontWeight:600,marginBottom:6,letterSpacing:1}}>RECENTE FOTO'S</div>
+          <div style={{fontSize:10,color:'var(--text-tertiary)',fontWeight:600,marginBottom:6,letterSpacing:1}}>RECENTE FOTO'S</div>
           <div className="photo-grid">
             {photos.slice(0,9).map((item,i)=>(
               <div key={i} className="photo-grid-item animate-in" onClick={()=>onPhoto&&onPhoto(item.photo)}>
@@ -1630,7 +1673,7 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
                   :<img src={item.photo} alt="submission"/>}
                 <div className="photo-grid-overlay">
                   <span>{item.team_emoji||'🎮'}</span>
-                  {item.points>0&&<span style={{color:'#ffd700'}}>+{item.points}</span>}
+                  {item.points>0&&<span style={{color:'var(--accent)'}}>+{item.points}</span>}
                 </div>
               </div>
             ))}
@@ -1639,7 +1682,7 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
       )}
 
       {filtered.length===0&&(
-        <div style={{textAlign:'center',padding:40,color:'#555'}}>
+        <div style={{textAlign:'center',padding:40,color:'var(--text-tertiary)'}}>
           <div style={{fontSize:40,marginBottom:12}}>📢</div>
           <div>Nog geen activiteit</div>
           {filter!=='all'&&<button className="btn btn-ghost" onClick={()=>setFilter('all')} style={{marginTop:14,fontSize:12}}>Laat alles zien</button>}
@@ -1658,11 +1701,11 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
               <div style={{flex:1}}>
                 <div style={{fontSize:13,fontWeight:600}}>
                   {item.team_name||'Systeem'}
-                  {isMe&&<span style={{fontSize:9,color:'#00d4ff',marginLeft:6,background:'rgba(0,212,255,0.15)',padding:'2px 6px',borderRadius:8}}>jij</span>}
+                  {isMe&&<span style={{fontSize:9,color:'var(--foto)',marginLeft:6,background:'rgba(0,212,255,0.15)',padding:'2px 6px',borderRadius:8}}>jij</span>}
                 </div>
-                <div style={{fontSize:12,color:'#aaa'}}>{item.message}</div>
+                <div style={{fontSize:12,color:'var(--text-secondary)'}}>{item.message}</div>
               </div>
-              {item.points>0&&<div style={{fontSize:13,fontWeight:800,color:'#ffd700'}}>+{item.points}</div>}
+              {item.points>0&&<div style={{fontSize:13,fontWeight:800,color:'var(--accent)'}}>+{item.points}</div>}
               {item.points<0&&<div style={{fontSize:13,fontWeight:800,color:'#ff6b6b'}}>{item.points}</div>}
             </div>
             {item.photo&&(
@@ -1681,7 +1724,7 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
                 );
               })}
               <div style={{flex:1}}/>
-              <div style={{fontSize:10,color:'#555',marginTop:3}}>{new Date(item.created_at).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</div>
+              <div style={{fontSize:10,color:'var(--text-tertiary)',marginTop:3}}>{new Date(item.created_at).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}</div>
             </div>
           </div>
         );
@@ -1733,12 +1776,12 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
     <div style={{height:'100%',overflowY:'auto',padding:16,paddingBottom:90}}>
       {/* V10: Game-master controls */}
       <div className="glass-strong" style={{padding:14,marginBottom:16,borderColor:'rgba(255,215,0,0.25)'}}>
-        <div style={{fontSize:11,color:'#ffd700',fontWeight:700,letterSpacing:1,marginBottom:10}}>🎛️ GAME MASTER CONTROLS</div>
+        <div style={{fontSize:11,color:'var(--accent)',fontWeight:700,letterSpacing:1,marginBottom:10}}>🎛️ GAME MASTER CONTROLS</div>
 
         {/* Jorik tracker */}
         <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:'#888',marginBottom:6}}>
-            JORIK IS NU: {jorikTeamId==null?<span style={{color:'#aaa'}}>tussen teams</span>:(()=>{const t=teams.find(x=>x.id===jorikTeamId);return t?<span style={{color:t.color,fontWeight:700}}>{t.emoji} {t.name}</span>:<span>onbekend</span>;})()}
+          <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:6}}>
+            JORIK IS NU: {jorikTeamId==null?<span style={{color:'var(--text-secondary)'}}>tussen teams</span>:(()=>{const t=teams.find(x=>x.id===jorikTeamId);return t?<span style={{color:t.color,fontWeight:700}}>{t.emoji} {t.name}</span>:<span>onbekend</span>;})()}
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
             {teams.map(t=>(
@@ -1748,7 +1791,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
               </button>
             ))}
             <button onClick={()=>onMoveJorik&&onMoveJorik(null)}
-              style={{padding:'8px 10px',borderRadius:10,border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',color:'#aaa',fontSize:12,cursor:'pointer'}}>
+              style={{padding:'8px 10px',borderRadius:10,border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',color:'var(--text-secondary)',fontSize:12,cursor:'pointer'}}>
               — alleen —
             </button>
           </div>
@@ -1756,7 +1799,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 
         {/* Bar-break trigger */}
         <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:'#888',marginBottom:6}}>BAR BREAK starten</div>
+          <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:6}}>BAR BREAK starten</div>
           <div style={{display:'flex',gap:6}}>
             <input value={barInput} onChange={e=>setBarInput(e.target.value)} placeholder="Bar naam, bijv. Bokaal"
               style={{flex:1,padding:8,borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:13,outline:'none'}}/>
@@ -1767,7 +1810,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 
         {/* Finale trigger */}
         <div>
-          <div style={{fontSize:11,color:'#888',marginBottom:6}}>SPEL AFSLUITEN</div>
+          <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:6}}>SPEL AFSLUITEN</div>
           <button onClick={()=>{if(confirm('Spel beëindigen en naar de eindceremonie?'))onStartFinale&&onStartFinale()}}
             className="btn btn-danger" disabled={phase>=5} style={{width:'100%',padding:10,fontSize:13,opacity:phase>=5?0.4:1}}>
             🏆 {phase>=5?'Finale actief':'Start Finale & Ceremonie'}
@@ -1777,17 +1820,17 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
         <div>
-          <div style={{fontSize:11,color:'#888',fontWeight:600,letterSpacing:1}}>BEOORDELEN</div>
+          <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:600,letterSpacing:1}}>BEOORDELEN</div>
           <div style={{fontSize:18,fontWeight:800,marginTop:2}}>Wachtrij ({queue.length})</div>
         </div>
-        <div style={{fontSize:10,color:'#555',textAlign:'right'}}>Goedkeuren = punten blijven<br/>Afkeuren = punten worden ingetrokken</div>
+        <div style={{fontSize:10,color:'var(--text-tertiary)',textAlign:'right'}}>Goedkeuren = punten blijven<br/>Afkeuren = punten worden ingetrokken</div>
       </div>
 
       {queue.length===0&&(
-        <div style={{textAlign:'center',padding:40,color:'#555'}}>
+        <div style={{textAlign:'center',padding:40,color:'var(--text-tertiary)'}}>
           <div style={{fontSize:48,marginBottom:12}}>✅</div>
           <div style={{fontWeight:600}}>Niets te beoordelen</div>
-          <div style={{fontSize:12,color:'#666',marginTop:6}}>Foto's verschijnen hier zodra teams ze indienen.</div>
+          <div style={{fontSize:12,color:'var(--text-tertiary)',marginTop:6}}>Foto's verschijnen hier zodra teams ze indienen.</div>
         </div>
       )}
 
@@ -1799,9 +1842,9 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'start'}}>
               <div style={{flex:1}}>
                 <div style={{fontSize:14,fontWeight:700}}>{r.team_emoji||'🎮'} {r.team_name}</div>
-                <div style={{fontSize:12,color:'#aaa',marginTop:2}}>📍 {r.location_name}</div>
+                <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:2}}>📍 {r.location_name}</div>
                 <div style={{fontSize:13,color:'#fff',fontWeight:600,marginTop:6}}>{r.challenge_title}</div>
-                <div style={{fontSize:11,color:'#666',marginTop:2}}>{r.challenge_type} · +{r.points_awarded} pts</div>
+                <div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:2}}>{r.challenge_type} · +{r.points_awarded} pts</div>
               </div>
               <span className="review-badge review-badge-pending">pending</span>
             </div>
@@ -1810,7 +1853,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
               ?(isVideoData(r.photo_url)
                 ?<video src={r.photo_url} className="review-photo" controls muted onClick={()=>onPhoto&&onPhoto(r.photo_url)}/>
                 :<img src={r.photo_url} className="review-photo" alt="submission" onClick={()=>onPhoto&&onPhoto(r.photo_url)}/>)
-              :<div style={{padding:20,textAlign:'center',color:'#666',background:'rgba(255,255,255,0.03)',borderRadius:10,marginTop:8,fontSize:12}}>
+              :<div style={{padding:20,textAlign:'center',color:'var(--text-tertiary)',background:'rgba(255,255,255,0.03)',borderRadius:10,marginTop:8,fontSize:12}}>
                   📷 Foto te groot voor cloud-sync · alleen bij team beschikbaar
                 </div>}
 
@@ -1859,11 +1902,11 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
             <div style={{fontSize:28,marginBottom:4}}>{loc.e}</div>
             <h2 style={{fontSize:20,fontWeight:800}}>{loc.n}</h2>
             <div style={{display:'flex',gap:8,marginTop:6,alignItems:'center'}}>
-              <span style={{fontSize:11,padding:'2px 8px',borderRadius:6,background:'rgba(0,212,255,0.15)',color:'#00d4ff'}}>{loc.c}</span>
-              {dist!=null&&<span style={{fontSize:12,color:'#888'}}>{fmtDist(dist)}</span>}
+              <span style={{fontSize:11,padding:'2px 8px',borderRadius:6,background:'rgba(0,212,255,0.15)',color:'var(--foto)'}}>{loc.c}</span>
+              {dist!=null&&<span style={{fontSize:12,color:'var(--text-secondary)'}}>{fmtDist(dist)}</span>}
             </div>
           </div>
-          <button onClick={onClose} style={{background:'none',border:'none',color:'#666',fontSize:28,cursor:'pointer',padding:4}}>✕</button>
+          <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-tertiary)',fontSize:28,cursor:'pointer',padding:4}}>✕</button>
         </div>
 
         {loc.ch.map((ch,idx)=>{
@@ -1876,7 +1919,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
 
           return(
             <div key={idx} className={`ch-card ${done&&!wasWrong?'completed':''} ${wasWrong?'wrong-done':''} ${locked?'locked':''}`} style={{position:'relative'}}>
-              {locked&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1,fontSize:14,color:'#ffd700',fontWeight:700}}>🔒 Eerst een foto-opdracht!</div>}
+              {locked&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1,fontSize:14,color:'var(--accent)',fontWeight:700}}>🔒 Eerst een foto-opdracht!</div>}
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',marginBottom:8}}>
                 <div style={{flex:1}}>
                   <span className={`ch-type ch-type-${ch.t}`}>{ch.t}</span>
@@ -1884,11 +1927,11 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                 </div>
                 <div className="points-badge">+{ch.p}</div>
               </div>
-              <p style={{fontSize:13,color:'#aaa',marginBottom:10,lineHeight:1.4}}>{ch.d}</p>
+              <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.4}}>{ch.d}</p>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <div className="difficulty"><span className="star">{stars(ch.df)}</span> {ch.df}</div>
-                {done&&!wasWrong&&<div style={{fontSize:13,color:'#00ff88',fontWeight:700}}>✓ Voltooid {ptsEarned>0&&`(+${ptsEarned} pts)`}</div>}
-                {wasWrong&&<div style={{fontSize:13,color:'#ff4444',fontWeight:700}}>✗ Fout gegokt · 0 pts{isQuiz&&ch.a?` · antwoord: ${ch.a}`:''}</div>}
+                {done&&!wasWrong&&<div style={{fontSize:13,color:'var(--success)',fontWeight:700}}>✓ Voltooid {ptsEarned>0&&`(+${ptsEarned} pts)`}</div>}
+                {wasWrong&&<div style={{fontSize:13,color:'var(--danger)',fontWeight:700}}>✗ Fout gegokt · 0 pts{isQuiz&&ch.a?` · antwoord: ${ch.a}`:''}</div>}
               </div>
               {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam}/>}
             </div>
@@ -1905,8 +1948,8 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
               </div>
               <div className="points-badge">+{rotatedQuiz.p}</div>
             </div>
-            <p style={{fontSize:13,color:'#aaa',marginBottom:10,lineHeight:1.4}}>{rotatedQuiz.d}</p>
-            <div style={{fontSize:11,color:'#888',marginBottom:8,fontStyle:'italic'}}>
+            <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:10,lineHeight:1.4}}>{rotatedQuiz.d}</p>
+            <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:8,fontStyle:'italic'}}>
               {rotatedQuiz._pool?'🎯 Bonus Rotterdam-vraag':'⭐ Extra vraag voor deze plek'}
             </div>
             <ChallengeAction ch={rotatedQuiz} locId={loc.id} chIdx={`dyn_${loc.id}_${Date.now()}`} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} onComplete={(lid,cidx,pts,photo)=>{
@@ -1996,7 +2039,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   if(ch.t==='quiz'){
     return(
       <div style={{marginTop:12}}>
-        <div style={{fontSize:11,color:'#888',marginBottom:8,fontStyle:'italic'}}>
+        <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:8,fontStyle:'italic'}}>
           ⚡ Eén kans — fout gegokt = 0 pts
         </div>
         {ch.o.map((opt,i)=>{
@@ -2013,8 +2056,8 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
             </button>
           );
         })}
-        {quizFeedback==='wrong'&&<div style={{fontSize:13,color:'#ff4444',marginTop:8,fontWeight:600}}>❌ Helaas. Het juiste antwoord was: {ch.a} · 0 pts</div>}
-        {quizFeedback==='correct'&&<div style={{fontSize:13,color:'#00ff88',marginTop:8,fontWeight:600}}>✅ Correct! +{ch.p} pts</div>}
+        {quizFeedback==='wrong'&&<div style={{fontSize:13,color:'var(--danger)',marginTop:8,fontWeight:600}}>❌ Helaas. Het juiste antwoord was: {ch.a} · 0 pts</div>}
+        {quizFeedback==='correct'&&<div style={{fontSize:13,color:'var(--success)',marginTop:8,fontWeight:600}}>✅ Correct! +{ch.p} pts</div>}
       </div>
     );
   }
@@ -2042,10 +2085,10 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
         {processing?'⏳ Verwerken...':ch.t==='video'?'🎬 Video Opnemen':ch.t==='creative'?'📸 Foto/Video Maken':'📸 Foto Maken'}
       </button>
       {isAdmin&&dist!=null&&dist>gateRadius&&(
-        <div style={{fontSize:11,color:'#ff6b35',marginTop:6,textAlign:'center'}}>⚠️ Admin override · normaal {Math.round(dist)}m te ver</div>
+        <div style={{fontSize:11,color:'var(--video)',marginTop:6,textAlign:'center'}}>⚠️ Admin override · normaal {Math.round(dist)}m te ver</div>
       )}
       {!isAdmin&&isMedia&&dist!=null&&dist<=gateRadius&&(
-        <div style={{fontSize:11,color:'#00ff88',marginTop:6,textAlign:'center'}}>✓ Je bent op locatie ({Math.round(dist)}m)</div>
+        <div style={{fontSize:11,color:'var(--success)',marginTop:6,textAlign:'center'}}>✓ Je bent op locatie ({Math.round(dist)}m)</div>
       )}
       {preview&&(isVideoData(preview)
         ?<video src={preview} className="photo-preview" controls muted/>
@@ -2064,23 +2107,23 @@ function WeddingMission({onClose,onComplete,done}){
   return(
     <>
       <div className="sheet-overlay" onClick={onClose}/>
-      <div className="sheet" style={{background:'linear-gradient(180deg,#1a0e30 0%,#0f1335 100%)'}}>
+      <div className="sheet" style={{background:'linear-gradient(180deg,#1a0e30 0%,var(--bg) 100%)'}}>
         <div className="sheet-handle"/>
         <div style={{textAlign:'center',marginBottom:20}}>
           <div style={{fontSize:48,marginBottom:12}}>🤫🎬</div>
           <h2 style={{fontSize:22,fontWeight:800,background:'linear-gradient(135deg,#a855f7,#ff6b35)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>GEHEIME MISSIE</h2>
-          <div style={{fontSize:14,color:'#888',marginTop:8}}>Bruiloftsvideo voor Jorik</div>
+          <div style={{fontSize:14,color:'var(--text-secondary)',marginTop:8}}>Bruiloftsvideo voor Jorik</div>
         </div>
 
         <div className="glass" style={{padding:16,marginBottom:16}}>
-          <h3 style={{fontSize:14,fontWeight:700,color:'#a855f7',marginBottom:8}}>INSTRUCTIES</h3>
+          <h3 style={{fontSize:14,fontWeight:700,color:'var(--quiz)',marginBottom:8}}>INSTRUCTIES</h3>
           <p style={{fontSize:13,color:'#ccc',lineHeight:1.6}}>
             Neem een video op met jullie team. Dit wordt onderdeel van een verrassingsvideo die op Jorik's bruiloft wordt vertoond.
           </p>
-          <p style={{fontSize:13,color:'#ff6b35',fontWeight:600,marginTop:12}}>
+          <p style={{fontSize:13,color:'var(--video)',fontWeight:600,marginTop:12}}>
             ⚠️ Doe dit ALLEEN wanneer Jorik NIET bij jullie team is!
           </p>
-          <p style={{fontSize:13,color:'#888',marginTop:12,fontStyle:'italic'}}>
+          <p style={{fontSize:13,color:'var(--text-secondary)',marginTop:12,fontStyle:'italic'}}>
             Het script wordt later nog toegevoegd door de organisatie.
           </p>
         </div>
@@ -2095,7 +2138,7 @@ function WeddingMission({onClose,onComplete,done}){
               </button>
             </>
           )}
-          {(done||uploaded)&&<div style={{textAlign:'center',fontSize:16,color:'#00ff88',fontWeight:700}}>✅ Video opgenomen! Dankjewel!</div>}
+          {(done||uploaded)&&<div style={{textAlign:'center',fontSize:16,color:'var(--success)',fontWeight:700}}>✅ Video opgenomen! Dankjewel!</div>}
         </div>
 
         <button className="btn btn-ghost" onClick={onClose} style={{width:'100%',marginTop:8}}>Sluiten</button>
@@ -2118,9 +2161,9 @@ function BarBreakOverlay({info,onClose,onComplete}){
   return(
     <div className="barbreak-overlay" onClick={()=>{}}>
       <div className="barbreak-card" style={{maxWidth:500,width:'92%'}}>
-        <div style={{fontSize:11,color:'#ffd700',fontWeight:800,letterSpacing:2,marginBottom:6}}>🍻 BAR BREAK</div>
+        <div style={{fontSize:11,color:'var(--accent)',fontWeight:800,letterSpacing:2,marginBottom:6}}>🍻 BAR BREAK</div>
         <div style={{fontSize:26,fontWeight:900,marginBottom:6,background:'linear-gradient(135deg,#ffd700,#ff6b35)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
-        <div style={{fontSize:13,color:'#aaa',marginBottom:20,fontStyle:'italic'}}>Kies een mini-opdracht voor extra punten. Jullie kunnen ze alle drie doen.</div>
+        <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:20,fontStyle:'italic'}}>Kies een mini-opdracht voor extra punten. Jullie kunnen ze alle drie doen.</div>
         <div style={{display:'grid',gap:10,marginBottom:18}}>
           {info.mini.map((m,i)=>{
             const isDone=done.has(i);
@@ -2130,12 +2173,12 @@ function BarBreakOverlay({info,onClose,onComplete}){
                   <div style={{fontSize:24}}>{m.emoji}</div>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:700,fontSize:14}}>{m.title}</div>
-                    <div style={{fontSize:12,color:'#aaa'}}>{m.desc}</div>
+                    <div style={{fontSize:12,color:'var(--text-secondary)'}}>{m.desc}</div>
                   </div>
-                  <div style={{fontSize:13,fontWeight:800,color:'#ffd700'}}>+{m.pts}</div>
+                  <div style={{fontSize:13,fontWeight:800,color:'var(--accent)'}}>+{m.pts}</div>
                 </div>
                 {!isDone&&<button className="btn btn-cyan" onClick={()=>complete(m,i)} style={{width:'100%',padding:10,fontSize:12}}>✓ Klaar — {m.pts} pts</button>}
-                {isDone&&<div style={{fontSize:12,color:'#00ff88',fontWeight:700,textAlign:'center',padding:8}}>✓ Voltooid</div>}
+                {isDone&&<div style={{fontSize:12,color:'var(--success)',fontWeight:700,textAlign:'center',padding:8}}>✓ Voltooid</div>}
               </div>
             );
           })}
@@ -2156,30 +2199,30 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
   const totalChallenges=(activityFeed||[]).filter(a=>a.points>0).length;
 
   return(
-    <div style={{position:'fixed',inset:0,zIndex:10010,overflow:'auto',background:'radial-gradient(circle at 50% 20%,rgba(255,215,0,0.15),transparent 60%),radial-gradient(circle at 30% 80%,rgba(168,85,247,0.12),transparent 50%),#0a0e27'}}>
+    <div style={{position:'fixed',inset:0,zIndex:10010,overflow:'auto',background:'radial-gradient(circle at 50% 20%,rgba(255,215,0,0.15),transparent 60%),radial-gradient(circle at 30% 80%,rgba(168,85,247,0.12),transparent 50%),var(--bg)'}}>
       <div style={{padding:'40px 24px 80px',textAlign:'center',maxWidth:640,margin:'0 auto'}}>
-        <div style={{fontSize:12,color:'#ffd700',letterSpacing:4,fontWeight:800,marginBottom:8}}>━━━  DE UITSLAG  ━━━</div>
+        <div style={{fontSize:12,color:'var(--accent)',letterSpacing:4,fontWeight:800,marginBottom:8}}>━━━  DE UITSLAG  ━━━</div>
         <div style={{fontSize:42,fontWeight:900,marginBottom:6,background:'linear-gradient(135deg,#ffd700,#ff6b35,#a855f7)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>EINDSTAND</div>
-        <div style={{fontSize:13,color:'#888',marginBottom:32}}>{fmtHM(elapsed)} gespeeld · {teams.length} teams · {totalChallenges} voltooide uitdagingen</div>
+        <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:32}}>{fmtHM(elapsed)} gespeeld · {teams.length} teams · {totalChallenges} voltooide uitdagingen</div>
 
         {winner&&(
           <div className="glass-strong" style={{padding:28,marginBottom:24,borderColor:winner.color+'88',background:`linear-gradient(135deg,${winner.color}15,rgba(10,14,39,0.9))`,animation:'fadeInUp .6s ease both'}}>
-            <div style={{fontSize:11,color:'#ffd700',fontWeight:800,letterSpacing:3,marginBottom:4}}>🏆 WINNAAR</div>
+            <div style={{fontSize:11,color:'var(--accent)',fontWeight:800,letterSpacing:3,marginBottom:4}}>🏆 WINNAAR</div>
             <div style={{fontSize:64,marginBottom:4,animation:'float 3s ease-in-out infinite'}}>{winner.emoji}</div>
             <div style={{fontSize:30,fontWeight:900,marginBottom:6,color:winner.color}}>{winner.name}</div>
-            <div style={{fontSize:14,color:'#aaa',marginBottom:12}}>Vriend van de Bruidegom · Eeuwige Roem</div>
-            <div style={{fontSize:48,fontWeight:900,color:'#ffd700'}}>{winner.score}<span style={{fontSize:16,color:'#888',fontWeight:600}}> pts</span></div>
+            <div style={{fontSize:14,color:'var(--text-secondary)',marginBottom:12}}>Vriend van de Bruidegom · Eeuwige Roem</div>
+            <div style={{fontSize:48,fontWeight:900,color:'var(--accent)'}}>{winner.score}<span style={{fontSize:16,color:'var(--text-secondary)',fontWeight:600}}> pts</span></div>
           </div>
         )}
 
-        <div style={{fontSize:11,color:'#888',fontWeight:700,letterSpacing:2,marginBottom:10}}>VOLLEDIGE RANGSCHIKKING</div>
+        <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,letterSpacing:2,marginBottom:10}}>VOLLEDIGE RANGSCHIKKING</div>
         {sorted.map((t,i)=>(
           <div key={t.id} className="glass" style={{padding:14,marginBottom:8,display:'flex',alignItems:'center',gap:12,borderLeft:`4px solid ${t.color}`,animation:`fadeInUp .5s ease ${i*0.1}s both`,opacity:i>0?0.95:1}}>
             <div style={{fontSize:22,fontWeight:900,minWidth:36,color:i===0?'#ffd700':i===1?'#c0c0c0':i===2?'#cd7f32':'#555'}}>#{i+1}</div>
             <div style={{fontSize:28}}>{t.emoji}</div>
             <div style={{flex:1,textAlign:'left'}}>
-              <div style={{fontWeight:700,fontSize:15}}>{t.name}{t.id===jorikTeamId&&<span style={{marginLeft:8,fontSize:11,color:'#ffd700'}}>· met Jorik</span>}</div>
-              <div style={{fontSize:11,color:'#888'}}>{t.id===myTeam?.id?'Jouw team':'Team'}</div>
+              <div style={{fontWeight:700,fontSize:15}}>{t.name}{t.id===jorikTeamId&&<span style={{marginLeft:8,fontSize:11,color:'var(--accent)'}}>· met Jorik</span>}</div>
+              <div style={{fontSize:11,color:'var(--text-secondary)'}}>{t.id===myTeam?.id?'Jouw team':'Team'}</div>
             </div>
             <div style={{fontSize:22,fontWeight:900,color:t.color}}>{t.score}</div>
           </div>
@@ -2187,12 +2230,12 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
 
         {photos.length>0&&(
           <div style={{marginTop:32}}>
-            <div style={{fontSize:11,color:'#888',fontWeight:700,letterSpacing:2,marginBottom:10}}>📸 MOMENTEN VAN DE DAG</div>
+            <div style={{fontSize:11,color:'var(--text-secondary)',fontWeight:700,letterSpacing:2,marginBottom:10}}>📸 MOMENTEN VAN DE DAG</div>
             <div className="photo-grid">
               {photos.map((p,i)=>(
                 <div key={i} className="photo-grid-item" style={{animation:`fadeInUp .4s ease ${i*0.05}s both`}}>
                   {isVideoData(p.photo)?<video src={p.photo} muted/>:<img src={p.photo} alt=""/>}
-                  <div className="photo-grid-overlay"><span>{p.team_emoji||'🎮'}</span>{p.points>0&&<span style={{color:'#ffd700'}}>+{p.points}</span>}</div>
+                  <div className="photo-grid-overlay"><span>{p.team_emoji||'🎮'}</span>{p.points>0&&<span style={{color:'var(--accent)'}}>+{p.points}</span>}</div>
                 </div>
               ))}
             </div>
@@ -2201,7 +2244,7 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
 
         <div style={{marginTop:40,padding:20,borderRadius:16,background:'linear-gradient(135deg,rgba(168,85,247,0.1),rgba(255,107,53,0.08))',border:'1px solid rgba(168,85,247,0.3)'}}>
           <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>🥂 Proost op Jorik</div>
-          <div style={{fontSize:13,color:'#aaa',lineHeight:1.5}}>
+          <div style={{fontSize:13,color:'var(--text-secondary)',lineHeight:1.5}}>
             De ring is terug. De bruiloft kan door. Al jullie foto's, video's en roasts zijn vastgelegd en worden samengevoegd tot een verrassingsvideo die Jorik pas op 14 juni te zien krijgt. Bedankt voor jullie energie vandaag.
           </div>
         </div>
