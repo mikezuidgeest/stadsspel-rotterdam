@@ -1859,14 +1859,19 @@ function App(){
     try{prev.commit&&prev.commit();}catch(e){/* swallow */}
   };
   // V23 (#49): commit a photo_reviews status update with single auto-retry on failure.
+  // V25 (#53): optional `notes` persists to photo_reviews.reviewer_notes (V22 column),
+  // capturing the admin's rejection reason for queue-quality trend analysis and so
+  // the rejected team sees a more informative feed entry.
   // If the commit fails twice, re-queue the photo and surface a toast so the admin
   // can try again. `sideEffects` runs only on a successful commit (e.g. score delta,
   // activity feed insert for rejections) — this prevents the photo-rejection
   // double-penalty race from recurring when the update itself failed.
-  const commitReview=(r,newStatus,sideEffects)=>{
+  const commitReview=(r,newStatus,sideEffects,notes)=>{
     if(!sb)return;
+    const payload={status:newStatus,reviewed_at:new Date().toISOString()};
+    if(notes&&typeof notes==='string'&&notes.trim())payload.reviewer_notes=notes.trim().slice(0,240);
     const doUpdate=()=>sb.from('photo_reviews')
-      .update({status:newStatus,reviewed_at:new Date().toISOString()})
+      .update(payload)
       .eq('id',r.id);
     const onFail=(err)=>{
       console.error('[photo_reviews]',newStatus,'commit failed:',err);
@@ -1905,11 +1910,15 @@ function App(){
     const commit=()=>commitReview(r,'approved',null);
     setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},10000); return{row:r,action:'approved',deadline:Date.now()+10000,timer,commit};});
   };
-  const rejectReview=(r)=>{
+  // V25 (#53): rejectReview now accepts an optional reason string — persisted to
+  // photo_reviews.reviewer_notes and embedded in the team's activity-feed entry so
+  // they see WHY the photo was rejected, not just that it was.
+  const rejectReview=(r,reason)=>{
     if(!sb)return;
     setReviewQueue(prev=>prev.filter(x=>x.id!==r.id));
     // V18 (§1.9.11): extended 5-min undo window for rejections — higher stakes than approvals
     const REJECT_UNDO_MS=300000;
+    const trimmedReason=reason&&typeof reason==='string'?reason.trim().slice(0,200):'';
     const commit=()=>commitReview(r,'rejected',()=>{
       if(REVIEW_REJECT_PENALTY){
         // V20: atomic negative delta. Also updates local scores immediately if this is my team.
@@ -1920,20 +1929,24 @@ function App(){
       if(!OFFLINE&&sb){
         const rejectedTeam=teams.find(t=>t.id===r.team_id);
         const penalty=REVIEW_REJECT_PENALTY?r.points_awarded:0;
+        const titlePart=r.challenge_title||'uitdaging';
+        // V25 (#53): append reason to the feed message so teams learn what to fix next time.
+        const baseMsg=penalty>0
+          ?`Foto afgekeurd — "${titlePart}" · -${penalty} pts`
+          :`Foto afgekeurd — "${titlePart}"`;
+        const fullMsg=trimmedReason?`${baseMsg} · ${trimmedReason}`:baseMsg;
         sb.from('activity_feed').insert({
           team_id:r.team_id,
           team_name:rejectedTeam?.name||r.team_name||'Team',
           team_emoji:rejectedTeam?.emoji||r.team_emoji||'❌',
           team_color:rejectedTeam?.color||'#ff6b6b',
-          message:penalty>0
-            ?`Foto afgekeurd — "${r.challenge_title||'uitdaging'}" · -${penalty} pts`
-            :`Foto afgekeurd — "${r.challenge_title||'uitdaging'}"`,
+          message:fullMsg,
           points:penalty>0?-penalty:0,
           created_at:new Date().toISOString(),
         }).then(()=>{},()=>{});
       }
-    });
-    setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},REJECT_UNDO_MS); return{row:r,action:'rejected',deadline:Date.now()+REJECT_UNDO_MS,timer,commit};});
+    },trimmedReason||null);
+    setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},REJECT_UNDO_MS); return{row:r,action:'rejected',deadline:Date.now()+REJECT_UNDO_MS,timer,commit,reason:trimmedReason};});
   };
   const undoReview=()=>{
     if(!reviewUndo)return;
@@ -2252,11 +2265,40 @@ function App(){
     assignHotTarget();
   },[phase,myTeam,hotTarget,assignHotTarget]);
 
-  // V17: hot target expiry watcher — deduct 5 pts and assign next
+  // V27 P0-B: same-tab latch + cross-tab BroadcastChannel for hot-target expiry.
+  // Live forensic audit (18 Apr 2026) found 61 duplicate "miste de deadline" rows
+  // for one team across a 4-hour idle window — the watchdog below used to fire
+  // once per tick (nowTs is in the deps) AND once per open tab. Now:
+  //  - `expiredHotRef` caches the last-fired key per tab so the same hotTarget
+  //    can never double-fire from this tab.
+  //  - A BroadcastChannel ("stadsspel-miss") announces the claim to sibling
+  //    tabs immediately so they also set their latch and skip the insert.
+  //  - jorikInTeam is NOT a guard here (hot-target is every-team, not Jorik-only).
+  const expiredHotRef=React.useRef(null);
+  const missChannelRef=React.useRef(null);
+  useEffect(()=>{
+    if(typeof BroadcastChannel==='undefined')return;
+    let ch=null;
+    try{
+      ch=new BroadcastChannel('stadsspel-miss');
+      ch.onmessage=(ev)=>{
+        if(ev&&ev.data&&ev.data.type==='claim'&&ev.data.key){
+          expiredHotRef.current=ev.data.key; // peer already fired — suppress our own
+        }
+      };
+      missChannelRef.current=ch;
+    }catch(e){/* no-op — BroadcastChannel unsupported on this browser */}
+    return()=>{try{ch&&ch.close();}catch(e){}};
+  },[]);
   useEffect(()=>{
     if(!hotTarget)return;
     if(nowTs<hotTarget.deadline)return;
-    // Expired
+    // Stable key per hotTarget instance: team + POI + deadline timestamp.
+    // Deadline changes on Extra Tijd, so extending the timer re-arms the latch.
+    const key=(myTeam?.id||'x')+':'+hotTarget.locId+':'+hotTarget.deadline;
+    if(expiredHotRef.current===key)return; // already handled by this tab or a peer
+    expiredHotRef.current=key;
+    try{missChannelRef.current&&missChannelRef.current.postMessage({type:'claim',key});}catch(e){}
     const loc=L_DATA.find(l=>l.id===hotTarget.locId);
     setToast(`⏱ Te laat bij ${loc?.n||'target'} · −${HOT_EXPIRE_PENALTY} pts`);
     addActivity(`miste de deadline bij ${loc?.n||'target'} · −${HOT_EXPIRE_PENALTY} pts`,-HOT_EXPIRE_PENALTY);
@@ -2687,8 +2729,37 @@ function App(){
       setStorySeen(prev=>new Set([...prev,'intro']));
     }
     // V12: broadcast start via game_state — every phone snaps out of lobby
+    // V27 P0-A: ALSO seed jorik_team_id + jorik_moved_at. Pre-V27 startGame never
+    // wrote these, so game_state.jorik_team_id stayed NULL, the auto-rotate watcher
+    // early-returned on `if(!jorikTeamId||!jorikMovedAt)`, and the Jorik mechanic
+    // was silently dead for every fresh game. Live forensic audit (18 Apr 2026)
+    // confirmed all 4 teams had has_jorik=false after a phase=1 upsert.
     if(!OFFLINE&&sb){
-      sb.from('game_state').upsert({id:1,phase:1,started_at:new Date(now).toISOString(),game_ended:false,bar_break_active:null,bar_break_started_at:null}).then(()=>{},()=>{});
+      const seedTeam=(Array.isArray(teams)?teams:[]).find(t=>!t.spectator);
+      const seedPayload={id:1,phase:1,started_at:new Date(now).toISOString(),game_ended:false,bar_break_active:null,bar_break_started_at:null};
+      if(seedTeam){
+        seedPayload.jorik_team_id=seedTeam.id;
+        seedPayload.jorik_moved_at=new Date(now).toISOString();
+      }
+      sb.from('game_state').upsert(seedPayload).then(()=>{
+        if(seedTeam){
+          // Mirror locally so auto-rotate + band watchers wake up immediately,
+          // even before the realtime UPDATE echoes back.
+          setJorikTeamId(seedTeam.id);
+          setJorikMovedAt(now);
+        }
+      },(err)=>{
+        // Pre-V21 DBs don't have jorik_moved_at — retry without it so start
+        // doesn't stall. Admin can manually seed Jorik via the chip row.
+        const msg=String(err?.message||'').toLowerCase();
+        if(msg.includes('jorik_moved_at')||err?.code==='42703'){
+          const retryPayload=Object.assign({},seedPayload);
+          delete retryPayload.jorik_moved_at;
+          sb.from('game_state').upsert(retryPayload).then(()=>{
+            if(seedTeam){setJorikTeamId(seedTeam.id);setJorikMovedAt(now);}
+          },()=>{});
+        }
+      });
     }
   };
 
@@ -4120,6 +4191,18 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
   const[showTeamAdmin,setShowTeamAdmin]=React.useState(false);
   const[undoLeft,setUndoLeft]=React.useState(0);
   const[broadcastMsg,setBroadcastMsg]=React.useState('');
+  // V25 (#53): reject-reason picker — tracks which review row has the picker expanded
+  // and the custom-reason text. Reset when a reject fires or picker is cancelled.
+  const[rejectOpenId,setRejectOpenId]=React.useState(null);
+  const[rejectCustom,setRejectCustom]=React.useState('');
+  const[rejectCustomOpen,setRejectCustomOpen]=React.useState(false);
+  const REJECT_REASONS=[
+    {k:'te-ver',l:'📍 Te ver weg'},
+    {k:'onherkenbaar',l:'🔍 Onderwerp niet herkenbaar'},
+    {k:'onscherp',l:'📸 Onscherp / onduidelijk'},
+    {k:'geen-team',l:'👤 Geen teamleden zichtbaar'},
+    {k:'verkeerd',l:'🎯 Verkeerde opdracht'},
+  ];
   // V18 (§1.9.10): queue filter — 'all' | 'green' | 'yellow' | 'red'
   // V18 audit-fix: unknown distance (gps_distance==null) groups with 'red' — treat-as-suspicious default
   const[reviewFilter,setReviewFilter]=React.useState('all');
@@ -4143,11 +4226,12 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 
   return(
     <div style={{height:'100%',overflowY:'auto',padding:'var(--sp-5)',paddingBottom:'var(--sp-10)'}}>
-      {/* Review undo banner */}
+      {/* Review undo banner — V25 (#53): also surfaces the reject reason when one was captured */}
       {reviewUndo&&undoLeft>0&&(
         <div className="row-3 panel-sm" style={{position:'sticky',top:0,zIndex:20,marginBottom:'var(--sp-3)',background:reviewUndo.action==='approved'?'rgba(95,216,165,0.15)':'rgba(255,107,107,0.15)',borderColor:reviewUndo.action==='approved'?'rgba(95,216,165,0.35)':'rgba(255,107,107,0.35)'}}>
           <div className="flex-1 t-body-emph" style={{color:reviewUndo.action==='approved'?'var(--success)':'var(--danger)'}}>
             {reviewUndo.action==='approved'?'✓ Goedgekeurd':'✗ Afgekeurd'}: {reviewUndo.row.team_name} · {reviewUndo.row.challenge_title}
+            {reviewUndo.reason&&<div className="t-caption t-muted" style={{marginTop:2,fontWeight:'normal'}}>Reden: {reviewUndo.reason}</div>}
           </div>
           <button onClick={onUndoReview} className="btn btn-ghost btn-sm">↶ Ongedaan ({undoLeft>=60?`${Math.floor(undoLeft/60)}m ${undoLeft%60}s`:`${undoLeft}s`})</button>
         </div>
@@ -4162,17 +4246,21 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
           <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>
             Jorik is nu: {jorikTeamId==null?<span className="t-muted">loopt alleen</span>:(()=>{const t=teams.find(x=>x.id===jorikTeamId);return t?<span style={{color:t.color,fontWeight:'var(--fw-bold)'}}>{t.emoji} {t.name}</span>:<span>onbekend</span>;})()}
           </div>
-          <div className="row-2" style={{flexWrap:'nowrap',overflowX:'auto',paddingBottom:'var(--sp-1)',scrollbarWidth:'thin',WebkitOverflowScrolling:'touch'}}>
+          {/* V25 (#56): chips wrap to a second row instead of horizontal-scrolling,
+              so all teams stay visible without the admin needing to swipe sideways
+              on mobile. Kept whiteSpace:nowrap per chip so multi-word team names
+              stay on one line. */}
+          <div className="row-2" style={{flexWrap:'wrap',rowGap:'var(--sp-2)'}}>
             {teams.filter(t=>t.id>0).map(t=>(
               <button key={t.id} onClick={()=>onMoveJorik&&onMoveJorik(t.id)}
                 className="t-body-emph"
-                style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:jorikTeamId===t.id?`2px solid ${t.color}`:'1px solid var(--border)',background:jorikTeamId===t.id?t.color+'22':'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)',flexShrink:0}}>
+                style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:jorikTeamId===t.id?`2px solid ${t.color}`:'1px solid var(--border)',background:jorikTeamId===t.id?t.color+'22':'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)'}}>
                 {t.emoji} {t.name}
               </button>
             ))}
             <button onClick={()=>onMoveJorik&&onMoveJorik(null)}
               className="t-body-emph t-muted"
-              style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)',flexShrink:0}}>
+              style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)'}}>
               👤 alleen
             </button>
           </div>
@@ -4339,7 +4427,13 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
             </div>
 
             <div className="review-actions">
-              <button className="btn btn-danger btn-sm" onClick={async()=>{if(await ask(`Foto van ${r.team_name} afkeuren? -${r.points_awarded} pts.`,{danger:true,confirmLabel:'Afkeuren'}))onReject(r)}}>✗ Afkeuren</button>
+              {/* V25 (#53): tap "Afkeuren" to expand a reason-chip grid instead of a one-step confirm.
+                  Picking a chip commits the rejection with that reason, which persists to
+                  photo_reviews.reviewer_notes and shows up in the team's feed entry so they
+                  know what to fix next time. 5-min undo window still applies. */}
+              {rejectOpenId!==r.id&&(
+                <button className="btn btn-danger btn-sm" onClick={()=>{setRejectOpenId(r.id);setRejectCustom('');setRejectCustomOpen(false);}}>✗ Afkeuren</button>
+              )}
               {/* V18 (§1.9.4): confirm approve only when submission is suspicious (no photo OR >100m off) */}
               <button className="btn btn-cyan btn-sm" onClick={async()=>{
                 const suspicious=!r.photo_url||(typeof r.gps_distance==='number'&&r.gps_distance>100);
@@ -4350,6 +4444,45 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
                 onApprove(r);
               }}>✓ Goedkeuren</button>
             </div>
+            {rejectOpenId===r.id&&(
+              <div className="panel-sm" style={{marginTop:'var(--sp-3)',padding:'var(--sp-3)',background:'rgba(255,107,107,0.05)',border:'1px solid rgba(255,107,107,0.25)',borderRadius:'var(--r-md)'}}>
+                <div className="t-label-sm t-danger" style={{marginBottom:'var(--sp-2)'}}>Waarom afkeuren? <span className="t-caption t-muted">(tik een reden, komt in team-feed)</span></div>
+                <div className="row-2" style={{flexWrap:'wrap',rowGap:'var(--sp-2)',marginBottom:'var(--sp-2)'}}>
+                  {REJECT_REASONS.map(o=>(
+                    <button key={o.k} onClick={()=>{onReject(r,o.l);setRejectOpenId(null);}}
+                      className="t-body-emph"
+                      style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-pill)',border:'1px solid rgba(255,107,107,0.35)',background:'rgba(255,107,107,0.1)',color:'#fff',cursor:'pointer',fontSize:'var(--fs-12)',whiteSpace:'nowrap'}}>
+                      {o.l}
+                    </button>
+                  ))}
+                  {!rejectCustomOpen&&(
+                    <button onClick={()=>setRejectCustomOpen(true)} className="t-body-emph"
+                      style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-pill)',border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',color:'#fff',cursor:'pointer',fontSize:'var(--fs-12)',whiteSpace:'nowrap'}}>
+                      ✏️ Anders…
+                    </button>
+                  )}
+                  <button onClick={()=>{onReject(r,'');setRejectOpenId(null);}} className="t-body-emph t-muted"
+                    style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-pill)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'var(--text-tertiary)',cursor:'pointer',fontSize:'var(--fs-12)',whiteSpace:'nowrap'}}
+                    title="Afkeuren zonder reden (niet aanbevolen)">
+                    Geen reden
+                  </button>
+                </div>
+                {rejectCustomOpen&&(
+                  <div className="row-2" style={{marginBottom:'var(--sp-2)'}}>
+                    <input value={rejectCustom} onChange={e=>setRejectCustom(e.target.value)}
+                      placeholder="Korte reden (max 200 tekens)" maxLength={200} autoFocus
+                      className="t-body-emph"
+                      style={{flex:1,padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',outline:'none',fontSize:'var(--fs-13)'}}/>
+                    <button disabled={!rejectCustom.trim()} onClick={()=>{onReject(r,rejectCustom.trim());setRejectOpenId(null);setRejectCustom('');setRejectCustomOpen(false);}}
+                      className="btn btn-danger btn-sm">✗ Afkeuren</button>
+                  </div>
+                )}
+                <button onClick={()=>{setRejectOpenId(null);setRejectCustom('');setRejectCustomOpen(false);}}
+                  className="t-caption t-muted" style={{background:'transparent',border:'none',padding:'var(--sp-1) var(--sp-2)',cursor:'pointer',textDecoration:'underline'}}>
+                  Annuleren
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
@@ -4600,6 +4733,9 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   }
 
   // V6/V16: GPS gate UI — single-line distance, no duplication
+  // V25 (#55): dropped the "-Nm" negative-prefixed badge; the hint text already
+  // communicates the remaining distance positively, and a minus sign here made
+  // it look like a countdown going the wrong way.
   if(tooFar){
     const need=Math.round(dist-gateRadius);
     return(
@@ -4609,7 +4745,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
           <div className="gate-text">Loop dichterbij om de foto te maken</div>
           <div className="gate-hint">Nog {need}m tot binnen range</div>
         </div>
-        <div className="gate-distance">-{need}m</div>
+        <div className="gate-distance">{need}m</div>
       </div>
     );
   }
