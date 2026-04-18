@@ -3706,6 +3706,14 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
   const[reactions,setReactions]=useState({}); // {feedKey: {emoji: count}}
   const[myReactions,setMyReactions]=useState({}); // {feedKey: Set<emoji>}
   const deviceIdRef=useRef(null);
+  // V30.1: DELETE events from Supabase Realtime arrive with only {id} in the
+  // old-row payload regardless of REPLICA IDENTITY FULL (the realtime service
+  // caches table metadata at slot-creation time and doesn't refresh). We
+  // maintain a local id → {feed_key,emoji,device_id} map so we can still
+  // decrement the right counter when someone un-reacts from another device.
+  // The map is populated on mount (via the initial select) and on every
+  // INSERT realtime event, and drained on DELETE. No cross-device drift.
+  const reactionRowsRef=useRef({});
 
   // V30: composite key — matches the activity_feed realtime dedup key so
   // optimistic-local rows and their echoed server rows collapse to one key.
@@ -3738,7 +3746,9 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
 
     // Initial fetch — grab all reactions (tiny rows; a 500-row feed × 5 emojis ×
     // ~16 devices = 40k reactions max, well within one select round-trip).
-    sb.from('feed_reactions').select('feed_key,device_id,emoji').then(res=>{
+    // V30.1: also pulls id so reactionRowsRef can resolve DELETE events that
+    // ship with just {id} on Supabase Realtime.
+    sb.from('feed_reactions').select('id,feed_key,device_id,emoji').then(res=>{
       if(!alive||!res?.data)return;
       const rx={}, mine={};
       const myDev=deviceIdRef.current;
@@ -3749,13 +3759,19 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
           if(!mine[r.feed_key])mine[r.feed_key]=new Set();
           mine[r.feed_key].add(r.emoji);
         }
+        if(r.id!=null){
+          reactionRowsRef.current[r.id]={feed_key:r.feed_key,emoji:r.emoji,device_id:r.device_id};
+        }
       });
       setReactions(rx);
       setMyReactions(mine);
     },()=>{/* table missing on an old DB — silent; reactions just won't persist */});
 
-    // Realtime — INSERT increments the counter, DELETE decrements. Needs
-    // REPLICA IDENTITY FULL on feed_reactions so DELETE ships the old row.
+    // Realtime — INSERT increments the counter, DELETE decrements.
+    // V30.1: Supabase Realtime caches table metadata at slot-attach time and
+    // streams DELETE payloads with only {id} in the old-row regardless of
+    // REPLICA IDENTITY FULL at the table level. We resolve DELETE events
+    // against reactionRowsRef (populated on initial load + every INSERT).
     const sub=sb.channel('feed_reactions').on('postgres_changes',
       {event:'*',schema:'public',table:'feed_reactions'},
       payload=>{
@@ -3763,6 +3779,9 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
         const myDev=deviceIdRef.current;
         if(payload.eventType==='INSERT'){
           const r=payload.new; if(!r||!r.feed_key)return;
+          if(r.id!=null){
+            reactionRowsRef.current[r.id]={feed_key:r.feed_key,emoji:r.emoji,device_id:r.device_id};
+          }
           setReactions(prev=>{
             const cur={...(prev[r.feed_key]||{})};
             cur[r.emoji]=(cur[r.emoji]||0)+1;
@@ -3776,18 +3795,25 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
             });
           }
         }else if(payload.eventType==='DELETE'){
-          const r=payload.old; if(!r||!r.feed_key)return;
+          // V30.1: old payload is often just {id} — look up full row locally.
+          const o=payload.old||{};
+          const hit=(o.id!=null)?reactionRowsRef.current[o.id]:null;
+          const feed_key=o.feed_key||hit?.feed_key;
+          const emoji=o.emoji||hit?.emoji;
+          const device_id=o.device_id||hit?.device_id;
+          if(!feed_key||!emoji)return; // unknown row (tab opened after both INSERT and DELETE in <1ms) — ignore; next mount's select corrects
+          if(o.id!=null)delete reactionRowsRef.current[o.id];
           setReactions(prev=>{
-            const cur={...(prev[r.feed_key]||{})};
-            const next=Math.max(0,(cur[r.emoji]||0)-1);
-            if(next===0)delete cur[r.emoji]; else cur[r.emoji]=next;
-            return{...prev,[r.feed_key]:cur};
+            const cur={...(prev[feed_key]||{})};
+            const next=Math.max(0,(cur[emoji]||0)-1);
+            if(next===0)delete cur[emoji]; else cur[emoji]=next;
+            return{...prev,[feed_key]:cur};
           });
-          if(r.device_id===myDev){
+          if(device_id===myDev){
             setMyReactions(prev=>{
-              const cur=new Set(prev[r.feed_key]||[]);
-              cur.delete(r.emoji);
-              return{...prev,[r.feed_key]:cur};
+              const cur=new Set(prev[feed_key]||[]);
+              cur.delete(emoji);
+              return{...prev,[feed_key]:cur};
             });
           }
         }
