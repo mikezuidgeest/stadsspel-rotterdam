@@ -1511,8 +1511,19 @@ function App(){
       }
     }).subscribe();
     const actSub=sb.channel('activity').on('postgres_changes',{event:'INSERT',schema:'public',table:'activity_feed'},payload=>{
-      // V21: raised in-memory cap from 50 → 500 (see addActivity for rationale)
-      setActivityFeed(prev=>[payload.new,...prev].slice(0,500));
+      // V22 P0 fix: dedup optimistic-append vs realtime-echo.
+      // addActivity() and broadcastMessage() both prepend a local entry BEFORE
+      // the server INSERT so the author sees instant feedback. The same INSERT
+      // then comes back via this subscription — without dedup the author's own
+      // row appears twice. We compare by composite key since the client keeps
+      // the exact created_at it sent to the server.
+      setActivityFeed(prev=>{
+        const n=payload.new;
+        const key=`${n.created_at}|${n.team_id}|${n.message}`;
+        if(prev.some(a=>`${a.created_at}|${a.team_id}|${a.message}`===key))return prev;
+        // V21: cap at 500 (see addActivity for rationale)
+        return[n,...prev].slice(0,500);
+      });
       // V10: parse Jorik system broadcasts (fallback if game_state field not available)
       const msg=payload.new.message||'';
       const m=msg.match(/^\[JORIK\] team=(\d+|null)/);
