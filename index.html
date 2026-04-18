@@ -435,6 +435,34 @@
 
     /* V13: Section labels */
     .section-label{font-size:10px;color:var(--text-secondary);font-weight:800;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:10px}
+
+    /* V25 (#71): two-radius task discovery — band pill, two-ring mini-map, task rows */
+    .band-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:var(--r-pill);font-size:11px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap}
+    .band-pill.unlock{background:rgba(95,216,165,0.18);color:var(--creatief-2);border:1px solid rgba(95,216,165,0.4)}
+    .band-pill.preview{background:rgba(228,178,92,0.16);color:var(--accent-2);border:1px solid rgba(228,178,92,0.4);animation:bandWarm 2s ease-in-out infinite}
+    .band-pill.far{background:rgba(255,255,255,0.04);color:var(--text-tertiary);border:1px solid var(--border)}
+    @keyframes bandWarm{0%,100%{box-shadow:0 0 0 0 rgba(228,178,92,0.55)}50%{box-shadow:0 0 0 6px rgba(228,178,92,0)}}
+    .two-ring{flex-shrink:0;width:100px;height:100px}
+    .two-ring svg{display:block}
+    .two-ring .ring-preview{fill:none;stroke:rgba(228,178,92,0.35);stroke-width:1.5;stroke-dasharray:4 3}
+    .two-ring .ring-unlock{fill:rgba(95,216,165,0.08);stroke:rgba(95,216,165,0.6);stroke-width:1.5}
+    .two-ring .ring-target{fill:#e4b25c}
+    .two-ring .ring-me{fill:#6ea3ff;stroke:#fff;stroke-width:1.5}
+    .task-row{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:var(--r-md);background:linear-gradient(155deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015));border:1px solid var(--border);cursor:pointer;transition:transform .2s var(--spring),border-color .2s,background .2s;-webkit-tap-highlight-color:transparent}
+    .task-row:hover{transform:translateY(-1px);border-color:var(--border-strong)}
+    .task-row:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+    .task-row.unlock{border-color:rgba(95,216,165,0.45);background:linear-gradient(155deg,rgba(95,216,165,0.1),rgba(95,216,165,0.02))}
+    .task-row.preview{border-color:rgba(228,178,92,0.35)}
+    .task-row.far{opacity:0.82}
+    .task-row.completed{opacity:0.55;filter:grayscale(0.4)}
+    .task-row-emoji{font-size:22px;flex-shrink:0;width:28px;text-align:center}
+    .task-row-body{flex:1;min-width:0;display:flex;flex-direction:column}
+    .task-row-name{font-size:13px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .task-row-meta{font-size:10px;color:var(--text-tertiary);margin-top:1px;letter-spacing:0.02em}
+    .task-row-chevron{color:var(--text-tertiary);font-size:18px;flex-shrink:0;padding-right:2px}
+    .task-group-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-tertiary);margin:14px 0 8px;padding-left:2px}
+    .task-group-label.unlock{color:var(--creatief-2)}
+    .task-group-label.preview{color:var(--accent-2)}
   </style>
 </head>
 <body>
@@ -572,6 +600,14 @@ const PHOTO_GATE_RADIUS=50;        // meters — must be within this to take a p
 const PHOTO_GATE_GRACE=20;         // extra meters allowed (GPS noise tolerance)
 const REVIEW_REJECT_PENALTY=true;  // when admin rejects, deduct points awarded
 // Status enum for photo_reviews table: 'pending' | 'approved' | 'rejected'
+
+// V25 (#71): Two-radius task discovery UX.
+// PREVIEW_RADIUS — "getting warm" band. Task is close enough to plan a path to.
+// UNLOCK_RADIUS  — "you're here" band. Challenge copy + CTAs communicate actionable state.
+// PHOTO_GATE_RADIUS (50m) remains as the stricter inner gate for photo capture —
+// defense-in-depth, independent of the UX bands above.
+const PREVIEW_RADIUS=300;
+const UNLOCK_RADIUS=100;
 
 // V14: Global countdown — the diner at Markthal/Bokaal is 19:30 on game day
 // In dev we fall back to "now + 4h" so timers are visible during non-game-day previews
@@ -839,6 +875,21 @@ function fmtDist(m){return m<1000?`${Math.round(m)}m`:`${(m/1000).toFixed(1)}km`
 function fmtTime(s){const m=Math.floor(s/60),sec=s%60;return`${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`}
 function fmtHM(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60);return h>0?`${h}u ${m}m`:`${m}m`}
 function stars(df){return df==='easy'?'★':df==='medium'?'★★':'★★★'}
+
+// V25 (#71): Band classifier for the two-radius task discovery UX.
+// Returns one of 'unlock' | 'preview' | 'far' | 'unknown'.
+//   unlock  — inside UNLOCK_RADIUS (100m): challenge is actionable here.
+//   preview — between UNLOCK and PREVIEW_RADIUS (300m): getting warm.
+//   far     — beyond PREVIEW_RADIUS: visible but not yet close.
+//   unknown — no GPS fix yet (pos null). Renders as 'far' visually but without distance text.
+function locBand(pos,loc){
+  if(!pos||!loc)return{band:'unknown',dist:null};
+  // pos uses Leaflet naming (lat/lng); L_DATA uses compact (la/lo).
+  const d=haversine(pos.lat,pos.lng,loc.la,loc.lo);
+  if(d<=UNLOCK_RADIUS)return{band:'unlock',dist:d};
+  if(d<=PREVIEW_RADIUS)return{band:'preview',dist:d};
+  return{band:'far',dist:d};
+}
 
 // V12: relative time (for activity feed)
 function fmtRelTime(iso){
@@ -2963,7 +3014,7 @@ function App(){
 
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} pos={pos} onSelect={setSelLoc}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} hotTarget={hotTarget} nowTs={nowTs}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} confirmAsync={confirmAsync}/>}
@@ -3305,10 +3356,115 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync}){
   );
 }
 
+// V25 (#71): TwoRingIndicator — mini SVG showing preview (300m) outer ring,
+// unlock (100m) inner ring, target dot at POI center, and the user's own dot
+// positioned along the bearing with a scale capped at the preview radius.
+function TwoRingIndicator({dist,pos,loc}){
+  // Radii in svg px: preview=40 (outer), unlock=14 (inner)
+  const cx=50,cy=50,PREV_PX=40,UNLOCK_PX=14;
+  // User-dot position: project the real meters distance onto the svg radius.
+  // Beyond preview: pin to the outer edge + add a subtle arrow hint.
+  let ux=cx,uy=cy,off=false;
+  if(pos&&loc&&dist!=null){
+    // Bearing from user → target as a planar vector (lon scaled by cos(lat)) — good enough at city scale.
+    // pos uses Leaflet naming (lat/lng); L_DATA uses compact (la/lo).
+    const dLat=loc.la-pos.lat;                                       // +ve = target north of user
+    const dLon=(loc.lo-pos.lng)*Math.cos(pos.lat*Math.PI/180);       // +ve = target east of user
+    const mag=Math.hypot(dLat,dLon)||1;
+    // Target sits at (cx,cy). User dot sits on the opposite bearing from target.
+    // SVG: east = +x (same as +lon), north = -y (so we ADD lat-delta to y to move south).
+    const pxDist=Math.min(dist,PREVIEW_RADIUS)/PREVIEW_RADIUS*PREV_PX;
+    ux=cx-(dLon/mag)*pxDist; // target east of user ⇒ draw user west of cx
+    uy=cy+(dLat/mag)*pxDist; // target north of user ⇒ draw user south (larger y)
+    off=dist>PREVIEW_RADIUS;
+  }
+  return(
+    <div className="two-ring">
+      <svg width="100" height="100" viewBox="0 0 100 100" aria-hidden="true">
+        {/* Outer preview ring (dashed amber) */}
+        <circle cx={cx} cy={cy} r={PREV_PX} className="ring-preview" fill="none" strokeWidth="1.5" strokeDasharray="3 3"/>
+        {/* Inner unlock ring (solid green) */}
+        <circle cx={cx} cy={cy} r={UNLOCK_PX} className="ring-unlock" fill="none" strokeWidth="2"/>
+        {/* Target dot */}
+        <circle cx={cx} cy={cy} r="3" className="ring-target"/>
+        {/* User dot */}
+        {pos&&<circle cx={ux} cy={uy} r="4" className="ring-me"/>}
+        {off&&pos&&<circle cx={ux} cy={uy} r="7" fill="none" stroke="rgba(139,185,255,0.4)" strokeWidth="1" strokeDasharray="2 2"/>}
+      </svg>
+    </div>
+  );
+}
+
+// V25 (#71): TaskList — grouped, always-visible list of every main-deck task.
+// Sort: by band (unlock → preview → far → unknown), distance within band,
+// completed pushed to a trailing "Al gedaan" group. Filters out bars (separate mechanic).
+function TaskList({pos,onSelect,completed,visitedLocs}){
+  // Build rows once; treat each L_DATA POI as a row.
+  const rows=L_DATA
+    .filter(l=>l.c!=='bar')
+    .map(loc=>{
+      const{band,dist}=locBand(pos,loc);
+      const locCompleted=completed&&completed[loc.id]?Object.keys(completed[loc.id]).length:0;
+      const total=(loc.ch&&loc.ch.length)||0;
+      const allDone=total>0&&locCompleted>=total;
+      return{loc,band,dist,locCompleted,total,allDone};
+    });
+  // Partition by group
+  const groups={unlock:[],preview:[],far:[],done:[]};
+  rows.forEach(r=>{
+    if(r.allDone)groups.done.push(r);
+    else if(r.band==='unlock')groups.unlock.push(r);
+    else if(r.band==='preview')groups.preview.push(r);
+    else groups.far.push(r); // far + unknown
+  });
+  // Within each group, sort by distance (null last)
+  const sortByDist=(a,b)=>{
+    if(a.dist==null&&b.dist==null)return 0;
+    if(a.dist==null)return 1;
+    if(b.dist==null)return -1;
+    return a.dist-b.dist;
+  };
+  groups.unlock.sort(sortByDist);
+  groups.preview.sort(sortByDist);
+  groups.far.sort(sortByDist);
+  groups.done.sort(sortByDist);
+  const renderGroup=(label,list,cls)=>{
+    if(!list.length)return null;
+    return(
+      <div style={{marginBottom:'var(--sp-3)'}}>
+        <div className={`task-group-label ${cls}`}>{label} · {list.length}</div>
+        {list.map(r=>(
+          <button key={r.loc.id} className={`task-row ${r.allDone?'completed':r.band}`} onClick={()=>onSelect(r.loc.id)}>
+            <div className="task-row-emoji">{r.loc.e||'📍'}</div>
+            <div className="task-row-body">
+              <div className="task-row-name">{r.loc.n}</div>
+              <div className="task-row-meta">
+                {r.total>0?`${r.total} challenge${r.total===1?'':'s'} · ${r.locCompleted}/${r.total} klaar`:'Geen challenges'}
+                {r.dist!=null&&<span style={{opacity:0.7,marginLeft:6}}>· {fmtDist(r.dist)}</span>}
+              </div>
+            </div>
+            <div className="task-row-chevron">›</div>
+          </button>
+        ))}
+      </div>
+    );
+  };
+  return(
+    <section style={{marginTop:'var(--sp-5)'}}>
+      <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Alle missies</h3>
+      {!pos&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS — zet locatie aan om afstanden te zien. Je kunt wel alvast door de lijst scrollen.</div>}
+      {renderGroup('🎯 Nu te doen',groups.unlock,'unlock')}
+      {renderGroup('🔥 In de buurt',groups.preview,'preview')}
+      {renderGroup('🧭 Verder weg',groups.far,'')}
+      {renderGroup('✓ Al gedaan',groups.done,'')}
+    </section>
+  );
+}
+
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax,visitedLocs,jorikMissionsDone,onShowJorikMissions}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax,visitedLocs,jorikMissionsDone,onShowJorikMissions,pos,onSelect}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
   const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
@@ -3495,6 +3651,9 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         </div>
       )}
 
+      {/* V25 (#71): Alle missies — always-visible, band-grouped task list */}
+      <TaskList pos={pos} onSelect={onSelect} completed={completed} visitedLocs={visitedLocs}/>
+
       {/* V18 (Batch 5): Rotterdam Deck — visited-POI sticker collection */}
       {visitedLocs&&visitedLocs.size>0&&(
         <div style={{marginTop:'var(--sp-7)'}}>
@@ -3599,21 +3758,47 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
     }).addTo(mapInst.current);
   },[pos]);
 
-  // V12: fade visited POIs on the map
+  // V12 + V25 (#71): Combined restyler for visited fade AND proximity-band state.
+  // Runs on visitedLocs OR pos changes. Priority: visited wins (muted grayscale),
+  // otherwise band (unlock → enlarge + green glow; preview → amber ring; far → slightly muted).
   useEffect(()=>{
     if(!markersRef.current)return;
     markersRef.current.forEach(mk=>{
       const visited=visitedLocs&&visitedLocs.has(mk._locId);
       const el=mk.getElement&&mk.getElement();
-      if(el){
-        const inner=el.querySelector('div>div');
-        if(inner){
-          inner.style.opacity=visited?'0.25':'1';
-          inner.style.filter=visited?'grayscale(1)':'none';
-        }
+      if(!el)return;
+      const inner=el.querySelector('div>div');
+      if(!inner)return;
+      // Reset to defaults first
+      inner.style.transform='scale(1)';
+      inner.style.filter='none';
+      inner.style.opacity='1';
+      inner.style.boxShadow=`0 0 8px ${mk._color}66`;
+      inner.style.border='2px solid rgba(255,255,255,0.35)';
+      if(visited){
+        inner.style.opacity='0.25';
+        inner.style.filter='grayscale(1)';
+        return;
+      }
+      // Determine band for this POI
+      const loc=L_DATA.find(l=>l.id===mk._locId);
+      if(!loc||!pos){
+        // No GPS yet: leave default styling.
+        return;
+      }
+      const{band}=locBand(pos,loc);
+      if(band==='unlock'){
+        inner.style.transform='scale(1.25)';
+        inner.style.border='2px solid #7ee4b7';
+        inner.style.boxShadow=`0 0 14px #7ee4b7cc, 0 0 6px ${mk._color}`;
+      }else if(band==='preview'){
+        inner.style.border='2px solid #f0c373';
+        inner.style.boxShadow=`0 0 10px #f0c37388`;
+      }else{
+        inner.style.opacity='0.7';
       }
     });
-  },[visitedLocs]);
+  },[visitedLocs,pos]);
 
   // V12: show dinner zone only from phase 3 onward; pulse in phase 4+
   useEffect(()=>{
@@ -4178,6 +4363,8 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam}){
   if(!loc)return null;
   const dist=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):null;
+  // V25 (#71): two-radius band classification for this POI
+  const{band}=locBand(pos,loc);
   // V7.1 hotfix: only lock quizzes when the location actually HAS a photo challenge to unlock against.
   // Otherwise quiz-only locations (Spido Kade, BlueCity, Willemswerf) would be permanently unreachable.
   const hasAnyPhoto=loc.ch.some(ch=>ch.t==='photo'||ch.t==='video'||ch.t==='creative');
@@ -4196,18 +4383,32 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
       <div className="sheet-overlay" onClick={onClose}/>
       <div className="sheet">
         <div className="sheet-handle"/>
-        <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-5)'}}>
+        <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-3)'}}>
           <div>
             <div style={{fontSize:32,marginBottom:'var(--sp-2)',filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.35))'}}>{loc.e}</div>
             <h2 className="t-section">{loc.n}</h2>
             <div className="row-2" style={{marginTop:'var(--sp-2)',flexWrap:'wrap'}}>
               <span className="chip chip-blue">{loc.c}</span>
-              {dist!=null&&<span className="t-caption">{fmtDist(dist)}</span>}
               <a href={`https://www.google.com/maps/dir/?api=1&destination=${loc.la},${loc.lo}&travelmode=walking`} target="_blank" rel="noopener noreferrer"
                 className="chip" style={{background:'rgba(95,216,165,0.14)',borderColor:'rgba(95,216,165,0.3)',color:'var(--creatief-2)',textDecoration:'none'}}>🧭 Route</a>
             </div>
           </div>
           <button onClick={onClose} aria-label="Sluiten" style={{background:'none',border:'none',color:'var(--text-tertiary)',fontSize:26,cursor:'pointer',padding:'var(--sp-1)',lineHeight:1}}>✕</button>
+        </div>
+        {/* V25 (#71): band-aware proximity panel — mini two-ring map + pill + copy */}
+        <div style={{display:'flex',alignItems:'center',gap:'var(--sp-3)',padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',marginBottom:'var(--sp-5)'}}>
+          <TwoRingIndicator dist={dist} pos={pos} loc={loc}/>
+          <div style={{flex:1,minWidth:0}}>
+            <span className={`band-pill ${band==='unknown'?'far':band}`}>
+              {band==='unlock'?'🎯 Nu te doen':band==='preview'?'🔥 In de buurt':band==='far'?'🧭 Verder weg':'📍 GPS onbekend'}
+            </span>
+            <div style={{marginTop:6,fontSize:13,lineHeight:1.4,color:'var(--text-secondary)'}}>
+              {band==='unlock'?'Je bent er — maak je foto of video hier.':
+               band==='preview'?`Bijna daar · ${fmtDist(dist)} — blijf lopen richting ${loc.n}.`:
+               band==='far'?`Nog ver weg · ${fmtDist(dist)} — loop richting ${loc.n} om te openen.`:
+               'Nog geen GPS-fix. Je kunt wel alvast de challenges lezen.'}
+            </div>
+          </div>
         </div>
 
         {loc.ch.map((ch,idx)=>{
