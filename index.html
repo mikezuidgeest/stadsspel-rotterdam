@@ -1001,6 +1001,34 @@ async function compressPhotoAdaptive(dataURL){
 // Detect whether dataURL is a video (keep raw; don't try to compress)
 function isVideoData(d){return typeof d==='string'&&d.startsWith('data:video')}
 
+// V23 (#48): stable winner ranking with tiebreakers.
+// Primary: score (desc). Tie-breakers in order:
+//   - earlier last-completion timestamp wins (the team that reached the score first)
+//   - more challenges completed (activity entries with points>0) wins
+//   - earlier team creation order wins (deterministic last resort)
+// Pure function — safe to call from a useEffect, useMemo, or a child component.
+function rankTeams(teams,scores,activityFeed){
+  const stats={};
+  (teams||[]).forEach(t=>{stats[t.id]={last:0,count:0,created:new Date(t.created_at||0).getTime()||t.id||0};});
+  (activityFeed||[]).forEach(a=>{
+    if(!a||a.team_id==null||!(a.points>0))return;
+    const rec=stats[a.team_id];if(!rec)return;
+    rec.count++;
+    const ts=new Date(a.created_at||0).getTime()||0;
+    if(ts>rec.last)rec.last=ts;
+  });
+  return[...(teams||[])]
+    .map(t=>({...t,score:(scores&&scores[t.id])||0,_last:stats[t.id]?.last||0,_count:stats[t.id]?.count||0,_created:stats[t.id]?.created||0}))
+    .sort((a,b)=>{
+      if(b.score!==a.score)return b.score-a.score;
+      const aL=a._last||Number.MAX_SAFE_INTEGER;
+      const bL=b._last||Number.MAX_SAFE_INTEGER;
+      if(aL!==bL)return aL-bL;
+      if(b._count!==a._count)return b._count-a._count;
+      return a._created-b._created;
+    });
+}
+
 // V20: expanded bar-break mini-challenge POOL (6 items). Each bar-break
 // deterministically picks 3 of these based on bar name + started timestamp,
 // so every team sees the SAME 3 for that break, but different breaks
@@ -1344,6 +1372,21 @@ function App(){
 
   // V14: celebration auto-dismiss
   useEffect(()=>{if(celebration){const t=setTimeout(()=>setCelebration(null),2400);return()=>clearTimeout(t)}},[celebration]);
+
+  // V23 (#52): fire winner celebration ONCE when we enter phase 5 (FINALE).
+  // Uses rankTeams() so the celebrated team is identical to FinaleScreen's winner
+  // after the tiebreaker. A ref latches per-phase so an effect re-run (teams/scores
+  // shifting in the same phase, or a refresh) doesn't double-fire.
+  const finaleCelebratedRef=React.useRef(false);
+  useEffect(()=>{
+    if(phase!==5){finaleCelebratedRef.current=false;return;}
+    if(finaleCelebratedRef.current)return;
+    if(!teams||teams.length===0)return;
+    const winner=rankTeams(teams,scores,activityFeed)[0];
+    if(!winner)return;
+    finaleCelebratedRef.current=true;
+    celebrate({big:true,emoji:'🏆',title:`${winner.emoji} ${winner.name} wint!`,sub:`${winner.score} pts`});
+  },[phase,teams,scores,activityFeed,celebrate]);
 
   // V14: trigger haptic + sound
   const celebrate=useCallback((payload)=>{
@@ -1725,10 +1768,51 @@ function App(){
     clearTimeout(prev.timer);
     try{prev.commit&&prev.commit();}catch(e){/* swallow */}
   };
+  // V23 (#49): commit a photo_reviews status update with single auto-retry on failure.
+  // If the commit fails twice, re-queue the photo and surface a toast so the admin
+  // can try again. `sideEffects` runs only on a successful commit (e.g. score delta,
+  // activity feed insert for rejections) — this prevents the photo-rejection
+  // double-penalty race from recurring when the update itself failed.
+  const commitReview=(r,newStatus,sideEffects)=>{
+    if(!sb)return;
+    const doUpdate=()=>sb.from('photo_reviews')
+      .update({status:newStatus,reviewed_at:new Date().toISOString()})
+      .eq('id',r.id);
+    const onFail=(err)=>{
+      console.error('[photo_reviews]',newStatus,'commit failed:',err);
+      // Put the photo back in the queue so the admin can retry.
+      setReviewQueue(prev=>prev.some(x=>x.id===r.id)?prev:[r,...prev]);
+      setToast(`⚠️ Kon foto niet ${newStatus==='approved'?'goedkeuren':'afkeuren'} — terug in wachtrij. Probeer opnieuw.`);
+    };
+    doUpdate().then(
+      (res)=>{
+        if(res&&res.error){
+          // one retry with a 600ms delay
+          setTimeout(()=>{
+            doUpdate().then(
+              (r2)=>{if(r2&&r2.error){onFail(r2.error)}else{try{sideEffects&&sideEffects()}catch(e){console.error('[review] side-effects threw:',e)}}},
+              (err2)=>onFail(err2)
+            );
+          },600);
+        }else{
+          try{sideEffects&&sideEffects()}catch(e){console.error('[review] side-effects threw:',e)}
+        }
+      },
+      (err)=>{
+        // Network-level throw — same retry path
+        setTimeout(()=>{
+          doUpdate().then(
+            (r2)=>{if(r2&&r2.error){onFail(r2.error)}else{try{sideEffects&&sideEffects()}catch(e){console.error('[review] side-effects threw:',e)}}},
+            (err2)=>onFail(err2)
+          );
+        },600);
+      }
+    );
+  };
   const approveReview=(r)=>{
     if(!sb)return;
     setReviewQueue(prev=>prev.filter(x=>x.id!==r.id));
-    const commit=()=>{sb.from('photo_reviews').update({status:'approved',reviewed_at:new Date().toISOString()}).eq('id',r.id);};
+    const commit=()=>commitReview(r,'approved',null);
     setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},10000); return{row:r,action:'approved',deadline:Date.now()+10000,timer,commit};});
   };
   const rejectReview=(r)=>{
@@ -1736,8 +1820,7 @@ function App(){
     setReviewQueue(prev=>prev.filter(x=>x.id!==r.id));
     // V18 (§1.9.11): extended 5-min undo window for rejections — higher stakes than approvals
     const REJECT_UNDO_MS=300000;
-    const commit=()=>{
-      sb.from('photo_reviews').update({status:'rejected',reviewed_at:new Date().toISOString()}).eq('id',r.id);
+    const commit=()=>commitReview(r,'rejected',()=>{
       if(REVIEW_REJECT_PENALTY){
         // V20: atomic negative delta. Also updates local scores immediately if this is my team.
         applyScoreDelta(r.team_id,-r.points_awarded);
@@ -1759,7 +1842,7 @@ function App(){
           created_at:new Date().toISOString(),
         }).then(()=>{},()=>{});
       }
-    };
+    });
     setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},REJECT_UNDO_MS); return{row:r,action:'rejected',deadline:Date.now()+REJECT_UNDO_MS,timer,commit};});
   };
   const undoReview=()=>{
@@ -4569,7 +4652,9 @@ function BarBreakOverlay({info,onClose,onComplete}){
 // V10: FINALE CEREMONY SCREEN
 // ═══════════════════════════════════════════
 function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
-  const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
+  // V23 (#48): use rankTeams() so ties break deterministically (earlier finisher wins,
+  // then by challenge count, then by creation order). Single source of truth for winner.
+  const sorted=React.useMemo(()=>rankTeams(teams,scores,activityFeed),[teams,scores,activityFeed]);
   const winner=sorted[0];
   // V18: full carousel — top-scoring photos first, expand/collapse
   const allPhotos=(activityFeed||[]).filter(a=>a.photo).slice().sort((a,b)=>(b.points||0)-(a.points||0));
