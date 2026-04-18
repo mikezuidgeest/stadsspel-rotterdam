@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V17 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam V18 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
@@ -978,7 +978,9 @@ function App(){
   });
   // V5 FEATURE 1: narrative state
   const[storyShown,setStoryShown]=useState(null); // key of the currently-open story modal
-  const[storySeen,setStorySeen]=useState(new Set()); // phases whose story has been shown
+  // V19: rehydrate which story chapters the player has already seen so a refresh
+  // doesn't replay the Proloog / phase story from scratch.
+  const[storySeen,setStorySeen]=useState(()=>new Set(Array.isArray(hydrated?.storySeen)?hydrated.storySeen:[]));
   const[nextStory,setNextStory]=useState(null); // V10: queue for sequential story modals
   // V5 FEATURE 3: seen quiz tracking
   const[seenQuizzes,setSeenQuizzes]=useState(new Set());
@@ -1203,6 +1205,22 @@ function App(){
       }
     }).subscribe();
 
+    // V19: teams DELETE — admin pruned a team. Propagate cleanly: drop it
+    // from teams+scores on every phone, and if it was MY team, kick me back to
+    // setup with a clear message instead of leaving a ghost myTeam behind.
+    const teamDeleteSub=sb.channel('teams-delete').on('postgres_changes',{event:'DELETE',schema:'public',table:'teams'},payload=>{
+      const t=payload.old||{};
+      if(t.id==null)return;
+      setTeams(prev=>prev.filter(p=>p.id!==t.id));
+      setScores(prev=>{const n={...prev};delete n[t.id];return n;});
+      if(myTeam?.id===t.id){
+        setToast('Je team is verwijderd door de Game Master');
+        setMyTeam(null);
+        clearSession();
+        setScreen('setup');
+      }
+    }).subscribe();
+
     // V12: game_state sync — admin's START/BAR BREAK/FINALE broadcast to every phone
     const gsSub=sb.channel('game-state').on('postgres_changes',{event:'UPDATE',schema:'public',table:'game_state'},payload=>{
       const gs=payload.new;
@@ -1278,7 +1296,7 @@ function App(){
       },()=>{/* table missing — silent */});
     }
     return()=>{
-      teamSub.unsubscribe();teamInsertSub.unsubscribe();gsSub.unsubscribe();actSub.unsubscribe();
+      teamSub.unsubscribe();teamInsertSub.unsubscribe();teamDeleteSub.unsubscribe();gsSub.unsubscribe();actSub.unsubscribe();
       reviewInsertSub.unsubscribe();reviewUpdateSub.unsubscribe();
     };
   },[myTeam,isAdmin]);
@@ -1696,10 +1714,32 @@ function App(){
     }
   },[unlockPopup]);
 
+  // V19: if a Supabase teams refresh no longer contains myTeam.id (e.g. the row
+  // was recreated after an accidental delete), try to re-attach by name+emoji.
+  // Without this, a stale cached myTeam.id makes `isMine` false everywhere:
+  // no ★ Jij, no score updates, no scoring writes.
+  useEffect(()=>{
+    if(!myTeam)return;
+    if(myTeam.spectator)return;
+    if(!teams||teams.length===0)return;
+    if(teams.some(t=>t.id===myTeam.id))return; // still valid
+    const relink=teams.find(t=>t.name===myTeam.name && t.emoji===myTeam.emoji);
+    if(relink){
+      setMyTeam(relink);
+      setToast('Team opnieuw gekoppeld');
+    }
+  },[teams,myTeam]);
+
   // V12: persist key session fields so a refresh doesn't kick players out
   useEffect(()=>{
     if(myTeam)saveSession({screen,myTeam,phase,gameStart});
   },[screen,myTeam,phase,gameStart]);
+
+  // V19: also persist which story chapters have been seen — otherwise a refresh
+  // re-queues the Proloog/phase story because storySeen resets to an empty Set.
+  useEffect(()=>{
+    if(myTeam)saveSession({storySeen:[...storySeen]});
+  },[storySeen,myTeam]);
 
   // V12: leaving a team (tap the HUD avatar)
   const leaveTeam=useCallback(()=>{
@@ -1831,10 +1871,9 @@ function App(){
           <div className="text-center" style={{marginTop:'var(--sp-3)'}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>{
               if(!confirm(`Je zit nu in ${myTeam.emoji} ${myTeam.name}. Wil je van team wisselen?`))return;
-              if(!OFFLINE&&sb&&typeof myTeam.id==='number'&&myTeam.id>=0){
-                sb.from('teams').delete().eq('id',myTeam.id).then(()=>{},()=>{});
-                setTeams(prev=>prev.filter(t=>t.id!==myTeam.id));
-              }
+              // V19: leave the team locally — do NOT delete the Supabase row,
+              // because teammates may still be in it. Only the admin can prune
+              // teams via the dedicated 🗑 button.
               setMyTeam(null);
               clearSession();
               setScreen('setup');
