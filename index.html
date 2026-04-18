@@ -321,11 +321,7 @@
     /* === V5 ADDITIONS === */
 
     /* V13: Narrative modal */
-    .story-overlay{position:fixed;inset:0;z-index:10010;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(20px) saturate(1.3);-webkit-backdrop-filter:blur(20px) saturate(1.3);background:rgba(10,11,16,0.92);animation:fadeInUp .35s var(--ease-out);padding:20px}
-    .story-card{max-width:440px;width:100%;padding:32px 28px;border-radius:var(--r-2xl);background:linear-gradient(155deg,rgba(178,155,255,0.12),rgba(110,163,255,0.06));border:1px solid var(--border-strong);text-align:center;box-shadow:var(--sh-lg),var(--sh-ring);animation:fadeInPop .5s var(--spring)}
-    .story-chapter{display:inline-flex;align-items:center;padding:6px 14px;border-radius:var(--r-pill);font-size:10px;font-weight:800;background:rgba(178,155,255,0.22);color:#d8ccff;letter-spacing:0.15em;margin-bottom:20px}
-    .story-title{font-family:var(--font-display);font-size:26px;font-weight:900;margin-bottom:14px;background:linear-gradient(135deg,var(--foto-2),var(--quiz-2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.035em}
-    .story-text{font-size:14px;line-height:1.65;color:var(--text-secondary);margin-bottom:24px;text-align:left}
+    /* V30: .story-overlay / .story-card / .story-chapter / .story-title / .story-text removed with chapter-modal system */
 
     /* V13: Photo grid */
     .photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
@@ -363,8 +359,7 @@
     .gps-pill .snap-btn{margin-left:4px;padding:4px 10px;border-radius:var(--r-pill);background:rgba(110,163,255,0.18);border:1px solid rgba(110,163,255,0.35);color:var(--foto-2);font-size:10px;font-weight:700;cursor:pointer}
 
     /* V13: Story ticker */
-    .story-ticker{padding:14px 18px;margin:0 0 14px 0;border-radius:var(--r-lg);background:linear-gradient(135deg,rgba(178,155,255,0.08),rgba(110,163,255,0.04));border:1px solid rgba(178,155,255,0.2);border-left:3px solid var(--quiz);font-size:13px;line-height:1.55;color:var(--text-secondary);transition:transform .25s var(--spring),background .2s;box-shadow:var(--sh-ring)}
-    .story-ticker:hover{transform:translateY(-1px);background:linear-gradient(135deg,rgba(178,155,255,0.12),rgba(110,163,255,0.07))}
+    /* V30: .story-ticker removed with chapter-modal system */
 
     /* V13: Activity row */
     .activity-row{padding:14px 16px;margin-bottom:10px;border-radius:var(--r-lg);background:linear-gradient(155deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015));border:1px solid var(--border);transition:background .2s;box-shadow:var(--sh-ring)}
@@ -524,41 +519,8 @@ const STARTER_PACKS=[
   {name:'Markthal Monsters',emoji:'🐙',color:'#ec4899'},
 ];
 
-// ═══════════════════════════════════════════
-// V5 FEATURE 1: NARRATIVE — "Jorik's lost ring"
-// ═══════════════════════════════════════════
-const NARRATIVE={
-  intro:{
-    chapter:'PROLOOG',
-    title:"Jorik's verloren trouwring",
-    text:"Acht dagen voor de bruiloft. Jorik heeft vanmorgen zijn trouwring laten vallen — ergens in het hart van Rotterdam. Paniek. Hij weet alleen nog dat hij langs meerdere iconische plekken is gefietst.\n\nJullie missie: de stad uitkammen, bewijs verzamelen (foto's, video's, kennis), en de ring terugvinden voordat de ceremonie begint. Ieder team werkt op eigen houtje — maar slechts één team kan de held zijn.\n\nTijdens de jacht zijn er onderweg biertjes, bar breaks, en stiekem óók een geheime opdracht waar Jorik niets van mag weten...\n\n2 uur tot vertrek. De klok tikt. Veel geluk."
-  },
-  phase1:{
-    chapter:'FASE 1 · DE ZOEKTOCHT BEGINT',
-    title:"Langs de iconen",
-    text:"Elk team begint bij het Maritiem Museum. Jorik's ring kan overal zijn — bij de Erasmusbrug, in de Markthal, op de Kubuswoningen. Hoe meer plekken jullie bezoeken, hoe groter de kans dat de ring opduikt.\n\nElke voltooide uitdaging brengt je dichter bij de waarheid. Let op elkaars activiteit — de eerste die iets ontdekt op een plek krijgt bonuspunten."
-  },
-  phase2:{
-    chapter:'FASE 2 · STEMMEN UIT DE STAD',
-    title:"Barbreaks & geruchten",
-    text:"Tijd voor een biertje. Onderweg hoor je verhalen — sommige kloppen, sommige niet. Tip: tijdens bar breaks wisselt Jorik van team. Maak er gebruik van. En vergeet niet: wanneer Jorik NIET bij jullie is, is er een geheime missie die alleen jullie kunnen uitvoeren..."
-  },
-  phase3:{
-    chapter:'FASE 3 · DE CIRKEL SLUIT',
-    title:"Schaduwen en spoken",
-    text:"De tegenstand wordt slimmer. Als de timer knelt: gebruik je ⏳ Extra Tijd-ladingen. Elke lading verlengt je actieve opdracht met +5 minuten — je hebt er 3 per team, en je verdient er extra bij score-milestones. Gebruik ze wanneer je bijna bij een volgend icon bent, of om een missende streak te redden."
-  },
-  phase4:{
-    chapter:'FASE 4 · DE FINALE',
-    title:"Markthal, ring, diner",
-    text:"De sporen wijzen naar de Markthal. Iedereen verzamelt rond Markthal/Bokaal voor het diner om 19:30. Het team met de meeste punten wint de officiële 'Vriend van de Bruidegom' titel — en natuurlijk de eeuwige roem.\n\nLaatste tip: de ring is nooit echt weg. Hij zit op Jorik's vinger tijdens de bruiloft. Maar de zoektocht? Die verdient een overwinning."
-  },
-  win:{
-    chapter:'EINDSPEL',
-    title:"Jullie hebben Jorik terug",
-    text:"De ring is symbolisch teruggevonden — Jorik mag zonder zorgen trouwen. Jullie verhalen, foto's en video's zijn vastgelegd en worden op de bruiloft vertoond. Proost."
-  }
-};
+// V30 (Less-is-More): NARRATIVE chapter-modal constant removed. The full proloog +
+// per-phase + eindspel chapter system was gutted in favour of the simple core loop.
 
 // ═══════════════════════════════════════════
 // V19+ JORIK-SPECIFIC MISSIONS
@@ -1081,50 +1043,17 @@ function rankTeams(teams,scores,activityFeed){
     });
 }
 
-// V20: expanded bar-break mini-challenge POOL (6 items). Each bar-break
-// deterministically picks 3 of these based on bar name + started timestamp,
-// so every team sees the SAME 3 for that break, but different breaks
-// feel fresh and no two bars get the same combination by accident.
-const BAR_MINI_POOL=[
-  {emoji:'🍺',title:'Proost!',desc:'Groepsfoto met een biertje op tafel',pts:25},
-  {emoji:'🥃',title:'Shot roulette',desc:'Willekeurig teamlid neemt een shot (of iets soft). Film het!',pts:35},
-  {emoji:'🎤',title:'Bar karaoke',desc:'Eén teamlid zingt 1 minuut lang Nederlandstalige hit. Pub mag meedoen.',pts:40},
-  {emoji:'💍',title:'Jorik-roast',desc:'Eén teamlid brengt een 20-sec roast op Jorik. Video maken.',pts:35},
-  {emoji:'📞',title:'Belletje naar bruid',desc:'Bel de bruid, laat Jorik iets liefs (of doms) zeggen. Met luidspreker op video.',pts:45},
-  {emoji:'🧍',title:'Freeze frame',desc:'Hele team staat 30 sec stijf stil midden in de bar. Film de reacties.',pts:30},
-];
+// V30 (Phase 6): bar breaks are now a single shared group-photo + proost moment.
+// The old 3-of-6 seeded pool was too much cognitive load mid-pub — everyone reading
+// three different mini-challenges and deciding which to do killed the vibe. One
+// clear action: everyone in one frame, glass in the air, done.
+const BAR_MOMENT={emoji:'🍻',title:'Groepsfoto + proost',desc:'Iedereen samen, glazen in de lucht — één foto of video per team.',pts:40};
 
-// Simple deterministic string hash (djb2-ish) — stable across clients
-function seedHash(s){
-  let h=5381;
-  const str=String(s||'');
-  for(let i=0;i<str.length;i++){h=((h<<5)+h+str.charCodeAt(i))>>>0;}
-  return h;
-}
-
-// Fisher-Yates with a seeded LCG, picks N items deterministically from `pool`.
-function pickNSeeded(pool,n,seed){
-  if(n>=pool.length)return[...pool];
-  let s=(seed>>>0)||1;
-  const rand=()=>{s=(s*1664525+1013904223)>>>0;return s/0x100000000;};
-  const arr=[...pool];
-  for(let i=arr.length-1;i>0;i--){
-    const j=Math.floor(rand()*(i+1));
-    [arr[i],arr[j]]=[arr[j],arr[i]];
-  }
-  return arr.slice(0,n);
-}
-
-// V12/V20: canonical bar-break mini-challenge list. Takes optional (barName, startedAt)
-// so remote clients produce the same 3-of-6 pick as the admin who triggered the break.
-function defaultBarMinis(barName,startedAt){
-  if(barName==null&&startedAt==null){
-    // Legacy caller (no args) — return the full pool (previous behaviour: 3 items).
-    // Used only by pre-break preview; live play always passes the seed args.
-    return BAR_MINI_POOL.slice(0,3);
-  }
-  const seed=seedHash(`${barName||''}|${startedAt||0}`);
-  return pickNSeeded(BAR_MINI_POOL,3,seed);
+// V30: signature preserved (admin trigger, echo handler, rehydrate all call with
+// barName+startedAt). Always returns a 1-item array so existing `.mini.map(...)`
+// and `mini.title` callsites keep working.
+function defaultBarMinis(_barName,_startedAt){
+  return[BAR_MOMENT];
 }
 
 // V12: bar POIs for the admin dropdown (derived from L_DATA at runtime; fallback list here)
@@ -1211,14 +1140,11 @@ function App(){
       setDialog({type:'prompt',msg,defaultVal,confirmLabel:'OK',cancelLabel:'Annuleer',resolve});
     });
   },[]);
-  // V17: Extra Tijd charges replace Ghost state
-  const[timeCharges,setTimeCharges]=useState(TIME_CHARGE_MAX);
-  const[timeChargeMax,setTimeChargeMax]=useState(TIME_CHARGE_MAX);
-  // Legacy compatibility: any code that still reads ghost/ghostMax gets a stub
-  const ghost={active:false,timeLeft:0,used:timeChargeMax-timeCharges};
-  const ghostMax=timeChargeMax;
-  const setGhost=()=>{};
-  const setGhostMax=setTimeChargeMax;
+  // V30: Ghost/Extra-Tijd being removed in the Less-is-More pass. Setters remain
+  // for the transitional callsites (tier-unlock milestone, streak unlock, activateExtraTime,
+  // hot-target) that Phase 1/3 will gut; once Phase 3 lands, this state goes away entirely.
+  const[timeCharges,setTimeCharges]=useState(0);
+  const[timeChargeMax,setTimeChargeMax]=useState(0);
   const[unlockedMilestones,setUnlockedMilestones]=useState(new Set());
   const[unlockPopup,setUnlockPopup]=useState(null); // {emoji, label, name}
   const[lastTier,setLastTier]=useState(null); // for tier-unlock popup
@@ -1246,12 +1172,8 @@ function App(){
     const v=new URLSearchParams(window.location.search).get('admin');
     return v==='vriendvanjorik';
   });
-  // V5 FEATURE 1: narrative state
-  const[storyShown,setStoryShown]=useState(null); // key of the currently-open story modal
-  // V19: rehydrate which story chapters the player has already seen so a refresh
-  // doesn't replay the Proloog / phase story from scratch.
-  const[storySeen,setStorySeen]=useState(()=>new Set(Array.isArray(hydrated?.storySeen)?hydrated.storySeen:[]));
-  const[nextStory,setNextStory]=useState(null); // V10: queue for sequential story modals
+  // V30 (Less-is-More): storyShown / storySeen / nextStory state removed along with
+  // the NARRATIVE chapter-modal system. Nothing queues or shows story chapters any more.
   // V5 FEATURE 3: seen quiz tracking
   const[seenQuizzes,setSeenQuizzes]=useState(new Set());
   // V5 FEATURE 5: GPS smoothing buffer
@@ -1272,7 +1194,7 @@ function App(){
   const[reviewFlashTs,setReviewFlashTs]=useState(0);
   // V14: engagement state
   const[celebration,setCelebration]=useState(null); // {emoji,title,sub,breakdown,confetti}
-  const[quizStreak,setQuizStreak]=useState(0); // consecutive correct quizzes
+  // V30: quizStreak removed in Less-is-More pass — streak rewards + streak chip gone
   const[lastLevelSeen,setLastLevelSeen]=useState(null); // for level-up detection
   // V29 (§1): useRef latch for level-up dedup. The old setState-only latch
   // raced on rapid score echoes — when Supabase realtime pushed score updates
@@ -1283,8 +1205,9 @@ function App(){
   const lastLevelSeenRef=useRef(null);
   const[nowTs,setNowTs]=useState(Date.now()); // tick state for countdown clocks
   const tapGuardRef=useRef(0); // V14: A4 — prevents repeated-click loss during re-render
-  // V17: hot target = the timed "next thing to do". {locId, chIdx, deadline, assignedAt}
-  const[hotTarget,setHotTarget]=useState(null);
+  // V30: hotTarget state removed along with the timed-next-thing system.
+  const hotTarget=null;
+  const setHotTarget=()=>{};
 
   // Timer
   useEffect(()=>{
@@ -1599,19 +1522,7 @@ function App(){
         // V14 (A2): when a player transitions from lobby to game via admin broadcast,
         // they miss the PROLOOG (only admin's local startGame() triggers it).
         // Queue intro first so every phone gets the narrative setup.
-        setScreen(s=>{
-          if(s==='lobby'){
-            setStorySeen(prev=>{
-              if(!prev.has('intro')){
-                setStoryShown('intro');
-                return new Set([...prev,'intro']);
-              }
-              return prev;
-            });
-            return 'game';
-          }
-          return s;
-        });
+        setScreen(s=>s==='lobby'?'game':s);
       }
       if(gs.jorik_team_id!==undefined){
         // V21: stamp the persisted server-side clock when the Jorik holder
@@ -2047,39 +1958,18 @@ function App(){
     const loc=L_DATA.find(l=>l.id===locId);
     const isQuiz=loc&&loc.ch[chIdx]?.t==='quiz';
 
-    // V14: hot-streak logic (quizzes only)
-    let streakBonus=0;
-    let streakLabel='';
-    let timeUnlock=false;
-    let newStreak=quizStreak;
-    if(isQuiz){
-      if(isWrongZero){
-        newStreak=0;
-      }else{
-        newStreak=quizStreak+1;
-        if(STREAK_REWARDS[newStreak]){
-          streakBonus=STREAK_REWARDS[newStreak];
-          streakLabel=`🔥 ${newStreak} op rij`;
-        }
-        if(newStreak===STREAK_TIME_UNLOCK){
-          timeUnlock=true;
-        }
-      }
-      setQuizStreak(newStreak);
-    }
-
+    // V30: streak bonuses + Extra-Tijd unlock removed in the Less-is-More pass.
+    // Scoring stays simple: base points × phase multiplier, plus first-finder bonus.
     // V20: FINALE multiplier — all scoring ×1.5 during phase 4 (last 20 min).
-    // Applied to base + streak (not first-bonus — that races async and applies its own multiplier).
     const phaseMult=phase===4?FINALE_MULTIPLIER:1;
     const basePts=Math.round(pts*phaseMult);
-    const appliedStreakBonus=Math.round(streakBonus*phaseMult);
     // V20: FIRST_BONUS is now resolved honestly server-side via challenge_first_finder
     // (see block further down). We no longer award it optimistically — it's a late
     // add-on that fires via a second delta + toast once the race is resolved.
     // OFFLINE mode keeps the old eager behaviour so solo testing still feels complete.
     const isFirstEligible=(!isDynamicBonus&&!isWrongZero);
     const firstBonus=(OFFLINE&&isFirstEligible)?Math.round(FIRST_BONUS*phaseMult):0;
-    let totalPts=basePts+firstBonus+appliedStreakBonus;
+    let totalPts=basePts+firstBonus;
 
     if(!isDynamicBonus){
       setCompleted(prev=>({...prev,[locId]:{...prev[locId],[chIdx]:true}}));
@@ -2091,32 +1981,25 @@ function App(){
       applyScoreDelta(myTeam?.id,totalPts);
       setScorePopup(`+${totalPts}`);
     }
-    if(timeUnlock){
-      // V17: streak unlocks an Extra Tijd charge (max + current)
-      setTimeChargeMax(m=>m+1);
-      setTimeCharges(c=>c+1);
-    }
     if(loc){
       if(isWrongZero){
         setToast(`${loc.e} ❌ Fout · 0 pts`);
       }else{
-        setToast(`${loc.e} +${totalPts} pts!${streakLabel?' '+streakLabel:''}`);
+        setToast(`${loc.e} +${totalPts} pts!`);
       }
     }
 
-    // V14/V17: celebration on correct answer
+    // V14/V30: simple celebration on correct answer (streak/time-unlock branches removed)
     if(!isWrongZero&&loc){
-      const big=appliedStreakBonus>0||timeUnlock;
       const breakdownBits=[`+${basePts} basis`];
       if(firstBonus>0)breakdownBits.push(`+${firstBonus} eerste`);
-      if(appliedStreakBonus>0)breakdownBits.push(`+${appliedStreakBonus} streak`);
       if(phaseMult!==1)breakdownBits.push(`🏁 FINALE ×${phaseMult}`);
       celebrate({
-        emoji:timeUnlock?'⏳':big?'🔥':loc.e,
-        title:timeUnlock?'Extra Tijd ontgrendeld!':big?`${newStreak} op rij!`:'Goed zo!',
+        emoji:loc.e,
+        title:'Goed zo!',
         sub:`+${totalPts} pts`,
         breakdown:breakdownBits,
-        big,
+        big:false,
       });
     }
 
@@ -2126,8 +2009,6 @@ function App(){
         label=`zat ernaast bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · 0 pts`;
       }else if(isDynamicBonus){
         label=`🎲 Bonus quiz bij ${loc.n} gehaald!`;
-      }else if(appliedStreakBonus>0){
-        label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid! 🔥 ${newStreak} op rij · +${appliedStreakBonus} bonus`;
       }else{
         label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid!`;
       }
@@ -2212,13 +2093,10 @@ function App(){
       }
     }
 
-    // V17: if this was the hot target, clear it so the effect picks a new one
-    if(hotTarget&&hotTarget.locId===locId&&hotTarget.chIdx===chIdx){
-      setHotTarget(null);
-    }
+    // V30: hot-target clear-on-completion removed with the timed-target system.
   };
 
-  // V14: level-up watcher (B2) — V29 (§1): useRef latch for dedup
+  // V14: level-up watcher — V29 useRef latch for dedup; V30 simplified to inline toast (was full-screen modal)
   useEffect(()=>{
     const myScoreNow=scores[myTeam?.id]||0;
     const lv=levelFor(myScoreNow);
@@ -2232,105 +2110,21 @@ function App(){
     if(lv.level>lastLevelSeenRef.current){
       lastLevelSeenRef.current=lv.level; // latch BEFORE any side-effect fires
       setLastLevelSeen(lv.level);
-      celebrate({
-        emoji:lv.emoji,
-        title:`Level ${lv.level} · ${lv.name}`,
-        sub:lv.unlock||'Nieuwe rang',
-        breakdown:null,
-        big:true,
-        levelUp:true,
-      });
+      // V30 (Less-is-More): replaced the full-screen levelUp celebration modal with a
+      // lightweight toast — tier badge already lives on the leaderboard card, players
+      // don't need a cinematic reveal every time they cross a score line.
+      setToast(`${lv.emoji} Level ${lv.level} · ${lv.name}`);
       addActivity(`is level ${lv.level} · ${lv.name} geworden!`,0);
     }
   },[scores,myTeam]);
 
-  // V17: assign the next hot target — first uncompleted challenge with best ROI
-  const assignHotTarget=useCallback((override)=>{
-    const completedByLoc=completed;
-    // Candidates: any location with at least one uncompleted challenge
-    const candidates=[];
-    L_DATA.forEach(loc=>{
-      loc.ch.forEach((ch,chIdx)=>{
-        if(completedByLoc[loc.id]?.[chIdx])return;
-        const d=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):500;
-        const diffMult=ch.df==='hard'?1.3:ch.df==='medium'?1.15:1;
-        const roi=(ch.p*diffMult)/Math.max(d,30)*100;
-        candidates.push({locId:loc.id,chIdx,score:roi,dist:d});
-      });
-    });
-    if(!candidates.length){setHotTarget(null);return;}
-    // Prefer the exact override if given (used when a team deliberately picks a non-hot)
-    let pick;
-    if(override){
-      pick=candidates.find(c=>c.locId===override.locId&&c.chIdx===override.chIdx);
-    }
-    if(!pick){
-      candidates.sort((a,b)=>b.score-a.score);
-      pick=candidates[0];
-    }
-    setHotTarget({locId:pick.locId,chIdx:pick.chIdx,deadline:Date.now()+HOT_TARGET_MS,assignedAt:Date.now()});
-  },[completed,pos]);
-
-  // V17: first hot target when game starts
-  useEffect(()=>{
-    if(phase<1||phase>=5)return;
-    if(hotTarget)return;
-    if(myTeam?.spectator)return;
-    assignHotTarget();
-  },[phase,myTeam,hotTarget,assignHotTarget]);
-
-  // V27 P0-B: same-tab latch + cross-tab BroadcastChannel for hot-target expiry.
-  // Live forensic audit (18 Apr 2026) found 61 duplicate "miste de deadline" rows
-  // for one team across a 4-hour idle window — the watchdog below used to fire
-  // once per tick (nowTs is in the deps) AND once per open tab. Now:
-  //  - `expiredHotRef` caches the last-fired key per tab so the same hotTarget
-  //    can never double-fire from this tab.
-  //  - A BroadcastChannel ("stadsspel-miss") announces the claim to sibling
-  //    tabs immediately so they also set their latch and skip the insert.
-  //  - jorikInTeam is NOT a guard here (hot-target is every-team, not Jorik-only).
-  const expiredHotRef=React.useRef(null);
-  const missChannelRef=React.useRef(null);
-  useEffect(()=>{
-    if(typeof BroadcastChannel==='undefined')return;
-    let ch=null;
-    try{
-      ch=new BroadcastChannel('stadsspel-miss');
-      ch.onmessage=(ev)=>{
-        if(ev&&ev.data&&ev.data.type==='claim'&&ev.data.key){
-          expiredHotRef.current=ev.data.key; // peer already fired — suppress our own
-        }
-      };
-      missChannelRef.current=ch;
-    }catch(e){/* no-op — BroadcastChannel unsupported on this browser */}
-    return()=>{try{ch&&ch.close();}catch(e){}};
-  },[]);
-  useEffect(()=>{
-    if(!hotTarget)return;
-    if(nowTs<hotTarget.deadline)return;
-    // Stable key per hotTarget instance: team + POI + deadline timestamp.
-    // Deadline changes on Extra Tijd, so extending the timer re-arms the latch.
-    const key=(myTeam?.id||'x')+':'+hotTarget.locId+':'+hotTarget.deadline;
-    if(expiredHotRef.current===key)return; // already handled by this tab or a peer
-    expiredHotRef.current=key;
-    try{missChannelRef.current&&missChannelRef.current.postMessage({type:'claim',key});}catch(e){}
-    const loc=L_DATA.find(l=>l.id===hotTarget.locId);
-    setToast(`⏱ Te laat bij ${loc?.n||'target'} · −${HOT_EXPIRE_PENALTY} pts`);
-    addActivity(`miste de deadline bij ${loc?.n||'target'} · −${HOT_EXPIRE_PENALTY} pts`,-HOT_EXPIRE_PENALTY);
-    // V20: atomic negative delta — no more lost penalties under races
-    applyScoreDelta(myTeam?.id,-HOT_EXPIRE_PENALTY);
-    setHotTarget(null); // triggers the assign effect
-  },[nowTs,hotTarget,myTeam]);
-
-  // V17: Extra Tijd — add 5 min to the current hot target deadline
-  const activateExtraTime=useCallback(async()=>{
-    if(timeCharges<=0||!hotTarget)return;
-    const ok=await confirmAsync('+5 min extra tijd gebruiken?',{confirmLabel:'Ja, gebruik'});
-    if(!ok)return;
-    setTimeCharges(c=>c-1);
-    setHotTarget(h=>h?{...h,deadline:h.deadline+TIME_CHARGE_MS}:h);
-    setToast('⏳ +5 min toegevoegd');
-    addActivity('heeft Extra Tijd gebruikt · +5 min ⏳');
-  },[timeCharges,hotTarget,confirmAsync]);
+  // V30 (Less-is-More): hot-target + Extra Tijd system removed entirely.
+  // assignHotTarget, the auto-assign effect, the expiry watchdog (with BroadcastChannel
+  // dedup and expiredHotRef latch), and activateExtraTime were all cut. No "urgent next
+  // thing" clock, no missed-deadline penalty, no +5-min charges — players just pick
+  // challenges from the Kaart tab at their own pace.
+  const assignHotTarget=useCallback(()=>{},[]);
+  const activateExtraTime=useCallback(()=>{},[]);
 
   // V10: derive jorikInTeam from jorikTeamId (real cross-team sync via Supabase broadcast)
   useEffect(()=>{
@@ -2650,24 +2444,7 @@ function App(){
     }
   },[isAdmin,confirmAsync]);
 
-  // V9/V17: Unlock bonus Extra Tijd charges at score milestones
-  useEffect(()=>{
-    const myScoreNow=scores[myTeam?.id]||0;
-    TIME_CHARGE_BONUSES.forEach(t=>{
-      const key='time_'+t.score;
-      if(myScoreNow>=t.score && !unlockedMilestones.has(key)){
-        setTimeChargeMax(m=>m+t.charges);
-        setTimeCharges(c=>c+t.charges);
-        setUnlockedMilestones(prev=>new Set([...prev,key]));
-        setUnlockPopup({
-          emoji:'⏳',
-          label:'EXTRA TIJD · '+t.score+' PTS',
-          name:'+'+t.charges+' lading'+(t.charges>1?'en':''),
-        });
-        addActivity(`heeft ${t.charges} Extra Tijd-lading${t.charges>1?'en':''} ontgrendeld op ${t.score} pts!`,0);
-      }
-    });
-  },[scores,myTeam]);
+  // V30: Extra-Tijd milestone unlocks removed with the timed-target system.
 
   // V9: Tier badges based on completed challenges (5/10/15/20)
   useEffect(()=>{
@@ -2717,12 +2494,7 @@ function App(){
     if(myTeam)saveSession({screen,myTeam,phase,gameStart});
   },[screen,myTeam,phase,gameStart]);
 
-  // V19: also persist which story chapters have been seen — otherwise a refresh
-  // re-queues the Proloog/phase story because storySeen resets to an empty Set.
-  useEffect(()=>{
-    if(myTeam)saveSession({storySeen:[...storySeen]});
-  },[storySeen,myTeam]);
-
+  // V30: storySeen persistence removed with the chapter-modal system.
   // V19+: persist Jorik-mission completion state
   useEffect(()=>{
     if(myTeam)saveSession({jorikMissionsDone:[...jorikMissionsDone]});
@@ -2790,11 +2562,7 @@ function App(){
     setPhase(1);
     setScreen('game');
     addActivity('Het spel is begonnen! 🎮');
-    // V5: show intro story on first game start
-    if(!storySeen.has('intro')){
-      setStoryShown('intro');
-      setStorySeen(prev=>new Set([...prev,'intro']));
-    }
+    // V30: intro story trigger removed with the chapter-modal system.
     // V12: broadcast start via game_state — every phone snaps out of lobby
     // V27 P0-A: ALSO seed jorik_team_id + jorik_moved_at. Pre-V27 startGame never
     // wrote these, so game_state.jorik_team_id stayed NULL, the auto-rotate watcher
@@ -2830,26 +2598,7 @@ function App(){
     }
   };
 
-  // V10: queue phase stories (don't overwrite intro)
-  useEffect(()=>{
-    if(phase<1||phase>4)return;
-    const key='phase'+phase;
-    if(storySeen.has(key))return;
-    setNextStory(key);
-  },[phase]);
-
-  // V10: dispatcher — show queued story once current is closed
-  useEffect(()=>{
-    if(!nextStory)return;
-    if(storyShown!==null)return; // wait for current to close
-    if(storySeen.has(nextStory)){setNextStory(null);return;}
-    const t=setTimeout(()=>{
-      setStoryShown(nextStory);
-      setStorySeen(prev=>new Set([...prev,nextStory]));
-      setNextStory(null);
-    },600);
-    return()=>clearTimeout(t);
-  },[nextStory,storyShown,storySeen]);
+  // V30: phase-story queue + dispatcher effects removed with the chapter-modal system.
 
   // Completion counts
   const myScore=scores[myTeam?.id]||0;
@@ -3059,20 +2808,7 @@ function App(){
         </div>
       )}
 
-      {/* V17: Hot-target countdown replaces the diner clock */}
-      {phase>=1&&phase<5&&hotTarget&&(()=>{
-        const ms=Math.max(0,hotTarget.deadline-nowTs);
-        const secs=Math.floor(ms/1000);
-        const mins=Math.floor(secs/60);
-        const urgent=secs<=120;
-        const loc=L_DATA.find(l=>l.id===hotTarget.locId);
-        const label=secs>=60?`${mins}m ${secs%60}s`:`${secs}s`;
-        return(
-          <div className={`game-clock ${urgent?'urgent':''}`} onClick={()=>setSelLoc(hotTarget.locId)} style={{cursor:'pointer'}}>
-            ⏱ {label} <span style={{opacity:0.7,marginLeft:'var(--sp-1)'}}>· {loc?.e||''} {loc?.n||'target'}</span>
-          </div>
-        );
-      })()}
+      {/* V30: hot-target countdown removed with the timed-target system. */}
 
       {/* V15: HUD — consistent padding + type */}
       <div style={{padding:`var(--sp-4) var(--sp-5)`,paddingTop:OFFLINE?'var(--sp-7)':phase>=1&&phase<5?'var(--sp-9)':'var(--sp-4)',background:'linear-gradient(180deg,rgba(10,11,16,0.92) 0%,rgba(10,11,16,0.85) 100%)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'var(--sp-3)',zIndex:100,backdropFilter:'blur(20px) saturate(1.4)',WebkitBackdropFilter:'blur(20px) saturate(1.4)',position:'relative'}}>
@@ -3088,7 +2824,6 @@ function App(){
                 <span className="t-label-sm t-accent">{lv.emoji} L{lv.level}</span>
                 {nxt?<span className="t-label-sm">{nxt.min-myScore} tot L{nxt.level}</span>:<span className="t-label-sm t-accent-2">Max</span>}
               </>;})()}
-              {quizStreak>=3&&<span className="streak-chip">🔥 {quizStreak}</span>}
             </div>
           </div>
         </div>
@@ -3097,14 +2832,8 @@ function App(){
           <div className="t-label-sm" style={{marginTop:2}}>pts</div>
         </div>
         <div style={{textAlign:'right',minWidth:64}}>
-          {/* V17: Extra Tijd — tap to add +5 min to hot target */}
-          <button onClick={activateExtraTime} disabled={timeCharges<=0||!hotTarget} className="chip"
-            style={{border:timeCharges>0?'1px solid rgba(228,178,92,0.35)':'1px solid var(--border)',background:timeCharges>0?'var(--accent-glow)':'var(--surface)',color:timeCharges>0?'var(--accent-2)':'var(--text-tertiary)',cursor:timeCharges>0&&hotTarget?'pointer':'default',opacity:timeCharges<=0?0.5:1,fontWeight:'var(--fw-bold)'}}
-            title={hotTarget?'+5 min extra tijd':'Geen actieve opdracht'}>
-            ⏳ {timeCharges}/{timeChargeMax}
-          </button>
-          {/* V18 (§1.5 batch 2): clarify 0/102 ambiguity — show challenges + POIs visited */}
-          <div className="t-label-sm" style={{marginTop:'var(--sp-1)'}}>{myChallenges} ch · {visitedLocs.size} POI</div>
+          {/* V30: Extra Tijd button removed with the timed-target system. */}
+          <div className="t-label-sm">{myChallenges} ch · {visitedLocs.size} POI</div>
         </div>
       </div>
 
@@ -3152,16 +2881,13 @@ function App(){
 
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} pos={pos} onSelect={setSelLoc}/>}
-        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} hotTarget={hotTarget} nowTs={nowTs}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
+        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync}/>}
       </div>
 
-      {/* V5: Narrative story modal */}
-      {storyShown&&NARRATIVE[storyShown]&&(
-        <StoryModal story={NARRATIVE[storyShown]} onClose={()=>setStoryShown(null)}/>
-      )}
+      {/* V30: NARRATIVE story modal render removed with the chapter-modal system. */}
 
       {/* V5: Photo lightbox */}
       {photoLightbox&&<PhotoLightbox media={photoLightbox} onClose={()=>setPhotoLightbox(null)}/>}
@@ -3602,55 +3328,30 @@ function TaskList({pos,onSelect,completed,visitedLocs}){
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax,visitedLocs,jorikMissionsDone,onShowJorikMissions,pos,onSelect}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,pendingMine,completed,visitedLocs,jorikMissionsDone,onShowJorikMissions}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
   const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
   const myTier=tierFor(myChallengesDone);
   const myNextTier=nextTier(myChallengesDone);
   const myScore=scores[myTeam?.id]||0;
-  // V17: next Extra Tijd unlock we haven't passed
-  const nextGhost=TIME_CHARGE_BONUSES.find(t=>myScore<t.score);
-  // V5: map current phase to the relevant narrative entry
-  const phaseKey=phase>=1&&phase<=4?`phase${phase}`:null;
-  const phaseStory=phaseKey?NARRATIVE[phaseKey]:null;
+  // V30: narrative phase-story ticker + Extra-Tijd milestone banner removed.
 
   return(
     <div style={{height:'100%',overflowY:'auto',padding:'var(--sp-5)',paddingBottom:'var(--sp-10)'}}>
-      {/* V18 (§1.5.2): narrative ticker — one-line HUD chip, no duplication with chapter modals */}
-      {phaseStory&&(
-        <button type="button" onClick={()=>onShowStory&&onShowStory(phaseKey)}
-          className="story-ticker row-2"
-          style={{cursor:'pointer',marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',border:'1px solid var(--border)',borderRadius:'var(--r-pill)',background:'rgba(178,155,255,0.08)',width:'100%',textAlign:'left',color:'#fff'}}>
-          <span className="t-label-sm" style={{color:'var(--quiz)',letterSpacing:'var(--ls-wide)'}}>{phaseStory.chapter}</span>
-          <span className="t-caption flex-1 truncate" style={{color:'var(--text-secondary)'}}>{phaseStory.title}</span>
-          <span className="t-caption" style={{color:'var(--quiz)'}}>›</span>
-        </button>
-      )}
-
-      {/* V18 (§1.5.3): next reward banner — motivational progress copy */}
-      {(myNextTier||nextGhost)&&(()=>{
-        const remainingTier=myNextTier?Math.max(0,myNextTier.min-myChallengesDone):0;
-        const remainingGhost=nextGhost?Math.max(0,nextGhost.score-myScore):0;
+      {/* V30: next-tier banner — motivational progress to the next challenge tier (Extra-Tijd branch removed) */}
+      {myNextTier&&(()=>{
+        const remainingTier=Math.max(0,myNextTier.min-myChallengesDone);
         return(
         <div className="reward-card" style={{marginBottom:'var(--sp-3)'}}>
-          <div className="reward-icon">{myNextTier?myNextTier.badge:'⏳'}</div>
+          <div className="reward-icon">{myNextTier.badge}</div>
           <div className="reward-info">
             <div className="t-label-sm t-accent" style={{marginBottom:'var(--sp-1)'}}>Volgende beloning</div>
             <div className="t-card-label">
-              {myNextTier?
-                (remainingTier===0?`${myNextTier.name} · bijna!`:`Nog ${remainingTier} challenge${remainingTier===1?'':'s'} → ${myNextTier.badge} ${myNextTier.name}`)
-                :
-                (remainingGhost===0?'Extra Tijd-lading · bijna!':`Nog ${remainingGhost} pts → ⏳ Extra Tijd`)
-              }
+              {remainingTier===0?`${myNextTier.name} · bijna!`:`Nog ${remainingTier} challenge${remainingTier===1?'':'s'} → ${myNextTier.badge} ${myNextTier.name}`}
             </div>
             <div className="reward-progress" style={{marginTop:'var(--sp-2)'}}>
-              <div className="reward-progress-fill" style={{
-                width: myNextTier?
-                  `${Math.min(100, (myChallengesDone/myNextTier.min)*100)}%`
-                  :
-                  `${Math.min(100, (myScore/nextGhost.score)*100)}%`
-              }}/>
+              <div className="reward-progress-fill" style={{width:`${Math.min(100, (myChallengesDone/myNextTier.min)*100)}%`}}/>
             </div>
           </div>
         </div>
@@ -3771,7 +3472,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
                   </span>
                 )}
               </div>
-              <div className="lb-stats">{teamChallenges} challenges · {t.locations_visited||0} locaties{isMine&&ghostMax>GHOST_MAX_USES?` · 👻×${ghostMax}`:''}</div>
+              <div className="lb-stats">{teamChallenges} challenges · {t.locations_visited||0} locaties</div>
               {/* Member names on leaderboard row */}
               {Array.isArray(t.members)&&t.members.length>0&&(
                 <div className="t-caption truncate" style={{marginTop:2}}>{t.members.slice(0,4).join(' · ')}{t.members.length>4?' · …':''}</div>
@@ -3789,8 +3490,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         </div>
       )}
 
-      {/* V25 (#71): Alle missies — always-visible, band-grouped task list */}
-      <TaskList pos={pos} onSelect={onSelect} completed={completed} visitedLocs={visitedLocs}/>
+      {/* V30 (Phase 5): TaskList moved to MapView — Ranking is now a pure scoreboard. */}
 
       {/* V18 (Batch 5): Rotterdam Deck — visited-POI sticker collection */}
       {visitedLocs&&visitedLocs.size>0&&(
@@ -3820,7 +3520,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 // ═══════════════════════════════════════════
 // MAP VIEW
 // ═══════════════════════════════════════════
-function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,hotTarget,nowTs}){
+function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,nowTs}){
   const mapRef=useRef(null);
   const mapInst=useRef(null);
   const markersRef=useRef([]);
@@ -3957,61 +3657,38 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
   // V17: nearby legacy computation kept for fallback if hotTarget is missing — mostly unused now
 
   return(
-    <div style={{height:'100%',display:'flex',flexDirection:'column',position:'relative'}}>
-      <div ref={mapRef} style={{flex:1}}/>
+    <div style={{height:'100%',overflowY:'auto',paddingBottom:'var(--sp-10)'}}>
+      {/* V30 (Phase 5): map sits at fixed height, TaskList scrolls below it.
+          Positioned children use this wrapper as their offset parent. */}
+      <div style={{position:'relative',height:'48vh',minHeight:280,flexShrink:0}}>
+        <div ref={mapRef} style={{width:'100%',height:'100%'}}/>
 
-      {/* V5.1/V12: GPS status pill — softer copy, tap to force-wake when paused */}
-      <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer'}} title="Tik om GPS te activeren">
-        <span className={`gps-dot ${gpsStatus||'weak'}`}/>
-        {gpsStatus==='good'?'GPS actief':gpsStatus==='sleep'?'GPS paust':'GPS zoekt…'}
-        {gpsSnap&&<span style={{color:'var(--foto)'}}>· op {gpsSnap}</span>}
-        {gpsStatus==='sleep'&&<span className="snap-btn">tik om te activeren</span>}
+        {/* V5.1/V12: GPS status pill — softer copy, tap to force-wake when paused */}
+        <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer'}} title="Tik om GPS te activeren">
+          <span className={`gps-dot ${gpsStatus||'weak'}`}/>
+          {gpsStatus==='good'?'GPS actief':gpsStatus==='sleep'?'GPS paust':'GPS zoekt…'}
+          {gpsSnap&&<span style={{color:'var(--foto)'}}>· op {gpsSnap}</span>}
+          {gpsStatus==='sleep'&&<span className="snap-btn">tik om te activeren</span>}
+        </div>
+
+        {/* V12: legend — bottom-left, stacked (V30: offset reduced since map is now fixed-height) */}
+        <div style={{position:'absolute',bottom:10,left:10,zIndex:1000,padding:'6px 8px',borderRadius:10,backdropFilter:'blur(12px)',background:'rgba(8,9,13,0.7)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:3,fontSize:9,color:'var(--text-secondary)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--foto)'}}/>Foto</div>
+          <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--video)'}}/>Video</div>
+          <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--creatief)'}}/>Creatief</div>
+          <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--quiz)'}}/>Quiz</div>
+        </div>
+
+        {/* V12: center-on-me (V30: offset reduced since map is now fixed-height) */}
+        {pos&&(
+          <button onClick={centerOnMe} style={{position:'absolute',bottom:10,right:12,zIndex:1000,width:38,height:38,borderRadius:19,background:'rgba(8,9,13,0.85)',border:'1px solid var(--border)',backdropFilter:'blur(12px)',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}} title="Centreer op mij">📍</button>
+        )}
       </div>
 
-      {/* V12: legend — bottom-left, stacked */}
-      <div style={{position:'absolute',bottom:180,left:10,zIndex:1000,padding:'6px 8px',borderRadius:10,backdropFilter:'blur(12px)',background:'rgba(8,9,13,0.7)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:3,fontSize:9,color:'var(--text-secondary)'}}>
-        <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--foto)'}}/>Foto</div>
-        <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--video)'}}/>Video</div>
-        <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--creatief)'}}/>Creatief</div>
-        <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--quiz)'}}/>Quiz</div>
+      {/* V30 (Phase 5): missions list lives in the Kaart tab now — map + missions in one place */}
+      <div style={{padding:'var(--sp-5)'}}>
+        <TaskList pos={pos} onSelect={onSelect} completed={completed} visitedLocs={visitedLocs}/>
       </div>
-
-      {/* V12: center-on-me */}
-      {pos&&(
-        <button onClick={centerOnMe} style={{position:'absolute',bottom:180,right:12,zIndex:1000,width:38,height:38,borderRadius:19,background:'rgba(8,9,13,0.85)',border:'1px solid var(--border)',backdropFilter:'blur(12px)',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}} title="Centreer op mij">📍</button>
-      )}
-
-      {/* V17: single hot-target card replaces the 3-card nearby stack */}
-      {hotTarget&&(()=>{
-        const loc=L_DATA.find(l=>l.id===hotTarget.locId);if(!loc)return null;
-        const ch=loc.ch[hotTarget.chIdx];if(!ch)return null;
-        const primaryType=ch.t;
-        const typeClass=primaryType==='photo'?'foto':primaryType==='creative'?'creatief':primaryType;
-        const label=primaryType==='photo'?'Foto':primaryType==='creative'?'Creatief':primaryType==='quiz'?'Quiz':'Video';
-        const secs=Math.max(0,Math.floor((hotTarget.deadline-nowTs)/1000));
-        const urgent=secs<=120;
-        const distM=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):null;
-        return(
-          <div className="nearby-panel">
-            <div className="nearby-card" onClick={()=>onSelect(loc.id)} style={{border:`2px solid ${urgent?'var(--danger)':'var(--accent)'}`,boxShadow:urgent?'0 8px 28px rgba(255,107,107,0.25)':'var(--sh-glow-gold)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>
-              <div className={`nearby-indicator ${typeClass}`}/>
-              <div className="nearby-info">
-                <div className="t-label-sm t-accent" style={{marginBottom:2}}>⏱ Hot target {secs>=60?`${Math.floor(secs/60)}m ${secs%60}s`:`${secs}s`}</div>
-                <div className="nearby-name">{loc.e} {loc.n}</div>
-                <div className="nearby-tags">
-                  <span className={`nearby-tag t-${typeClass==='foto'?'foto':typeClass}`}>{label}</span>
-                  <span className="nearby-tag" style={{background:'rgba(255,255,255,0.06)',color:'var(--text-secondary)'}}>{ch.ti}</span>
-                </div>
-              </div>
-              <div className="nearby-end">
-                {distM!=null&&<div className="nearby-dist">{fmtDist(distM)}</div>}
-                <div className="nearby-pts">+{ch.p}</div>
-              </div>
-              <div className="nearby-chevron">›</div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
@@ -4020,28 +3697,151 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
 // ACTIVITY FEED — V5: photo grid + filters
 // ═══════════════════════════════════════════
 function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
-  // V10: local-only emoji reactions (not persisted; just social texture in-session)
+  // V30 (Phase 7): reactions are now DB-persisted via the feed_reactions table
+  // (see SUPABASE-CATCHUP-PATCH-V30.sql). Before V30 reactions lived only in
+  // React state so nobody else ever saw your tap — the social signal was
+  // missing the "social" bit. Now every tap inserts a row and every untap
+  // deletes it; realtime subscription fans it to all other devices.
   const REACTIONS=['🔥','👏','💀','😂','🍻'];
-  const[reactions,setReactions]=useState({}); // {entryKey: {emoji: count}}
-  const[myReactions,setMyReactions]=useState({}); // {entryKey: Set<emoji>}
-  const entryKey=(item,i)=>`${item.created_at||i}_${item.team_id||'sys'}`;
+  const[reactions,setReactions]=useState({}); // {feedKey: {emoji: count}}
+  const[myReactions,setMyReactions]=useState({}); // {feedKey: Set<emoji>}
+  const deviceIdRef=useRef(null);
+
+  // V30: composite key — matches the activity_feed realtime dedup key so
+  // optimistic-local rows and their echoed server rows collapse to one key.
+  // Message is capped at 500 so the 300-char cut-off here is just a safety net.
+  const feedKey=(item)=>`${item.created_at||''}|${item.team_id==null?'sys':item.team_id}|${item.message||''}`.slice(0,300);
+
+  // V30: one-time per-device identifier. Multiple players share a team_id, so
+  // team_id alone can't distinguish "my reaction" from "my teammate's". A
+  // localStorage-backed device uuid gives each phone its own toggle state.
+  useEffect(()=>{
+    let d=null;
+    try{
+      d=localStorage.getItem('ssr_device_id');
+      if(!d){
+        d=(typeof crypto!=='undefined'&&crypto.randomUUID)
+          ?crypto.randomUUID()
+          :(Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+        try{localStorage.setItem('ssr_device_id',d);}catch(e){/* private mode — keep ref-only */}
+      }
+    }catch(e){
+      d=(Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+    }
+    deviceIdRef.current=d;
+  },[]);
+
+  // V30: hydrate reactions from DB + subscribe to realtime changes.
+  useEffect(()=>{
+    if(OFFLINE||!sb)return;
+    let alive=true;
+
+    // Initial fetch — grab all reactions (tiny rows; a 500-row feed × 5 emojis ×
+    // ~16 devices = 40k reactions max, well within one select round-trip).
+    sb.from('feed_reactions').select('feed_key,device_id,emoji').then(res=>{
+      if(!alive||!res?.data)return;
+      const rx={}, mine={};
+      const myDev=deviceIdRef.current;
+      res.data.forEach(r=>{
+        if(!rx[r.feed_key])rx[r.feed_key]={};
+        rx[r.feed_key][r.emoji]=(rx[r.feed_key][r.emoji]||0)+1;
+        if(r.device_id===myDev){
+          if(!mine[r.feed_key])mine[r.feed_key]=new Set();
+          mine[r.feed_key].add(r.emoji);
+        }
+      });
+      setReactions(rx);
+      setMyReactions(mine);
+    },()=>{/* table missing on an old DB — silent; reactions just won't persist */});
+
+    // Realtime — INSERT increments the counter, DELETE decrements. Needs
+    // REPLICA IDENTITY FULL on feed_reactions so DELETE ships the old row.
+    const sub=sb.channel('feed_reactions').on('postgres_changes',
+      {event:'*',schema:'public',table:'feed_reactions'},
+      payload=>{
+        if(!alive)return;
+        const myDev=deviceIdRef.current;
+        if(payload.eventType==='INSERT'){
+          const r=payload.new; if(!r||!r.feed_key)return;
+          setReactions(prev=>{
+            const cur={...(prev[r.feed_key]||{})};
+            cur[r.emoji]=(cur[r.emoji]||0)+1;
+            return{...prev,[r.feed_key]:cur};
+          });
+          if(r.device_id===myDev){
+            setMyReactions(prev=>{
+              const cur=new Set(prev[r.feed_key]||[]);
+              cur.add(r.emoji);
+              return{...prev,[r.feed_key]:cur};
+            });
+          }
+        }else if(payload.eventType==='DELETE'){
+          const r=payload.old; if(!r||!r.feed_key)return;
+          setReactions(prev=>{
+            const cur={...(prev[r.feed_key]||{})};
+            const next=Math.max(0,(cur[r.emoji]||0)-1);
+            if(next===0)delete cur[r.emoji]; else cur[r.emoji]=next;
+            return{...prev,[r.feed_key]:cur};
+          });
+          if(r.device_id===myDev){
+            setMyReactions(prev=>{
+              const cur=new Set(prev[r.feed_key]||[]);
+              cur.delete(r.emoji);
+              return{...prev,[r.feed_key]:cur};
+            });
+          }
+        }
+      }
+    ).subscribe();
+
+    return()=>{alive=false;try{sb.removeChannel(sub);}catch(e){}};
+  },[]);
+
   const toggleReaction=(key,emoji)=>{
+    const myDev=deviceIdRef.current;
+    // V30: determine current mine-state SYNCHRONOUSLY from latest state so
+    // the DB round-trip matches what we optimistically flip in the UI below.
+    const mineNow=(myReactions[key]||new Set()).has(emoji);
+
+    // Optimistic UI — realtime echo will no-op because the row is already
+    // reflected in state. If the DB round-trip fails, the echo never arrives
+    // and the user sees a stale tap; an explicit revert is deliberately NOT
+    // added because reactions are low-stakes and a silent error is less
+    // disruptive than a flicker.
     setMyReactions(prev=>{
       const cur=new Set(prev[key]||[]);
-      if(cur.has(emoji))cur.delete(emoji); else cur.add(emoji);
+      if(mineNow)cur.delete(emoji); else cur.add(emoji);
       return{...prev,[key]:cur};
     });
     setReactions(prev=>{
-      const cur=prev[key]||{};
-      const mine=(myReactions[key]||new Set()).has(emoji);
-      return{...prev,[key]:{...cur,[emoji]:(cur[emoji]||0)+(mine?-1:1)}};
+      const cur={...(prev[key]||{})};
+      const next=Math.max(0,(cur[emoji]||0)+(mineNow?-1:1));
+      if(next===0)delete cur[emoji]; else cur[emoji]=next;
+      return{...prev,[key]:cur};
     });
+
+    // Persist — offline/no-sb or missing device id both no-op silently.
+    if(OFFLINE||!sb||!myDev)return;
+    if(mineNow){
+      sb.from('feed_reactions').delete()
+        .eq('feed_key',key).eq('device_id',myDev).eq('emoji',emoji)
+        .then(()=>{},(err)=>console.warn('reaction delete failed',err?.message||err));
+    }else{
+      sb.from('feed_reactions').insert({
+        feed_key:key,device_id:myDev,
+        team_id:(typeof myTeamId==='number'?myTeamId:null),
+        emoji,
+      }).then(()=>{},(err)=>{
+        // 23505 = unique violation → row already exists (double-tap race). Ignore.
+        const code=err?.code||'';
+        if(code!=='23505')console.warn('reaction insert failed',err?.message||err);
+      });
+    }
   };
-  // Apply filter — V18 (§1.8.3): also support 'others' = alleen andere teams
+  // V30: 'others' filter removed in Less-is-More pass
   const filtered=feed.filter(item=>{
     if(filter==='photos')return !!item.photo;
     if(filter==='mine')return item.team_id===myTeamId;
-    if(filter==='others')return item.team_id&&item.team_id!==myTeamId&&item.team_id!==-1;
     return true;
   });
   const photos=feed.filter(i=>!!i.photo);
@@ -4053,12 +3853,11 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
         <div className="t-caption">{feed.length} berichten · {photos.length} foto's</div>
       </div>
 
-      {/* Filter pills — V18: added 'Andere teams' to scout the competition */}
+      {/* V30: simplified to three filter pills — "Andere teams" removed */}
       <div className="filter-pills">
         <button className={`filter-pill ${filter==='all'?'active':''}`} onClick={()=>setFilter('all')}>Alles</button>
         <button className={`filter-pill ${filter==='photos'?'active':''}`} onClick={()=>setFilter('photos')}>📸 Foto's</button>
         <button className={`filter-pill ${filter==='mine'?'active':''}`} onClick={()=>setFilter('mine')}>Mijn team</button>
-        <button className={`filter-pill ${filter==='others'?'active':''}`} onClick={()=>setFilter('others')}>👀 Andere teams</button>
       </div>
 
       {/* V29 (§3): removed "Recente foto's" grid. Photos already render
@@ -4077,7 +3876,7 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
 
       {filtered.map((item,i)=>{
         const isMe=item.team_id===myTeamId;
-        const key=entryKey(item,i);
+        const key=feedKey(item);
         const rx=reactions[key]||{};
         const mine=myReactions[key]||new Set();
         const isSystem=!item.team_id||item.team_name==='Game Master'||item.team_name==='Systeem';
@@ -4132,34 +3931,7 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
   );
 }
 
-// ═══════════════════════════════════════════
-// V5: NARRATIVE STORY MODAL
-// ═══════════════════════════════════════════
-function StoryModal({story,onClose}){
-  // V21 a11y: escape-to-close + role/aria-modal/aria-labelledby + focus trap
-  React.useEffect(()=>{
-    const onKey=(e)=>{if(e.key==='Escape'){e.stopPropagation();onClose&&onClose();}};
-    window.addEventListener('keydown',onKey);
-    return()=>window.removeEventListener('keydown',onKey);
-  },[onClose]);
-  const titleId=React.useMemo(()=>'story-title-'+Math.random().toString(36).slice(2,8),[]);
-  return(
-    <div className="story-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <div className="story-card" onClick={e=>e.stopPropagation()}>
-        <div className="story-chapter">{story.chapter}</div>
-        <div className="story-title" id={titleId}>{story.title}</div>
-        <div style={{textAlign:'left',marginBottom:'var(--sp-6)'}}>
-          {story.text.split('\n\n').map((p,i)=>(
-            <p key={i} className="t-body" style={{marginBottom:'var(--sp-3)'}}>{p}</p>
-          ))}
-        </div>
-        <button className="btn btn-cyan" onClick={onClose} style={{width:'100%'}} autoFocus aria-label="Sluit verhaal en ga verder">
-          Verder →
-        </button>
-      </div>
-    </div>
-  );
-}
+// V30 (Less-is-More): StoryModal component deleted along with NARRATIVE.
 
 // ═══════════════════════════════════════════
 // V5: PHOTO LIGHTBOX
@@ -4647,7 +4419,14 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                 </div>
                 <div className="points-badge">+{ch.p}</div>
               </div>
-              <p className="t-body" style={{marginBottom:'var(--sp-3)'}}>{ch.d}</p>
+              <p className="t-body" style={{marginBottom:'var(--sp-2)'}}>{ch.d}</p>
+              {/* V30 (Phase 8): scoring clarity — explicit one-line rule.
+                  Every L_DATA challenge is one-shot per team (the v20 unique
+                  constraint on completed_challenges enforces this). Before V30
+                  players had to infer from the faded card after submit; now the
+                  rule ships with the card so teams don't waste effort hoping a
+                  second photo might score again. */}
+              <div className="t-label-sm t-muted" style={{marginBottom:'var(--sp-3)',letterSpacing:'0.3px'}}>✅ 1× per team · eerste team +{FIRST_BONUS} bonus</div>
               <div className="row-between">
                 <div className="difficulty"><span className="star">{stars(ch.df)}</span> {ch.df}</div>
                 {done&&!wasWrong&&<div className="t-body-emph t-success">✓ Voltooid {ptsEarned>0&&`(+${ptsEarned} pts)`}</div>}
@@ -4672,6 +4451,9 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
             <div style={{fontSize:11,color:'var(--text-secondary)',marginBottom:8,fontStyle:'italic'}}>
               {rotatedQuiz._pool?'🎯 Bonus Rotterdam-vraag':'⭐ Extra vraag voor deze plek'}
             </div>
+            {/* V30 (Phase 8): dynamic bonus quizzes rotate — you can keep doing
+                them until the pool is dry. Make that obvious next to the card. */}
+            <div className="t-label-sm t-muted" style={{marginBottom:'var(--sp-2)',letterSpacing:'0.3px'}}>♻️ Zo vaak je wilt · elke keer +{rotatedQuiz.p} pts</div>
             <ChallengeAction ch={rotatedQuiz} locId={loc.id} chIdx={`dyn_${loc.id}_${Date.now()}`} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} onComplete={(lid,cidx,pts,photo)=>{
               // Dynamic-quiz rewards: award points, log activity, but do NOT mark built-in challenge
               onComplete(lid,-99,pts,photo);
@@ -5093,14 +4875,15 @@ function BarBreakOverlay({info,onClose,onComplete}){
         <div className="t-label t-accent" style={{textAlign:'center'}}>🍻 Bar break</div>
         <div id="barbreak-title" className="t-title" style={{marginTop:'var(--sp-2)',background:'linear-gradient(135deg,var(--accent-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
         <div className="chip" style={{margin:`var(--sp-4) auto var(--sp-5)`,color:urgent?'var(--danger)':'var(--accent-2)',borderColor:urgent?'rgba(255,107,107,0.4)':'rgba(228,178,92,0.35)',background:urgent?'rgba(255,107,107,0.12)':'var(--accent-glow)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>⏱ {secLeft>=60?`${Math.floor(secLeft/60)}m ${secLeft%60}s`:`${secLeft}s`} over</div>
-        <div className="t-body" style={{textAlign:'center',fontStyle:'italic',marginBottom:'var(--sp-5)'}}>Drie bonus-opdrachten · doe er zoveel als je wilt · elke telt apart</div>
+        <div className="t-body" style={{textAlign:'center',fontStyle:'italic',marginBottom:'var(--sp-5)'}}>Één moment · samen toasten · samen op de foto</div>
         <div className="stack-3" style={{textAlign:'left'}}>
           {info.mini.map((m,i)=>{
             const isDone=done.has(i);
-            const accept=m.title.toLowerCase().includes('karaoke')||m.title.toLowerCase().includes('roulette')?'video/*':'image/*,video/*';
+            // V30: single group-photo moment — both foto and video accepted
+            const accept='image/*,video/*';
             return(
               <div key={i} className="panel" style={{background:isDone?'linear-gradient(155deg,rgba(95,216,165,0.1),rgba(95,216,165,0.02))':undefined,borderColor:isDone?'rgba(95,216,165,0.3)':undefined}}>
-                <div className="row-3" style={{marginBottom:'var(--sp-3)'}}>
+                <div className="row-3" style={{marginBottom:'var(--sp-2)'}}>
                   <div style={{fontSize:28}}>{m.emoji}</div>
                   <div className="flex-1">
                     <div className="t-card-label">{m.title}</div>
@@ -5108,6 +4891,8 @@ function BarBreakOverlay({info,onClose,onComplete}){
                   </div>
                   <div className="t-num t-accent" style={{fontSize:'var(--fs-17)'}}>+{m.pts}</div>
                 </div>
+                {/* V30 (Phase 8): scoring clarity on bar-break moment too */}
+                <div className="t-label-sm t-muted" style={{marginBottom:'var(--sp-3)',letterSpacing:'0.3px'}}>✅ 1× per team deze break</div>
                 {!isDone&&<>
                   {/* V19+: no capture attribute — library uploads allowed */}
                   <input ref={el=>{fileRefs.current[i]=el}} type="file" accept={accept} style={{display:'none'}} onChange={e=>handleUpload(m,i,e.target.files[0])}/>
