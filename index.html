@@ -157,6 +157,7 @@
     @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
     @keyframes slideDown{from{transform:translateY(-24px);opacity:0}to{transform:translateY(0);opacity:1}}
     @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(228,178,92,0.5)}50%{box-shadow:0 0 0 14px rgba(228,178,92,0)}}
+    @keyframes reviewPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,68,68,0.8)}50%{transform:scale(1.3);box-shadow:0 0 0 8px rgba(255,68,68,0)}}
     @keyframes glow{0%,100%{filter:drop-shadow(0 0 8px rgba(228,178,92,0.8))}50%{filter:drop-shadow(0 0 22px rgba(228,178,92,0.4))}}
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
     @keyframes scoreFloat{0%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-80px) scale(1.35)}}
@@ -1125,6 +1126,14 @@ function App(){
   const[visitedLocs,setVisitedLocs]=useState(new Set());
   const[pos,setPos]=useState(null);
   const[tab,setTab]=useState('leaderboard');
+  // V23 (#50): ref-mirror of `tab` so long-lived realtime subscribe handlers
+  // (set up once with [myTeam,isAdmin] deps) can always see the latest tab.
+  const tabRef=React.useRef(tab);useEffect(()=>{tabRef.current=tab;},[tab]);
+  // V23 (#51): tracks any pending first-finder retry timers so we can clear them
+  // on component unmount — prevents dangling setTimeout callbacks from calling
+  // setState on an unmounted tree.
+  const pendingRetryTimersRef=React.useRef(new Set());
+  useEffect(()=>()=>{pendingRetryTimersRef.current.forEach(id=>clearTimeout(id));pendingRetryTimersRef.current.clear();},[]);
   const[selLoc,setSelLoc]=useState(null);
   const[toast,setToast]=useState(null);
   const[scorePopup,setScorePopup]=useState(null);
@@ -1208,6 +1217,8 @@ function App(){
   // V6: admin review queue
   const[reviewQueue,setReviewQueue]=useState([]); // pending photo_reviews for admin
   const[pendingMine,setPendingMine]=useState(0); // count of my team's pending reviews
+  // V23 (#50): timestamp of last new-review INSERT — drives badge pulse + ping on admin.
+  const[reviewFlashTs,setReviewFlashTs]=useState(0);
   // V14: engagement state
   const[celebration,setCelebration]=useState(null); // {emoji,title,sub,breakdown,confetti}
   const[quizStreak,setQuizStreak]=useState(0); // consecutive correct quizzes
@@ -1411,6 +1422,27 @@ function App(){
     }catch(e){}
   },[]);
 
+  // V23 (#50): soft single-beep ping for a newly-submitted photo_review.
+  // Fires only for admin when `tab!=='review'` so the admin gets audible attention
+  // without being nagged while actively processing the queue. Uses WebAudio directly
+  // so we don't need an external audio asset.
+  const playReviewPing=useCallback(()=>{
+    try{
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC)return;
+      const ctx=new AC();
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sine';
+      o.frequency.setValueAtTime(780,ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(1100,ctx.currentTime+0.08);
+      g.gain.setValueAtTime(0.0001,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.12,ctx.currentTime+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.35);
+      o.connect(g).connect(ctx.destination);
+      o.start();o.stop(ctx.currentTime+0.35);
+    }catch(e){}
+  },[]);
+
   // V12: Supabase real-time subscriptions — full multi-user sync
   useEffect(()=>{
     if(OFFLINE||!sb)return;
@@ -1600,6 +1632,13 @@ function App(){
       const r=payload.new;
       if(isAdmin&&r.status==='pending'){
         setReviewQueue(prev=>[r,...prev]);
+        // V23 (#50): ping + pulse the Beoordeel badge — but ONLY if admin is
+        // not already viewing the review queue (don't nag). Use tabRef so this
+        // long-lived subscribe closure always sees the current tab.
+        if(tabRef.current!=='review'){
+          setReviewFlashTs(Date.now());
+          playReviewPing();
+        }
       }
       if(r.team_id===myTeam?.id&&r.status==='pending'){
         setPendingMine(c=>c+1);
@@ -2054,31 +2093,51 @@ function App(){
       if(isFirstEligible&&FIRST_BONUS>0){
         // V20: FINALE multiplier also applies to FIRST_BONUS winners
         const firstBonusPts=Math.round(FIRST_BONUS*phaseMult);
-        sb.from('challenge_first_finder').insert({challenge_id:key,team_id:myTeam.id})
-          .then(
-            ({error})=>{
-              if(!error){
-                // We won the race.
-                applyScoreDelta(myTeam.id,firstBonusPts);
-                setToast(`🏆 Eerste bij ${loc.n}! +${firstBonusPts} pts bonus`);
-                addActivity(`was als eerste bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · +${firstBonusPts} pts bonus`,firstBonusPts,null,locId);
-                return;
+        // V23 (#51): network-hiccup retry. Conflicts (23505) and missing-table
+        // (42P01) are deterministic verdicts — never retry those. Any other
+        // error (fetch failure, 5xx, timeout) gets exactly one retry after
+        // 600 ms before we concede. Without this a brief GPRS blip during
+        // a close race would silently strip the +FIRST_BONUS from the
+        // rightful winner (they'd be "not first" on the retry that never ran).
+        const awardIfWon=()=>{
+          applyScoreDelta(myTeam.id,firstBonusPts);
+          setToast(`🏆 Eerste bij ${loc.n}! +${firstBonusPts} pts bonus`);
+          addActivity(`was als eerste bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · +${firstBonusPts} pts bonus`,firstBonusPts,null,locId);
+        };
+        const isConflict=(err)=>err&&(err.code==='23505'||String(err.message||'').toLowerCase().includes('duplicate')||String(err.code||'').startsWith('23'));
+        const isMissing=(err)=>{
+          if(!err)return false;
+          const m=String(err.message||'').toLowerCase();
+          return m.includes('does not exist')||m.includes('relation')||err.code==='42P01';
+        };
+        const scheduleRetry=(triesLeft)=>{
+          let id;
+          id=setTimeout(()=>{pendingRetryTimersRef.current.delete(id);attempt(triesLeft);},600);
+          pendingRetryTimersRef.current.add(id);
+        };
+        const attempt=(triesLeft)=>{
+          sb.from('challenge_first_finder').insert({challenge_id:key,team_id:myTeam.id})
+            .then(
+              ({error})=>{
+                if(!error){awardIfWon();return;}
+                if(isConflict(error))return; // lost the race, canonical outcome
+                if(isMissing(error)){
+                  console.warn('challenge_first_finder missing — legacy fallback: awarding FIRST_BONUS anyway',error.message);
+                  applyScoreDelta(myTeam.id,firstBonusPts);
+                  return;
+                }
+                // Transient error — retry once
+                if(triesLeft>0){scheduleRetry(triesLeft-1);return;}
+                console.warn('challenge_first_finder insert failed after retry',error);
               }
-              // Error code 23505 / PGRST duplicate / conflict = we lost the race. Silent no-op.
-              if(error.code==='23505'||String(error.message||'').toLowerCase().includes('duplicate')||String(error.code||'').startsWith('23')){
-                return;
-              }
-              // Table missing (migration pending) → fall back to legacy "everyone first" behaviour.
-              const msg=String(error.message||'').toLowerCase();
-              if(msg.includes('does not exist')||msg.includes('relation')||error.code==='42P01'){
-                console.warn('challenge_first_finder missing — legacy fallback: awarding FIRST_BONUS anyway',error.message);
-                applyScoreDelta(myTeam.id,firstBonusPts);
-                return;
-              }
-              console.warn('challenge_first_finder insert failed',error);
-            }
-          )
-          .catch(e=>console.warn('challenge_first_finder threw',e));
+            )
+            .catch(e=>{
+              // Thrown (network down, fetch rejected) — retry once
+              if(triesLeft>0){scheduleRetry(triesLeft-1);return;}
+              console.warn('challenge_first_finder threw after retry',e);
+            });
+        };
+        attempt(1);
       }
     }
 
@@ -2996,7 +3055,10 @@ function App(){
         ].map(t=>(
           <button key={t.id} className={`tab-btn ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)} style={{position:'relative'}}>
             <span className="tab-icon">{t.icon}</span>{t.label}
-            {t.badge>0&&<span style={{position:'absolute',top:2,right:'25%',background:'#ff4444',color:'#fff',fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:9,minWidth:14,textAlign:'center'}}>{t.badge}</span>}
+            {t.badge>0&&<span style={{position:'absolute',top:2,right:'25%',background:'#ff4444',color:'#fff',fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:9,minWidth:14,textAlign:'center',
+              // V23 (#50): pulse the Beoordeel badge for 3 s after a new photo_review INSERT.
+              animation:(t.id==='review'&&(nowTs-reviewFlashTs)<3000&&reviewFlashTs>0)?'reviewPulse 0.8s ease-out 3':'none'
+            }}>{t.badge}</span>}
           </button>
         ))}
       </div>
