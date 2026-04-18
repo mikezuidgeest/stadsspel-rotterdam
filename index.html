@@ -2530,6 +2530,53 @@ function App(){
     }
   },[isAdmin]);
 
+  // V28: admin override — reset the running game back to the lobby without
+  // needing to run SQL. Flips phase→0, clears started_at / Jorik / bar-break,
+  // and every connected phone snaps back to the lobby via the realtime
+  // subscription on game_state. Teams, scores, and completed_challenges are
+  // PRESERVED in the DB — this is "cancel current run", not "wipe". For a
+  // full wipe use SUPABASE-GAMEDAY-RESET.sql Block A (soft) or Block B (full).
+  const resetGame=useCallback(()=>{
+    if(!isAdmin)return;
+    setPhase(0);
+    setGameStart(null);
+    setJorikTeamId(null);
+    setJorikMovedAt(null);
+    setBarBreak(null);
+    setScreen('lobby');
+    if(!OFFLINE&&sb){
+      sb.from('game_state').update({
+        phase:0,
+        started_at:null,
+        game_ended:false,
+        bar_break_active:null,
+        bar_break_started_at:null,
+        jorik_team_id:null,
+        jorik_moved_at:null,
+      }).eq('id',1).then(()=>{},(err)=>{
+        // Pre-V21 DBs may lack jorik_moved_at — retry without it so the
+        // reset still lands phase=0 on every phone.
+        const msg=String(err?.message||'').toLowerCase();
+        if(msg.includes('jorik_moved_at')||err?.code==='42703'){
+          sb.from('game_state').update({
+            phase:0,
+            started_at:null,
+            game_ended:false,
+            bar_break_active:null,
+            bar_break_started_at:null,
+            jorik_team_id:null,
+          }).eq('id',1).then(()=>{},()=>{});
+        }
+      });
+      sb.from('activity_feed').insert({
+        team_id:null, team_name:'Game Master', team_emoji:'↺', team_color:'#d4a054',
+        message:'↺ Spel teruggezet naar de lobby door de Game Master',
+        points:0, created_at:new Date().toISOString(),
+      });
+    }
+    setToast('↺ Spel teruggezet naar de lobby');
+  },[isAdmin]);
+
   // V12: admin score override
   // V20 NOTE: this is kept as an absolute-set (not atomic delta) because it's
   // admin-only, low-frequency, and used for judgment calls where "I want team X
@@ -2881,13 +2928,13 @@ function App(){
 
         {isAdmin?(
           <div className="stack-3">
-            <button className="btn btn-gold btn-lg" onClick={async()=>{
-              if(teamCount<2){
-                const ok=await confirmAsync(`Slechts ${teamCount} team${teamCount===1?'':'s'} in de lobby. Toch starten?`,{confirmLabel:'Start toch'});
-                if(!ok)return;
-              }
-              startGame();
-            }} style={{width:'100%'}}>🎮 Start het spel{teamCount>0?` (${teamCount})`:''}</button>
+            {/* V28: stripped the teamCount<2 confirmAsync gate. Admin = Mike; no
+                friction, no dialog that could get obscured by stacked overlays
+                (GPS-denied sheet, bar-break, private-browsing banner). Button
+                now fires startGame() synchronously on click — if Mike really
+                wants to start with 0 or 1 teams, that's his call. Teams can
+                still register mid-lobby via realtime after phase flips. */}
+            <button className="btn btn-gold btn-lg" onClick={()=>startGame()} style={{width:'100%'}}>🎮 Start het spel{teamCount>0?` (${teamCount})`:''}</button>
             <div className="t-caption text-center">Jij bent de Game Master — druk zodra iedereen er is</div>
           </div>
         ):(
@@ -3088,7 +3135,7 @@ function App(){
         {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} pos={pos} onSelect={setSelLoc}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} hotTarget={hotTarget} nowTs={nowTs}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
-        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} confirmAsync={confirmAsync}/>}
+        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync}/>}
       </div>
 
       {/* V5: Narrative story modal */}
@@ -4183,7 +4230,7 @@ function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClos
 // ═══════════════════════════════════════════
 // V6: ADMIN REVIEW QUEUE
 // ═══════════════════════════════════════════
-function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinalePhase,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,reviewUndo,onUndoReview,onBroadcast,confirmAsync}){
+function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinalePhase,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,reviewUndo,onUndoReview,onBroadcast,onResetGame,confirmAsync}){
   // V20 UX P1: fallback to native confirm if prop missing (for isolated testing)
   const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
   const[barChoice,setBarChoice]=React.useState('');
@@ -4355,6 +4402,20 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
             className="btn btn-gold" disabled={phase>=5} style={{width:'100%'}}>
             🏆 {phase>=5?'Finale loopt':'Start finale & ceremonie'}
           </button>
+        </div>
+
+        {/* V28: admin emergency reset — pushes every phone back to the lobby
+            without running SQL. Preserves teams + scores + completions in the
+            DB (for a full wipe use SUPABASE-GAMEDAY-RESET.sql Block A/B). */}
+        <div style={{marginTop:'var(--sp-2)',paddingTop:'var(--sp-3)',borderTop:'1px dashed rgba(255,107,107,0.22)'}}>
+          <div className="t-label-sm" style={{marginBottom:'var(--sp-2)',color:'var(--danger)'}}>⚠ Noodstop</div>
+          <button onClick={async()=>{if(await ask('Spel resetten naar de lobby? Alle teams keren terug naar het wacht-scherm. Scores, teams en voltooide opdrachten blijven in de database bewaard.',{danger:true,confirmLabel:'Reset naar lobby'}))onResetGame&&onResetGame()}}
+            className="btn btn-ghost btn-sm" style={{width:'100%',color:'var(--danger)',borderColor:'rgba(255,107,107,0.3)',background:'rgba(255,107,107,0.06)'}}>
+            ↺ Reset spel naar lobby (phase = 0)
+          </button>
+          <div className="t-caption t-muted" style={{marginTop:'var(--sp-2)',textAlign:'center'}}>
+            Voor een volledige DB-wipe: draai <code>SUPABASE-GAMEDAY-RESET.sql</code> Block A/B.
+          </div>
         </div>
       </div>
 
