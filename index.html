@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Stadsspel Rotterdam V17 - Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Inter+Tight:wght@500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root{
@@ -67,7 +69,7 @@
     body{font-family:var(--font-body);background:var(--bg);color:var(--text-primary);-webkit-font-smoothing:antialiased;letter-spacing:-0.01em}
     body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at 20% 15%,rgba(228,178,92,0.05),transparent 45%),radial-gradient(circle at 85% 85%,rgba(110,163,255,0.045),transparent 50%)}
     /* V13: desktop frame */
-    @media (min-width:560px){#root{max-width:420px;margin:0 auto;box-shadow:0 0 120px rgba(0,0,0,0.55),inset 0 0 0 1px rgba(255,255,255,0.03);background:var(--bg)}}
+    @media (min-width:560px){#root{max-width:520px;margin:0 auto;box-shadow:0 0 120px rgba(0,0,0,0.55),inset 0 0 0 1px rgba(255,255,255,0.03);background:var(--bg)}}
     h1,h2,h3{font-family:var(--font-display);letter-spacing:var(--ls-tight)}
 
     /* V15: utility system — strict typography tokens */
@@ -137,8 +139,11 @@
     .btn-danger{background:linear-gradient(135deg,#ff8787,#c94d4d);box-shadow:0 10px 28px rgba(255,107,107,0.3)}
     .btn-danger:hover{box-shadow:0 14px 34px rgba(255,107,107,0.38)}
     .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;pointer-events:none}
-    .btn-sm{padding:var(--sp-2) var(--sp-4);min-height:40px;font-size:var(--fs-13)}
+    /* V18 (§2.7): 44px min tap target (WCAG 2.5.5 AAA baseline) */
+    .btn-sm{padding:var(--sp-2) var(--sp-4);min-height:44px;font-size:var(--fs-13)}
     .btn-lg{padding:var(--sp-5) var(--sp-7);min-height:60px;font-size:var(--fs-17);font-weight:var(--fw-bold)}
+    /* V18 (§2.7): keyboard focus ring — visible on Tab but not on mouse click */
+    .btn:focus-visible,.chip:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;box-shadow:0 0 0 4px rgba(228,178,92,0.18)}
 
     /* V13: Chip — compact pill used for tags, meta, filters */
     .chip{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:0.01em;transition:background .2s}
@@ -195,6 +200,8 @@
 
     /* V13: Offline banner */
     .offline-banner{position:fixed;top:0;left:0;right:0;padding:7px;text-align:center;font-size:10px;font-weight:700;color:var(--danger);background:rgba(255,107,107,0.1);border-bottom:1px solid rgba(255,107,107,0.22);z-index:10001;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);letter-spacing:0.05em;text-transform:uppercase}
+    .finale-pulse-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 14px;background:linear-gradient(90deg,rgba(228,178,92,0.22),rgba(255,107,107,0.22),rgba(228,178,92,0.22));border-top:1px solid rgba(228,178,92,0.35);border-bottom:1px solid rgba(228,178,92,0.35);color:#fff;animation:finalePulse 1.6s ease-in-out infinite;text-align:center;flex-wrap:wrap}
+    @keyframes finalePulse{0%,100%{box-shadow:inset 0 0 24px rgba(228,178,92,0.1);filter:brightness(1)}50%{box-shadow:inset 0 0 36px rgba(228,178,92,0.22);filter:brightness(1.15)}}
 
     /* V13: Bottom tab bar — floating pill */
     .tab-bar{position:fixed;bottom:max(10px,env(safe-area-inset-bottom));left:10px;right:10px;z-index:10000;backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);background:rgba(14,15,22,0.78);border:1px solid var(--border-strong);border-radius:var(--r-pill);display:flex;padding:6px;box-shadow:0 18px 40px rgba(0,0,0,0.5),var(--sh-ring)}
@@ -210,7 +217,7 @@
     /* V13: Bottom sheet — premium with grabber */
     .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:10000;animation:fadeInUp .25s var(--ease-out)}
     .sheet{position:fixed;bottom:0;left:0;right:0;max-height:88vh;overflow-y:auto;z-index:10001;background:linear-gradient(180deg,var(--bg-elev) 0%,var(--bg) 100%);border-top:1px solid var(--border-strong);border-radius:var(--r-2xl) var(--r-2xl) 0 0;padding:14px 20px 120px;animation:slideUp .4s var(--spring);box-shadow:0 -20px 60px rgba(0,0,0,0.5)}
-    @media (min-width:560px){.sheet{max-width:420px;margin:0 auto;left:0;right:0}}
+    @media (min-width:560px){.sheet{max-width:520px;margin:0 auto;left:0;right:0}}
     .sheet-handle{width:44px;height:5px;background:rgba(255,255,255,0.18);border-radius:var(--r-pill);margin:0 auto 18px;transition:background .2s}
     .sheet-handle:hover{background:rgba(255,255,255,0.28)}
 
@@ -237,7 +244,7 @@
     .quiz-option:disabled{pointer-events:none;cursor:not-allowed}
 
     /* V13: Leaderboard */
-    .lb-card{padding:16px 18px;margin-bottom:10px;border-radius:var(--r-lg);display:flex;align-items:center;gap:14px;transition:transform .25s var(--spring),background .25s;position:relative;overflow:hidden;background:linear-gradient(155deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02));border:1px solid var(--border);box-shadow:var(--sh-ring)}
+    .lb-card{padding:16px 18px;margin-bottom:10px;border-radius:var(--r-lg);display:flex;align-items:center;gap:14px;transition:transform .25s var(--spring),background .25s;position:relative;overflow:hidden;background:linear-gradient(155deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02));border:1px solid var(--border);box-shadow:var(--sh-ring);min-height:64px}
     .lb-card:hover{transform:translateY(-2px);background:linear-gradient(155deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))}
     .lb-rank{font-family:var(--font-display);font-size:22px;font-weight:900;min-width:36px;text-align:center;letter-spacing:-0.05em}
     .lb-rank-1{color:var(--accent-2);text-shadow:0 0 20px rgba(228,178,92,0.4)}
@@ -250,6 +257,9 @@
     .lb-stats{font-size:11px;color:var(--text-secondary);font-weight:500}
     .lb-score{font-family:var(--font-display);font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-0.04em}
     .lb-first{background:linear-gradient(155deg,rgba(228,178,92,0.13),rgba(228,178,92,0.03));border-color:rgba(228,178,92,0.28);box-shadow:var(--sh-glow-gold),var(--sh-ring)}
+    .lb-second{background:linear-gradient(155deg,rgba(196,196,196,0.09),rgba(196,196,196,0.02));border-color:rgba(196,196,196,0.22)}
+    .lb-third{background:linear-gradient(155deg,rgba(205,157,119,0.09),rgba(205,157,119,0.02));border-color:rgba(205,157,119,0.22)}
+    .lb-medal{font-size:18px;margin-right:4px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))}
 
     /* V13: Nearby panel — floating premium cards */
     .nearby-panel{position:absolute;bottom:92px;left:12px;right:12px;z-index:1000;display:flex;flex-direction:column;gap:8px}
@@ -326,6 +336,10 @@
     .starter-card:hover{transform:translateY(-3px);background:linear-gradient(155deg,rgba(255,255,255,0.075),rgba(255,255,255,0.025));box-shadow:var(--sh-md),var(--sh-ring)}
     .starter-card:active{transform:scale(0.97)}
     .starter-card.taken{opacity:0.3;pointer-events:none;filter:grayscale(0.4)}
+    .starter-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    .starter-edit-btn{position:absolute;top:6px;right:6px;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;border-radius:var(--r-pill);border:1px solid var(--border);background:rgba(20,22,32,0.65);color:#fff;font-size:12px;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0.55;transition:opacity .2s,transform .2s var(--spring);-webkit-tap-highlight-color:transparent;z-index:2}
+    .starter-edit-btn:hover{opacity:1;transform:scale(1.08)}
+    .starter-edit-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;opacity:1}
     .starter-emoji{font-size:40px;margin-bottom:10px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3));transition:transform .3s var(--spring)}
     .starter-card:hover .starter-emoji{transform:scale(1.08)}
     .starter-name{font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text-primary);letter-spacing:-0.02em}
@@ -378,7 +392,8 @@
     .provisional-badge{display:inline-flex;align-items:center;margin-left:8px;padding:3px 9px;border-radius:var(--r-pill);font-size:10px;font-weight:800;background:rgba(228,178,92,0.2);color:var(--accent-2);letter-spacing:0.03em}
 
     /* V13: Tier badge + unlock popup */
-    .tier-badge{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:3px 9px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);font-size:10px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase}
+    /* V18 audit-fix: drop margin-left — parent `.lb-name` now uses `gap:var(--sp-2)` so margin would double-space */
+    .tier-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);font-size:10px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase}
     .tier-badge .tier-emoji{font-size:14px}
     .tier-unlock-popup{position:fixed;top:28%;left:50%;transform:translateX(-50%);z-index:10004;padding:30px 40px;border-radius:var(--r-2xl);backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);background:rgba(14,15,22,0.95);border:1px solid var(--border-strong);text-align:center;animation:fadeInPop .5s var(--spring);box-shadow:0 20px 60px rgba(228,178,92,0.3),var(--sh-ring)}
     .tier-unlock-emoji{font-size:72px;margin-bottom:16px;animation:float 2.2s ease-in-out infinite;filter:drop-shadow(0 6px 20px rgba(228,178,92,0.5))}
@@ -420,6 +435,7 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback}=React;
@@ -491,7 +507,7 @@ const NARRATIVE={
   phase3:{
     chapter:'FASE 3 · DE CIRKEL SLUIT',
     title:"Schaduwen en spoken",
-    text:"De tegenstand wordt slimmer. Als het moeilijk wordt: activeer Ghost Mode. 5 minuten onzichtbaar voor andere teams — maximaal 3 keer per team. Gebruik hem verstandig: vlak voor een grote vondst, of om je volgende beweging te verbergen."
+    text:"De tegenstand wordt slimmer. Als de timer knelt: gebruik je ⏳ Extra Tijd-ladingen. Elke lading verlengt je actieve opdracht met +5 minuten — je hebt er 3 per team, en je verdient er extra bij score-milestones. Gebruik ze wanneer je bijna bij een volgend icon bent, of om een missende streak te redden."
   },
   phase4:{
     chapter:'FASE 4 · DE FINALE',
@@ -1267,21 +1283,27 @@ function App(){
     };
   },[myTeam,isAdmin]);
 
-  // V6/V12: admin actions with 10s undo window
-  const[reviewUndo,setReviewUndo]=useState(null); // {row, action, deadline, timer}
+  // V6/V12: admin actions with undo window
+  const[reviewUndo,setReviewUndo]=useState(null); // {row, action, deadline, timer, commit}
+  // V18 audit-fix: if another review is pending-undo, immediately fire its commit
+  // (we can't wait for a second undo slot — that would hide the first action forever)
+  const flushPendingUndo=(prev)=>{
+    if(!prev)return;
+    clearTimeout(prev.timer);
+    try{prev.commit&&prev.commit();}catch(e){/* swallow */}
+  };
   const approveReview=(r)=>{
     if(!sb)return;
     setReviewQueue(prev=>prev.filter(x=>x.id!==r.id));
-    const timer=setTimeout(()=>{
-      sb.from('photo_reviews').update({status:'approved',reviewed_at:new Date().toISOString()}).eq('id',r.id);
-      setReviewUndo(null);
-    },10000);
-    setReviewUndo({row:r,action:'approved',deadline:Date.now()+10000,timer});
+    const commit=()=>{sb.from('photo_reviews').update({status:'approved',reviewed_at:new Date().toISOString()}).eq('id',r.id);};
+    setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},10000); return{row:r,action:'approved',deadline:Date.now()+10000,timer,commit};});
   };
   const rejectReview=(r)=>{
     if(!sb)return;
     setReviewQueue(prev=>prev.filter(x=>x.id!==r.id));
-    const timer=setTimeout(()=>{
+    // V18 (§1.9.11): extended 5-min undo window for rejections — higher stakes than approvals
+    const REJECT_UNDO_MS=300000;
+    const commit=()=>{
       sb.from('photo_reviews').update({status:'rejected',reviewed_at:new Date().toISOString()}).eq('id',r.id);
       if(REVIEW_REJECT_PENALTY){
         sb.from('teams').select('score').eq('id',r.team_id).single().then(res=>{
@@ -1289,9 +1311,8 @@ function App(){
           sb.from('teams').update({score:newScore}).eq('id',r.team_id);
         });
       }
-      setReviewUndo(null);
-    },10000);
-    setReviewUndo({row:r,action:'rejected',deadline:Date.now()+10000,timer});
+    };
+    setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},REJECT_UNDO_MS); return{row:r,action:'rejected',deadline:Date.now()+REJECT_UNDO_MS,timer,commit};});
   };
   const undoReview=()=>{
     if(!reviewUndo)return;
@@ -1300,19 +1321,22 @@ function App(){
     setReviewUndo(null);
   };
 
-  const addActivity=(msg,pts=0,photoData=null)=>{
+  const addActivity=(msg,pts=0,photoData=null,locId=null)=>{
     const entry={
       team_id:myTeam?.id,message:msg,points:pts,
       created_at:new Date().toISOString(),
       team_emoji:myTeam?.emoji,team_name:myTeam?.name,
       team_color:myTeam?.color,
       photo:photoData||null,
+      loc_id:locId, // V18: tagged so finale MVP award can count unique locations
     };
     setActivityFeed(prev=>[entry,...prev].slice(0,50));
     // Only send to Supabase if the payload is manageable. Drop raw video blobs
     // (>500KB) to respect row limits; compressed photo thumbnails are fine.
     if(!OFFLINE&&sb){
       const shareable={...entry};
+      // V18: loc_id isn't in the activity_feed schema yet; strip before insert
+      delete shareable.loc_id;
       if(shareable.photo&&shareable.photo.length>600000){delete shareable.photo}
       sb.from('activity_feed').insert(shareable);
     }
@@ -1402,7 +1426,7 @@ function App(){
       }else{
         label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid!`;
       }
-      addActivity(label,isWrongZero?0:totalPts,photoData);
+      addActivity(label,isWrongZero?0:totalPts,photoData,locId);
     }
 
     if(!isDynamicBonus&&loc&&loc.ch[chIdx]?.t==='quiz'){
@@ -1545,6 +1569,8 @@ function App(){
   // V10/V12: bar-break trigger — admin signals a break at specific bar name
   // V12: persisted on game_state so all phones open the overlay at the same moment
   const[barBreakActive,setBarBreakActive]=useState(null); // {name, mini, started}
+  const[barBreakHidden,setBarBreakHidden]=useState(false); // V18: minimize overlay, show chip
+  useEffect(()=>{setBarBreakHidden(false);},[barBreakActive?.name,barBreakActive?.started]);
   const triggerBarBreak=useCallback((barName)=>{
     if(!isAdmin||!barName)return;
     const startedAt=Date.now();
@@ -1799,6 +1825,22 @@ function App(){
             ))}
           </div>
         )}
+
+        {/* V18 (§1.2.6): accidental join escape hatch — switch team before start */}
+        {myTeam&&!myTeam.spectator&&(
+          <div className="text-center" style={{marginTop:'var(--sp-3)'}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{
+              if(!confirm(`Je zit nu in ${myTeam.emoji} ${myTeam.name}. Wil je van team wisselen?`))return;
+              if(!OFFLINE&&sb&&typeof myTeam.id==='number'&&myTeam.id>=0){
+                sb.from('teams').delete().eq('id',myTeam.id).then(()=>{},()=>{});
+                setTeams(prev=>prev.filter(t=>t.id!==myTeam.id));
+              }
+              setMyTeam(null);
+              clearSession();
+              setScreen('setup');
+            }}>↩ Verkeerd team? Wissel</button>
+          </div>
+        )}
         <div style={{height:'var(--sp-7)'}}/>
 
         {isAdmin?(
@@ -1894,7 +1936,7 @@ function App(){
         </div>
         <div style={{textAlign:'center',minWidth:56}}>
           <div className="t-num" style={{fontSize:'var(--fs-24)',color:'var(--accent-2)',textShadow:'0 0 20px rgba(228,178,92,0.35)'}}>{myScore}</div>
-          <div className="t-label-sm" style={{marginTop:2}}>{myChallenges} · {visitedLocs.size} loc</div>
+          <div className="t-label-sm" style={{marginTop:2}}>pts</div>
         </div>
         <div style={{textAlign:'right',minWidth:64}}>
           {/* V17: Extra Tijd — tap to add +5 min to hot target */}
@@ -1903,7 +1945,8 @@ function App(){
             title={hotTarget?'+5 min extra tijd':'Geen actieve opdracht'}>
             ⏳ {timeCharges}/{timeChargeMax}
           </button>
-          <div className="t-label-sm" style={{marginTop:'var(--sp-1)'}}>{visitedLocs.size}/102</div>
+          {/* V18 (§1.5 batch 2): clarify 0/102 ambiguity — show challenges + POIs visited */}
+          <div className="t-label-sm" style={{marginTop:'var(--sp-1)'}}>{myChallenges} ch · {visitedLocs.size} POI</div>
         </div>
       </div>
 
@@ -1931,9 +1974,18 @@ function App(){
         </div>
       </div>
 
+      {/* V18 (V14 B1): FINALE pulsing banner — highly visible when phase 4 is live */}
+      {phase===4&&(
+        <div className="finale-pulse-banner" role="status" aria-live="polite">
+          <span style={{fontSize:16}}>🏆</span>
+          <span className="t-card-label" style={{letterSpacing:'var(--ls-wider)'}}>FINALE LIVE</span>
+          <span className="t-caption" style={{opacity:0.85}}>dichtste bij Jorik wint · sprint naar de cirkel</span>
+        </div>
+      )}
+
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} hotTarget={hotTarget} nowTs={nowTs}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage}/>}
@@ -1947,8 +1999,8 @@ function App(){
       {/* V5: Photo lightbox */}
       {photoLightbox&&<PhotoLightbox media={photoLightbox} onClose={()=>setPhotoLightbox(null)}/>}
 
-      {/* V10/V16: Bar-break overlay — now passes photo upload */}
-      {barBreakActive&&<BarBreakOverlay info={barBreakActive} onClose={()=>setBarBreakActive(null)} onComplete={(mini,pts,photo)=>{
+      {/* V10/V16/V18: Bar-break overlay — minimizable, persistent chip when hidden */}
+      {barBreakActive&&!barBreakHidden&&<BarBreakOverlay info={barBreakActive} onClose={()=>setBarBreakHidden(true)} onComplete={(mini,pts,photo)=>{
         setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+pts}));
         setScorePopup(`+${pts}`);
         addActivity(`haalde "${mini.title}" bij ${barBreakActive.name} · +${pts} pts`,pts,photo);
@@ -1956,6 +2008,21 @@ function App(){
           sb.from('teams').update({score:(scores[myTeam.id]||0)+pts}).eq('id',myTeam.id).then(()=>{},()=>{});
         }
       }}/>}
+      {/* V18: persistent bar-break chip — shows at top-left while minimized */}
+      {barBreakActive&&barBreakHidden&&(()=>{
+        const endsAt=(barBreakActive.started||Date.now())+BAR_BREAK_DURATION_MS;
+        const msLeft=Math.max(0,endsAt-nowTs);
+        const secLeft=Math.floor(msLeft/1000);
+        const urgent=secLeft<=60;
+        const label=secLeft>=60?`${Math.floor(secLeft/60)}m ${secLeft%60}s`:`${secLeft}s`;
+        return(
+          <div onClick={()=>setBarBreakHidden(false)}
+            style={{position:'fixed',top:OFFLINE?'calc(var(--sp-3) + 28px)':'var(--sp-3)',left:'50%',transform:'translateX(-50%)',zIndex:9999,padding:`var(--sp-2) var(--sp-4)`,borderRadius:'var(--r-pill)',background:urgent?'rgba(255,107,107,0.95)':'rgba(228,178,92,0.95)',color:'#0a0b10',fontSize:'var(--fs-13)',fontWeight:'var(--fw-bold)',boxShadow:'0 6px 20px rgba(0,0,0,0.5)',cursor:'pointer',display:'flex',alignItems:'center',gap:'var(--sp-2)',animation:urgent?'breathing 1s ease-in-out infinite':'none',maxWidth:'92%'}}>
+            🍻 Bar break · {barBreakActive.name} · ⏱ {label}
+            <span style={{opacity:0.7,fontSize:'var(--fs-11)'}}>tik om te openen</span>
+          </div>
+        );
+      })()}
 
       {/* V10: Finale ceremony (phase 5) */}
       {phase===5&&<FinaleScreen teams={teams} scores={scores} myTeam={myTeam} elapsed={elapsed} activityFeed={activityFeed} jorikTeamId={jorikTeamId}/>}
@@ -1997,8 +2064,17 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
   // V14 (A3): team members — a single textarea, one name per line
   const[membersText,setMembersText]=useState('');
   const parseMembers=()=>membersText.split(/[,\n]/).map(s=>s.trim()).filter(Boolean).slice(0,10);
-  // V12: editable name on a starter pack
+  // V12/V18: editable name on a starter pack — wired to UI via ✏️ chip on each pack card
   const[packNameOverride,setPackNameOverride]=useState({});
+  const renamePack=(p,e)=>{
+    if(e){e.stopPropagation();e.preventDefault();}
+    const current=packNameOverride[p.name]||p.name;
+    const input=prompt(`Nieuwe naam voor "${p.name}":`,current);
+    if(input===null)return;
+    const trimmed=input.trim();
+    if(!trimmed){setPackNameOverride(prev=>{const n={...prev};delete n[p.name];return n;});return;}
+    setPackNameOverride(prev=>({...prev,[p.name]:trimmed}));
+  };
   const usedEmojis=teams.map(t=>t.emoji);
   const usedNames=teams.map(t=>t.name.toLowerCase());
 
@@ -2075,7 +2151,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
   return(
     <div className="screen">
       <div className="text-center">
-        <div style={{fontSize:64,filter:'drop-shadow(0 6px 16px rgba(110,163,255,0.35))'}}>🎮</div>
+        <div style={{fontSize:64,filter:'drop-shadow(0 6px 16px rgba(228,178,92,0.35))'}}>💍</div>
         <h1 className="t-title animate-in" style={{marginTop:'var(--sp-3)'}}>Kies je team</h1>
         <p className="t-body animate-in animate-in-1" style={{marginTop:'var(--sp-2)'}}>Tik op een starter pack of maak je eigen</p>
       </div>
@@ -2096,13 +2172,31 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
           <div className="t-caption">optioneel · max 10</div>
         </div>
         <textarea value={membersText} onChange={e=>setMembersText(e.target.value)}
-          placeholder={"Jan\nPiet\nHenk"} rows={3}
-          className="t-body-emph"
+          placeholder={"Jan (captain)\nPiet\nHenk"} rows={3}
+          className="t-body-emph" aria-label="Teamleden, één naam per regel"
           style={{width:'100%',padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',outline:'none',fontFamily:'var(--font-body)',resize:'vertical',minHeight:72}}/>
         {parseMembers().length>0&&(
-          <div style={{display:'flex',flexWrap:'wrap',gap:'var(--sp-1)',marginTop:'var(--sp-3)'}}>
-            {parseMembers().map((m,i)=><span key={i} className="chip">{m}</span>)}
-          </div>
+          <>
+            <div className="t-caption" style={{marginTop:'var(--sp-2)'}}>👑 Eerste naam wordt captain · tik een chip om te promoveren</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:'var(--sp-1)',marginTop:'var(--sp-2)'}}>
+              {parseMembers().map((m,i)=>{
+                const isCaptain=i===0;
+                const promote=()=>{
+                  if(isCaptain)return;
+                  const all=parseMembers();
+                  const reordered=[m,...all.filter((x,j)=>j!==i)];
+                  setMembersText(reordered.join('\n'));
+                };
+                return(
+                  <button type="button" key={i} onClick={promote} className="chip"
+                    aria-label={isCaptain?`${m} is captain`:`Maak ${m} captain`}
+                    style={{cursor:isCaptain?'default':'pointer',border:isCaptain?'1px solid var(--accent)':'1px solid var(--border)',background:isCaptain?'var(--accent-glow)':'rgba(255,255,255,0.04)',color:isCaptain?'var(--accent-2)':'#fff',fontWeight:isCaptain?'var(--fw-bold)':'var(--fw-medium)'}}>
+                    {isCaptain&&<span style={{marginRight:4}}>👑</span>}{m}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
       <div style={{height:'var(--sp-5)'}}/>
@@ -2113,21 +2207,29 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
           <div className="starter-grid">
             {STARTER_PACKS.map((p,i)=>{
               const taken=usedEmojis.includes(p.emoji)||usedNames.includes(p.name.toLowerCase());
+              const shownName=packNameOverride[p.name]||p.name;
+              const renamed=!!packNameOverride[p.name];
+              const handleKey=(e)=>{if(!taken&&!busy&&(e.key==='Enter'||e.key===' ')){e.preventDefault();createFromPack(p);}};
               return(
-                <button key={i} className={`starter-card animate-in animate-in-${(i%4)+1} ${taken?'taken':''}`}
-                  onClick={()=>createFromPack(p)} disabled={taken||busy}
+                <div key={i} role="button" tabIndex={taken||busy?-1:0} aria-label={`${shownName} · kies dit team`} aria-disabled={taken||busy}
+                  className={`starter-card animate-in animate-in-${(i%4)+1} ${taken?'taken':''}`}
+                  onClick={()=>!taken&&!busy&&createFromPack(p)} onKeyDown={handleKey}
                   style={{borderColor:taken?'var(--border)':p.color,boxShadow:taken?'none':`0 8px 24px ${p.color}28,${p.color}12 0px 0px 0px 1px inset,var(--sh-ring)`}}>
+                  {!taken&&(
+                    <button type="button" className="starter-edit-btn" onClick={(e)=>renamePack(p,e)}
+                      aria-label={`Naam aanpassen voor ${shownName}`} title="Naam aanpassen">✏️</button>
+                  )}
                   <div className="starter-emoji">{p.emoji}</div>
-                  <div className="starter-name">{p.name}</div>
+                  <div className="starter-name">{shownName}</div>
+                  {renamed&&<div className="t-caption" style={{marginTop:2,color:p.color,fontSize:'var(--fs-10)'}}>({p.name})</div>}
                   <div className="starter-color" style={{background:p.color}}/>
                   {taken&&<div className="t-label-sm" style={{marginTop:'var(--sp-2)'}}>Bezet</div>}
-                </button>
+                </div>
               );
             })}
           </div>
           {err&&<div className="panel-sm t-body-emph t-danger text-center" style={{marginTop:'var(--sp-3)',background:'rgba(255,107,107,0.12)',borderColor:'rgba(255,107,107,0.35)'}}>⚠ {err}</div>}
           {busy&&<div className="t-caption text-center" style={{marginTop:'var(--sp-3)'}}>⏳ Team aanmaken…</div>}
-          <div className="t-caption text-center" style={{marginTop:'var(--sp-5)'}}>Liever zelf een naam verzinnen? <a onClick={()=>setMode('custom')} style={{color:'var(--foto-2)',cursor:'pointer',fontWeight:'var(--fw-semi)'}}>Eigen team maken</a></div>
         </div>
       )}
 
@@ -2182,7 +2284,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax,visitedLocs}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
   const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
@@ -2197,26 +2299,31 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 
   return(
     <div style={{height:'100%',overflowY:'auto',padding:'var(--sp-5)',paddingBottom:'var(--sp-10)'}}>
-      {/* Narrative ticker */}
+      {/* V18 (§1.5.2): narrative ticker — one-line HUD chip, no duplication with chapter modals */}
       {phaseStory&&(
-        <div className="story-ticker" onClick={()=>onShowStory&&onShowStory(phaseKey)} style={{cursor:'pointer',marginBottom:'var(--sp-3)'}}>
-          <div className="t-label-sm" style={{color:'var(--quiz)',marginBottom:'var(--sp-1)',letterSpacing:'var(--ls-widest)'}}>{phaseStory.chapter}</div>
-          <div className="t-card-label" style={{marginBottom:'var(--sp-1)'}}>{phaseStory.title}</div>
-          <div className="t-caption" style={{fontStyle:'italic'}}>Tik voor verhaal →</div>
-        </div>
+        <button type="button" onClick={()=>onShowStory&&onShowStory(phaseKey)}
+          className="story-ticker row-2"
+          style={{cursor:'pointer',marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',border:'1px solid var(--border)',borderRadius:'var(--r-pill)',background:'rgba(178,155,255,0.08)',width:'100%',textAlign:'left',color:'#fff'}}>
+          <span className="t-label-sm" style={{color:'var(--quiz)',letterSpacing:'var(--ls-wide)'}}>{phaseStory.chapter}</span>
+          <span className="t-caption flex-1 truncate" style={{color:'var(--text-secondary)'}}>{phaseStory.title}</span>
+          <span className="t-caption" style={{color:'var(--quiz)'}}>›</span>
+        </button>
       )}
 
-      {/* Next reward banner */}
-      {(myNextTier||nextGhost)&&(
+      {/* V18 (§1.5.3): next reward banner — motivational progress copy */}
+      {(myNextTier||nextGhost)&&(()=>{
+        const remainingTier=myNextTier?Math.max(0,myNextTier.min-myChallengesDone):0;
+        const remainingGhost=nextGhost?Math.max(0,nextGhost.score-myScore):0;
+        return(
         <div className="reward-card" style={{marginBottom:'var(--sp-3)'}}>
           <div className="reward-icon">{myNextTier?myNextTier.badge:'⏳'}</div>
           <div className="reward-info">
-            <div className="t-label-sm" style={{marginBottom:'var(--sp-1)'}}>Volgende beloning</div>
+            <div className="t-label-sm t-accent" style={{marginBottom:'var(--sp-1)'}}>Volgende beloning</div>
             <div className="t-card-label">
               {myNextTier?
-                `${myNextTier.name} bij ${myNextTier.min} challenges (${myChallengesDone}/${myNextTier.min})`
+                (remainingTier===0?`${myNextTier.name} · bijna!`:`Nog ${remainingTier} challenge${remainingTier===1?'':'s'} → ${myNextTier.badge} ${myNextTier.name}`)
                 :
-                `${nextGhost.label} (${myScore}/${nextGhost.score} pts)`
+                (remainingGhost===0?'Extra Tijd-lading · bijna!':`Nog ${remainingGhost} pts → ⏳ Extra Tijd`)
               }
             </div>
             <div className="reward-progress" style={{marginTop:'var(--sp-2)'}}>
@@ -2229,7 +2336,8 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Max tier banner */}
       {myTier&&!myNextTier&&(
@@ -2242,15 +2350,15 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         </div>
       )}
 
-      {/* Pending review */}
+      {/* V18 (§1.5.4): pending-review chip — one line, tap for detail */}
       {pendingMine>0&&(
-        <div className="panel-sm panel row-3" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(228,178,92,0.3)'}}>
-          <div style={{fontSize:22}}>⏳</div>
-          <div className="flex-1">
-            <div className="t-card-label t-accent">{pendingMine} foto{pendingMine===1?'':"'s"} in beoordeling</div>
-            <div className="t-caption" style={{marginTop:2}}>Punten zijn voorlopig toegekend · game master kan ze afkeuren</div>
-          </div>
-        </div>
+        <button type="button" onClick={()=>alert('Deze foto\'s zijn nog niet goedgekeurd door de game master. Je punten tellen voorlopig mee. Als een foto wordt afgekeurd, worden de punten afgetrokken.')}
+          className="row-2"
+          style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',border:'1px solid rgba(228,178,92,0.3)',borderRadius:'var(--r-pill)',background:'rgba(228,178,92,0.08)',width:'100%',cursor:'pointer',color:'#fff'}}>
+          <span style={{fontSize:14}}>⏳</span>
+          <span className="t-card-label t-accent flex-1" style={{textAlign:'left'}}>{pendingMine} foto{pendingMine===1?'':"'s"} in check</span>
+          <span className="t-caption">ⓘ</span>
+        </button>
       )}
 
       {/* Bar break banner */}
@@ -2269,10 +2377,10 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
           <div className="t-body" style={{marginTop:'var(--sp-1)'}}>Tik hier voor instructies · +{WEDDING_VIDEO_BONUS} pts</div>
         </div>
       )}
+      {/* V18 (§1.5.7): once done, shrink to a single-line chip (was full panel) */}
       {weddingDone&&(
-        <div className="panel-sm panel row-3" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(95,216,165,0.3)'}}>
-          <div style={{fontSize:20}}>✅</div>
-          <div className="t-card-label t-success">Geheime missie voltooid</div>
+        <div className="chip" style={{marginBottom:'var(--sp-3)',background:'rgba(95,216,165,0.12)',borderColor:'rgba(95,216,165,0.3)',color:'var(--success)',padding:'4px 10px',fontSize:'var(--fs-12)',alignSelf:'flex-start'}}>
+          ✅ Geheime missie voltooid
         </div>
       )}
 
@@ -2284,13 +2392,17 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         const teamChallenges=isMine?myChallengesDone:(t.challenges_completed||0);
         const teamTier=tierFor(teamChallenges);
         return(
-          <div key={t.id} className={`lb-card glass animate-in animate-in-${i+1} ${i===0?'lb-first':''}`}
+          <div key={t.id} className={`lb-card glass animate-in animate-in-${i+1} ${i===0?'lb-first':i===1?'lb-second':i===2?'lb-third':''}`}
             style={{borderLeft:`4px solid ${t.color}`}}>
-            <div className={`lb-rank ${i===0?'lb-rank-1':i===1?'lb-rank-2':i===2?'lb-rank-3':'lb-rank-other'}`}>#{i+1}</div>
+            <div className={`lb-rank ${i===0?'lb-rank-1':i===1?'lb-rank-2':i===2?'lb-rank-3':'lb-rank-other'}`}>
+              {i<3&&<span className="lb-medal">{['🥇','🥈','🥉'][i]}</span>}#{i+1}
+            </div>
             <div className="lb-emoji">{t.emoji}</div>
             <div className="lb-info">
-              <div className="lb-name" style={{display:'flex',alignItems:'center',flexWrap:'wrap'}}>
-                {t.name} {isMine?'(jij)':''}
+              <div className="lb-name" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:'var(--sp-2)'}}>
+                <span>{t.name}</span>
+                {/* V18 (§1.5.6): "JIJ" chip with strong contrast (was dim "(jij)" suffix) */}
+                {isMine&&<span className="chip" style={{padding:'1px 7px',fontSize:'var(--fs-10)',fontWeight:'var(--fw-bold)',background:'var(--accent-glow)',borderColor:'var(--accent)',color:'var(--accent-2)'}}>JIJ</span>}
                 {teamTier&&(
                   <span className="tier-badge" style={{color:teamTier.color,borderColor:teamTier.color+'66'}}>
                     <span className="tier-emoji">{teamTier.badge}</span>{teamTier.name}
@@ -2312,6 +2424,28 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         <div style={{textAlign:'center',padding:40,color:'var(--text-tertiary)'}}>
           <div style={{fontSize:48,marginBottom:16}}>🏆</div>
           <div>Nog geen scores</div>
+        </div>
+      )}
+
+      {/* V18 (Batch 5): Rotterdam Deck — visited-POI sticker collection */}
+      {visitedLocs&&visitedLocs.size>0&&(
+        <div style={{marginTop:'var(--sp-7)'}}>
+          <div className="row-between" style={{marginBottom:'var(--sp-3)'}}>
+            <div className="t-label">🗺️ Rotterdam Deck</div>
+            <div className="t-caption">{visitedLocs.size} / {L_DATA.length} ontgrendeld</div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(60px,1fr))',gap:6}}>
+            {L_DATA.slice(0,24).map(loc=>{
+              const unlocked=visitedLocs.has(loc.id);
+              return(
+                <div key={loc.id} className="animate-in" title={unlocked?loc.n:'nog niet bezocht'}
+                  style={{aspectRatio:'1/1',display:'flex',alignItems:'center',justifyContent:'center',background:unlocked?'linear-gradient(155deg,rgba(228,178,92,0.18),rgba(228,178,92,0.04))':'rgba(255,255,255,0.03)',border:`1px solid ${unlocked?'rgba(228,178,92,0.45)':'rgba(255,255,255,0.08)'}`,borderRadius:'var(--r-md)',fontSize:22,filter:unlocked?'none':'grayscale(1) opacity(0.3)',boxShadow:unlocked?'0 2px 10px rgba(228,178,92,0.15)':'none'}}>
+                  {unlocked?loc.e:'·'}
+                </div>
+              );
+            })}
+          </div>
+          {L_DATA.length>24&&<div className="t-caption t-muted text-center" style={{marginTop:'var(--sp-2)'}}>+{L_DATA.length-24} meer te ontdekken</div>}
         </div>
       )}
     </div>
@@ -2351,6 +2485,18 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
       if(types.includes('quiz'))return '#9b7bea';
       return '#d4a054';
     };
+    // V18: cluster group — collapses overlapping POIs at low zoom, spiderfies at high zoom
+    const cluster=(typeof L.markerClusterGroup==='function')?L.markerClusterGroup({
+      maxClusterRadius:45,
+      showCoverageOnHover:false,
+      spiderfyOnMaxZoom:true,
+      disableClusteringAtZoom:17,
+      iconCreateFunction:(c)=>{
+        const n=c.getChildCount();
+        const size=n>=20?44:n>=10?38:32;
+        return L.divIcon({html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:rgba(228,178,92,0.85);border:2px solid rgba(255,255,255,0.85);color:#0a0b10;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:${n>=20?16:14}px;box-shadow:0 4px 14px rgba(0,0,0,0.5)">${n}</div>`,className:'',iconSize:[size,size]});
+      }
+    }):null;
     L_DATA.forEach(loc=>{
       const col=catColorHex(loc);
       const mk=L.marker([loc.la,loc.lo],{
@@ -2358,12 +2504,14 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
           // V12: bigger dot (16px) + 8px invisible padding → 32×32 hit target
           html:`<div style="padding:8px;margin:-8px"><div style="width:16px;height:16px;border-radius:50%;background:${col};border:2px solid rgba(255,255,255,0.35);cursor:pointer;box-shadow:0 0 8px ${col}66;transition:all .2s"></div></div>`
         })
-      }).addTo(m);
+      });
       mk.on('click',()=>onSelect(loc.id));
       mk._locId=loc.id;
       mk._color=col;
       markersRef.current.push(mk);
+      if(cluster)cluster.addLayer(mk);else mk.addTo(m);
     });
+    if(cluster)cluster.addTo(m);
 
     // V12: Dinner zone circle — only rendered once phase unlocks it
     // (stored on the ref so the phase-watch effect can show/hide it)
@@ -2498,10 +2646,11 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
       return{...prev,[key]:{...cur,[emoji]:(cur[emoji]||0)+(mine?-1:1)}};
     });
   };
-  // Apply filter
+  // Apply filter — V18 (§1.8.3): also support 'others' = alleen andere teams
   const filtered=feed.filter(item=>{
     if(filter==='photos')return !!item.photo;
     if(filter==='mine')return item.team_id===myTeamId;
+    if(filter==='others')return item.team_id&&item.team_id!==myTeamId&&item.team_id!==-1;
     return true;
   });
   const photos=feed.filter(i=>!!i.photo);
@@ -2513,11 +2662,12 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
         <div className="t-caption">{feed.length} berichten · {photos.length} foto's</div>
       </div>
 
-      {/* Filter pills */}
+      {/* Filter pills — V18: added 'Andere teams' to scout the competition */}
       <div className="filter-pills">
         <button className={`filter-pill ${filter==='all'?'active':''}`} onClick={()=>setFilter('all')}>Alles</button>
         <button className={`filter-pill ${filter==='photos'?'active':''}`} onClick={()=>setFilter('photos')}>📸 Foto's</button>
         <button className={`filter-pill ${filter==='mine'?'active':''}`} onClick={()=>setFilter('mine')}>Mijn team</button>
+        <button className={`filter-pill ${filter==='others'?'active':''}`} onClick={()=>setFilter('others')}>👀 Andere teams</button>
       </div>
 
       {/* Photo grid preview */}
@@ -2650,7 +2800,17 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
   const[showTeamAdmin,setShowTeamAdmin]=React.useState(false);
   const[undoLeft,setUndoLeft]=React.useState(0);
   const[broadcastMsg,setBroadcastMsg]=React.useState('');
+  // V18 (§1.9.10): queue filter — 'all' | 'green' | 'yellow' | 'red'
+  // V18 audit-fix: unknown distance (gps_distance==null) groups with 'red' — treat-as-suspicious default
+  const[reviewFilter,setReviewFilter]=React.useState('all');
   const barOptions=getBarOptions();
+  const classifyDist=(d)=>d==null?'red':d<=PHOTO_GATE_RADIUS?'green':d<=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE?'yellow':'red';
+  const filteredQueue=reviewFilter==='all'?queue:queue.filter(r=>classifyDist(r.gps_distance)===reviewFilter);
+  const queueCounts={
+    green:queue.filter(r=>classifyDist(r.gps_distance)==='green').length,
+    yellow:queue.filter(r=>classifyDist(r.gps_distance)==='yellow').length,
+    red:queue.filter(r=>classifyDist(r.gps_distance)==='red').length,
+  };
 
   // V12: countdown for the undo banner
   React.useEffect(()=>{
@@ -2669,7 +2829,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
           <div className="flex-1 t-body-emph" style={{color:reviewUndo.action==='approved'?'var(--success)':'var(--danger)'}}>
             {reviewUndo.action==='approved'?'✓ Goedgekeurd':'✗ Afgekeurd'}: {reviewUndo.row.team_name} · {reviewUndo.row.challenge_title}
           </div>
-          <button onClick={onUndoReview} className="btn btn-ghost btn-sm">↶ Ongedaan ({undoLeft}s)</button>
+          <button onClick={onUndoReview} className="btn btn-ghost btn-sm">↶ Ongedaan ({undoLeft>=60?`${Math.floor(undoLeft/60)}m ${undoLeft%60}s`:`${undoLeft}s`})</button>
         </div>
       )}
 
@@ -2682,17 +2842,17 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
           <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>
             Jorik is nu: {jorikTeamId==null?<span className="t-muted">loopt alleen</span>:(()=>{const t=teams.find(x=>x.id===jorikTeamId);return t?<span style={{color:t.color,fontWeight:'var(--fw-bold)'}}>{t.emoji} {t.name}</span>:<span>onbekend</span>;})()}
           </div>
-          <div className="row-2" style={{flexWrap:'wrap',overflowX:'auto'}}>
+          <div className="row-2" style={{flexWrap:'nowrap',overflowX:'auto',paddingBottom:'var(--sp-1)',scrollbarWidth:'thin',WebkitOverflowScrolling:'touch'}}>
             {teams.filter(t=>t.id>0).map(t=>(
               <button key={t.id} onClick={()=>onMoveJorik&&onMoveJorik(t.id)}
                 className="t-body-emph"
-                style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:jorikTeamId===t.id?`2px solid ${t.color}`:'1px solid var(--border)',background:jorikTeamId===t.id?t.color+'22':'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)'}}>
+                style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:jorikTeamId===t.id?`2px solid ${t.color}`:'1px solid var(--border)',background:jorikTeamId===t.id?t.color+'22':'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)',flexShrink:0}}>
                 {t.emoji} {t.name}
               </button>
             ))}
             <button onClick={()=>onMoveJorik&&onMoveJorik(null)}
               className="t-body-emph t-muted"
-              style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)'}}>
+              style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:'1px dashed rgba(255,255,255,0.3)',background:'transparent',cursor:'pointer',whiteSpace:'nowrap',fontSize:'var(--fs-13)',flexShrink:0}}>
               👤 alleen
             </button>
           </div>
@@ -2766,6 +2926,15 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
           )}
         </div>
 
+        {/* V18: Admin pause — broadcasts a pause message to all teams (not a full time-pause; signals a stop) */}
+        <div>
+          <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Pauze</div>
+          <div className="row-2">
+            <button onClick={()=>onBroadcast&&onBroadcast('⏸️ PAUZE — iedereen stopt even met scores')} className="btn btn-ghost btn-sm flex-1">⏸ Pauze</button>
+            <button onClick={()=>onBroadcast&&onBroadcast('▶️ GO — verder spelen!')} className="btn btn-ghost btn-sm flex-1">▶ Hervat</button>
+          </div>
+        </div>
+
         {/* Finale */}
         <div>
           <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Finale & uitslag</div>
@@ -2785,6 +2954,23 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
         <div className="t-caption" style={{textAlign:'right',lineHeight:'var(--lh-snug)'}}>Goedkeuren = punten blijven<br/>Afkeuren = punten worden ingetrokken</div>
       </div>
 
+      {/* V18 (§1.9.10): filter chips — focus on suspicious first */}
+      {queue.length>0&&(
+        <div className="row-2" style={{marginBottom:'var(--sp-4)',flexWrap:'wrap'}}>
+          {[
+            {k:'all',l:`Alles · ${queue.length}`,c:'rgba(255,255,255,0.08)',b:'var(--border)'},
+            {k:'green',l:`🟢 Nabij · ${queueCounts.green}`,c:'rgba(95,216,165,0.15)',b:'rgba(95,216,165,0.35)'},
+            {k:'yellow',l:`🟡 Rand · ${queueCounts.yellow}`,c:'rgba(228,178,92,0.15)',b:'rgba(228,178,92,0.35)'},
+            {k:'red',l:`🔴 Ver · ${queueCounts.red}`,c:'rgba(255,107,107,0.15)',b:'rgba(255,107,107,0.35)'},
+          ].map(o=>(
+            <button key={o.k} onClick={()=>setReviewFilter(o.k)} className="t-body-emph"
+              style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-pill)',border:`1px solid ${o.b}`,background:reviewFilter===o.k?o.c:'rgba(255,255,255,0.02)',color:'#fff',cursor:'pointer',fontSize:'var(--fs-12)',opacity:reviewFilter===o.k?1:0.7}}>
+              {o.l}
+            </button>
+          ))}
+        </div>
+      )}
+
       {queue.length===0&&(
         <div className="panel text-center" style={{padding:'var(--sp-7)'}}>
           <div style={{fontSize:48}}>✅</div>
@@ -2793,7 +2979,13 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
         </div>
       )}
 
-      {queue.map(r=>{
+      {queue.length>0&&filteredQueue.length===0&&(
+        <div className="panel text-center" style={{padding:'var(--sp-5)'}}>
+          <div className="t-body">Geen items in dit filter</div>
+        </div>
+      )}
+
+      {filteredQueue.map(r=>{
         const dist=r.gps_distance;
         const distClass=dist==null?'':dist<=PHOTO_GATE_RADIUS?'review-dist-good':dist<=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE?'review-dist-warn':'review-dist-bad';
         return(
@@ -2823,7 +3015,15 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 
             <div className="review-actions">
               <button className="btn btn-danger btn-sm" onClick={()=>{if(confirm(`Foto van ${r.team_name} afkeuren? -${r.points_awarded} pts.`))onReject(r)}}>✗ Afkeuren</button>
-              <button className="btn btn-cyan btn-sm" onClick={()=>onApprove(r)}>✓ Goedkeuren</button>
+              {/* V18 (§1.9.4): confirm approve only when submission is suspicious (no photo OR >100m off) */}
+              <button className="btn btn-cyan btn-sm" onClick={()=>{
+                const suspicious=!r.photo_url||(typeof r.gps_distance==='number'&&r.gps_distance>100);
+                if(suspicious){
+                  const reason=!r.photo_url?'er is geen foto bijgevoegd':`de afstand was ${r.gps_distance}m (>100m)`;
+                  if(!confirm(`Weet je zeker dat je deze goedkeurt? ${reason}.`))return;
+                }
+                onApprove(r);
+              }}>✓ Goedkeuren</button>
             </div>
           </div>
         );
@@ -2878,9 +3078,15 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
           const ptsEarned=completedPts[idx];
           const wasWrong=done && ptsEarned===0;
 
+          // V18 (V14 A5): show the full unlock chain when the quiz is locked
+          const photoGate=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE;
+          const farFromPoi=locked&&!isAdmin&&dist!=null&&dist>photoGate;
+          const lockMsg=farFromPoi
+            ?`🔒 Loop naar ${loc.n} · foto maken · dan opent de quiz`
+            :'🔒 Eerst een foto-opdracht — dan opent de quiz';
           return(
             <div key={idx} className={`ch-card ${done&&!wasWrong?'completed':''} ${wasWrong?'wrong-done':''} ${locked?'locked':''}`} style={{position:'relative'}}>
-              {locked&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1}} className="t-card-label t-accent">🔒 Eerst een foto-opdracht!</div>}
+              {locked&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1,padding:'var(--sp-3)',textAlign:'center'}} className="t-card-label t-accent" title="Unlock volgorde: locatie bereiken → foto maken → quiz wordt open">{lockMsg}</div>}
               <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-2)'}}>
                 <div className="flex-1">
                   <span className={`ch-type ch-type-${ch.t}`}>{ch.t}</span>
@@ -3035,7 +3241,17 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
             </button>
           );
         })}
-        {quizFeedback==='wrong'&&<div className="t-body-emph t-danger" style={{marginTop:'var(--sp-3)'}}>❌ Helaas. Het juiste antwoord was: {ch.a} · 0 pts</div>}
+        {quizFeedback==='wrong'&&(
+          <div style={{marginTop:'var(--sp-3)'}}>
+            <div className="t-body-emph t-danger">❌ Helaas. Het juiste antwoord was: {ch.a} · 0 pts</div>
+            {/* V18 (§1.7.5): "Waarom?" — open a search on the correct answer + context so players can learn it */}
+            <a href={`https://www.google.com/search?q=${encodeURIComponent(`${ch.a} ${loc?.n||''} ${ch.ti} Rotterdam`)}`}
+              target="_blank" rel="noopener noreferrer"
+              className="t-caption" style={{display:'inline-block',marginTop:'var(--sp-2)',color:'var(--foto-2)',textDecoration:'underline',cursor:'pointer'}}>
+              ⓘ Waarom? Zoek uitleg op
+            </a>
+          </div>
+        )}
         {quizFeedback==='correct'&&<div className="t-body-emph t-success" style={{marginTop:'var(--sp-3)'}}>✅ Correct! +{ch.p} pts</div>}
       </div>
     );
@@ -3081,7 +3297,9 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
 // ═══════════════════════════════════════════
 function WeddingMission({onClose,onComplete,done,jorikInTeam}){
   const fileRef=useRef(null);
+  const retakeRef=useRef(null);
   const[uploaded,setUploaded]=useState(false);
+  const[retakeCount,setRetakeCount]=useState(0); // V18: show confirmation when retaking
 
   return(
     <>
@@ -3119,13 +3337,28 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam}){
         {!done&&!uploaded&&(
           <>
             <input ref={fileRef} type="file" accept="video/*" capture="environment" style={{display:'none'}}
-              onChange={e=>{if(e.target.files[0]){setUploaded(true);onComplete()}}}/>
+              onChange={e=>{if(e.target.files[0]){setUploaded(true);onComplete&&onComplete()}}}/>
             <button className="btn btn-cyan btn-lg" onClick={()=>!jorikInTeam&&fileRef.current?.click()} disabled={jorikInTeam} style={{width:'100%'}}>
               {jorikInTeam?'🚫 Wacht tot Jorik weg is':`🎬 Video opnemen (+${WEDDING_VIDEO_BONUS} pts)`}
             </button>
           </>
         )}
-        {(done||uploaded)&&<div className="panel-sm text-center t-success t-body-emph" style={{background:'rgba(95,216,165,0.1)',borderColor:'rgba(95,216,165,0.3)'}}>✅ Video opgenomen! Dankjewel!</div>}
+        {(done||uploaded)&&(
+          <div className="stack-2">
+            <div className="panel-sm text-center t-success t-body-emph" style={{background:'rgba(95,216,165,0.1)',borderColor:'rgba(95,216,165,0.3)'}}>
+              ✅ Video opgenomen! Dankjewel!{retakeCount>0&&<div className="t-label-sm" style={{marginTop:4,opacity:0.8}}>· {retakeCount}× opnieuw gedaan</div>}
+            </div>
+            {/* V18: retake button — new take replaces the previous; no extra points */}
+            <input ref={retakeRef} type="file" accept="video/*" capture="environment" style={{display:'none'}}
+              onChange={e=>{if(e.target.files[0]){setRetakeCount(c=>c+1)}}}/>
+            <button className="btn btn-ghost btn-sm"
+              onClick={()=>{if(jorikInTeam)return;if(confirm('Nieuwe opname vervangt de vorige (geen extra punten). Doorgaan?'))retakeRef.current?.click()}}
+              disabled={jorikInTeam} style={{width:'100%'}}>
+              {jorikInTeam?'🚫 Wacht tot Jorik weg is':'🔁 Nieuwe opname maken'}
+            </button>
+            <div className="t-caption t-muted text-center">Je hebt de punten al verdiend · opnieuw opnemen geeft geen bonus</div>
+          </div>
+        )}
 
         <button className="btn btn-ghost" onClick={onClose} style={{width:'100%',marginTop:'var(--sp-3)'}}>Sluiten</button>
       </div>
@@ -3167,7 +3400,7 @@ function BarBreakOverlay({info,onClose,onComplete}){
         <div className="t-label t-accent" style={{textAlign:'center'}}>🍻 Bar break</div>
         <div className="t-title" style={{marginTop:'var(--sp-2)',background:'linear-gradient(135deg,var(--accent-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
         <div className="chip" style={{margin:`var(--sp-4) auto var(--sp-5)`,color:urgent?'var(--danger)':'var(--accent-2)',borderColor:urgent?'rgba(255,107,107,0.4)':'rgba(228,178,92,0.35)',background:urgent?'rgba(255,107,107,0.12)':'var(--accent-glow)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>⏱ {secLeft>=60?`${Math.floor(secLeft/60)}m ${secLeft%60}s`:`${secLeft}s`} over</div>
-        <div className="t-body" style={{textAlign:'center',fontStyle:'italic',marginBottom:'var(--sp-5)'}}>Drie bonus-opdrachten · alle drie mogen</div>
+        <div className="t-body" style={{textAlign:'center',fontStyle:'italic',marginBottom:'var(--sp-5)'}}>Drie bonus-opdrachten · doe er zoveel als je wilt · elke telt apart</div>
         <div className="stack-3" style={{textAlign:'left'}}>
           {info.mini.map((m,i)=>{
             const isDone=done.has(i);
@@ -3205,8 +3438,45 @@ function BarBreakOverlay({info,onClose,onComplete}){
 function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   const winner=sorted[0];
-  const photos=(activityFeed||[]).filter(a=>a.photo).slice(0,9);
+  // V18: full carousel — top-scoring photos first, expand/collapse
+  const allPhotos=(activityFeed||[]).filter(a=>a.photo).slice().sort((a,b)=>(b.points||0)-(a.points||0));
+  const[photosExpanded,setPhotosExpanded]=useState(false);
+  const initialPhotoCount=12;
+  const photos=photosExpanded?allPhotos:allPhotos.slice(0,initialPhotoCount);
   const totalChallenges=(activityFeed||[]).filter(a=>a.points>0).length;
+
+  // V18 (§1.11.4): MVP sub-awards — fun side-prizes from the activity feed
+  const awards=React.useMemo(()=>{
+    const byTeam={}; // teamId -> {teamRef, photos, videos, locations:Set, bestSingle, quizStreak, totalPoints}
+    teams.forEach(t=>{byTeam[t.id]={team:t,photos:0,videos:0,locs:new Set(),best:0,totalPts:0};});
+    (activityFeed||[]).forEach(a=>{
+      if(!a||a.team_id==null)return;
+      const rec=byTeam[a.team_id];if(!rec)return;
+      if(a.photo){if(isVideoData(a.photo))rec.videos++;else rec.photos++;}
+      if(a.points>0){rec.totalPts+=a.points;if(a.points>rec.best)rec.best=a.points;}
+      if(a.loc_id!=null)rec.locs.add(a.loc_id);
+    });
+    const arr=Object.values(byTeam);
+    const pickMax=(fn,label,icon,desc)=>{const r=arr.reduce((m,x)=>fn(x)>fn(m)?x:m,arr[0]);return fn(r)>0?{team:r.team,value:fn(r),label,icon,desc}:null;};
+    return[
+      pickMax(r=>r.photos,'Foto-koning 📸','📸','meeste foto\'s geüpload'),
+      pickMax(r=>r.videos,'Video-regisseur 🎥','🎥','meeste videos geüpload'),
+      pickMax(r=>r.locs.size,'Ontdekkingsreiziger 🗺️','🗺️','meeste unieke locaties bezocht'),
+      pickMax(r=>r.best,'Grootste schot 💥','💥','hoogste score in één opdracht'),
+    ].filter(Boolean);
+  },[teams,activityFeed]);
+
+  // V18 (§1.11.3): lightweight share-text helper
+  const onShare=async()=>{
+    const lines=[`🏆 Jorik's Stadsspel — Eindstand`];
+    sorted.slice(0,3).forEach((t,i)=>lines.push(`${['🥇','🥈','🥉'][i]} ${t.emoji} ${t.name} · ${t.score} pts`));
+    lines.push(`${fmtHM(elapsed)} gespeeld · ${totalChallenges} uitdagingen voltooid`);
+    const text=lines.join('\n');
+    try{
+      if(navigator.share){await navigator.share({title:'Stadsspel Rotterdam',text});}
+      else{await navigator.clipboard.writeText(text);alert('Gekopieerd naar klembord');}
+    }catch(e){/* user cancelled or not supported */}
+  };
 
   return(
     <div style={{position:'fixed',inset:0,zIndex:10010,overflow:'auto',background:'radial-gradient(circle at 50% 20%,rgba(228,178,92,0.15),transparent 60%),radial-gradient(circle at 30% 80%,rgba(178,155,255,0.12),transparent 50%),var(--bg)'}}>
@@ -3216,12 +3486,16 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
         <div className="t-body" style={{marginTop:'var(--sp-3)',marginBottom:'var(--sp-7)'}}>{fmtHM(elapsed)} gespeeld · {teams.length} teams · {totalChallenges} voltooide uitdagingen</div>
 
         {winner&&(
-          <div className="glass-strong animate-in" style={{padding:'var(--sp-7)',marginBottom:'var(--sp-6)',borderColor:winner.color+'88',background:`linear-gradient(135deg,${winner.color}20,rgba(10,14,39,0.9))`}}>
-            <div className="t-label t-accent">🏆 Winnaar</div>
-            <div style={{fontSize:64,marginTop:'var(--sp-2)',animation:'float 3s ease-in-out infinite'}}>{winner.emoji}</div>
-            <div className="t-title" style={{color:winner.color,marginTop:'var(--sp-2)'}}>{winner.name}</div>
-            <div className="t-body" style={{marginTop:'var(--sp-2)',marginBottom:'var(--sp-3)'}}>Vriend van de Bruidegom · Eeuwige Roem</div>
-            <div className="t-num t-accent" style={{fontSize:'var(--fs-48)'}}>{winner.score}<span className="t-body" style={{marginLeft:6}}>pts</span></div>
+          <div className="glass-strong animate-in" style={{position:'relative',padding:'var(--sp-7)',marginBottom:'var(--sp-6)',borderColor:winner.color+'88',background:`linear-gradient(135deg,${winner.color}20,rgba(10,14,39,0.9)),rgba(0,0,0,0.45)`,overflow:'hidden'}}>
+            {/* V18: dark readability overlay so winner name stays legible on any team color */}
+            <div aria-hidden="true" style={{position:'absolute',inset:0,background:'radial-gradient(ellipse at center,rgba(0,0,0,0.35),rgba(0,0,0,0.55))',pointerEvents:'none'}}/>
+            <div style={{position:'relative'}}>
+              <div className="t-label t-accent">🏆 Winnaar</div>
+              <div style={{fontSize:64,marginTop:'var(--sp-2)',animation:'float 3s ease-in-out infinite',filter:'drop-shadow(0 4px 10px rgba(0,0,0,0.6))'}}>{winner.emoji}</div>
+              <div className="t-title" style={{color:winner.color,marginTop:'var(--sp-2)',textShadow:'0 2px 8px rgba(0,0,0,0.9),0 0 2px rgba(0,0,0,0.8)'}}>{winner.name}</div>
+              <div className="t-body" style={{marginTop:'var(--sp-2)',marginBottom:'var(--sp-3)',textShadow:'0 1px 6px rgba(0,0,0,0.8)'}}>Vriend van de Bruidegom · Eeuwige Roem</div>
+              <div className="t-num t-accent" style={{fontSize:'var(--fs-48)',textShadow:'0 2px 10px rgba(0,0,0,0.8)'}}>{winner.score}<span className="t-body" style={{marginLeft:6}}>pts</span></div>
+            </div>
           </div>
         )}
 
@@ -3238,17 +3512,48 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
           </div>
         ))}
 
+        {/* V18 (§1.11.4): MVP sub-awards — highlight side-achievements */}
+        {awards.length>0&&(
+          <div style={{marginTop:'var(--sp-7)'}}>
+            <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>🎖 MVP-prijzen</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:'var(--sp-3)'}}>
+              {awards.map((a,i)=>(
+                <div key={i} className="panel animate-in" style={{textAlign:'center',padding:'var(--sp-4)',borderColor:a.team.color+'66',background:`linear-gradient(155deg,${a.team.color}18,rgba(255,255,255,0.02))`,animationDelay:`${i*0.08}s`}}>
+                  <div style={{fontSize:32}}>{a.icon}</div>
+                  <div className="t-card-label" style={{marginTop:'var(--sp-2)'}}>{a.label}</div>
+                  <div className="t-caption t-muted" style={{marginTop:2}}>{a.desc}</div>
+                  <div className="t-body-emph" style={{marginTop:'var(--sp-2)',color:a.team.color}}>{a.team.emoji} {a.team.name}</div>
+                  <div className="t-label-sm t-accent">{a.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* V18 (§1.11.3): share results — uses Web Share API or falls back to clipboard */}
+        <div className="row-2" style={{marginTop:'var(--sp-5)',justifyContent:'center'}}>
+          <button onClick={onShare} className="btn btn-ghost btn-sm">📤 Deel eindstand</button>
+        </div>
+
         {photos.length>0&&(
           <div style={{marginTop:'var(--sp-7)'}}>
-            <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>📸 Momenten van de dag</div>
+            <div className="row-between" style={{marginBottom:'var(--sp-3)'}}>
+              <div className="t-label">📸 Momenten van de dag</div>
+              <div className="t-label-sm t-muted">{photosExpanded?allPhotos.length:Math.min(initialPhotoCount,allPhotos.length)} / {allPhotos.length}</div>
+            </div>
             <div className="photo-grid">
               {photos.map((p,i)=>(
-                <div key={i} className="photo-grid-item" style={{animationDelay:`${i*0.05}s`}}>
+                <div key={i} className="photo-grid-item" style={{animationDelay:`${Math.min(i,20)*0.05}s`}}>
                   {isVideoData(p.photo)?<video src={p.photo} muted/>:<img src={p.photo} alt=""/>}
                   <div className="photo-grid-overlay"><span>{p.team_emoji||'🎮'}</span>{p.points>0&&<span className="t-accent">+{p.points}</span>}</div>
                 </div>
               ))}
             </div>
+            {allPhotos.length>initialPhotoCount&&(
+              <button onClick={()=>setPhotosExpanded(v=>!v)} className="btn btn-ghost" style={{width:'100%',marginTop:'var(--sp-3)'}}>
+                {photosExpanded?'Minder tonen ▲':`Toon alle ${allPhotos.length} foto's ▼`}
+              </button>
+            )}
           </div>
         )}
 
