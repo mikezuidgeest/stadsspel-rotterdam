@@ -1274,6 +1274,13 @@ function App(){
   const[celebration,setCelebration]=useState(null); // {emoji,title,sub,breakdown,confetti}
   const[quizStreak,setQuizStreak]=useState(0); // consecutive correct quizzes
   const[lastLevelSeen,setLastLevelSeen]=useState(null); // for level-up detection
+  // V29 (§1): useRef latch for level-up dedup. The old setState-only latch
+  // raced on rapid score echoes — when Supabase realtime pushed score updates
+  // back-to-back, multiple useEffect fires would all read the same stale
+  // `lastLevelSeen` closure (pre-commit) and each call addActivity once, giving
+  // the "Beunhazen is level 2 · Zoeker geworden!" ×3 bug in Mike's screenshot.
+  // The ref is updated synchronously, so the second firing sees the new level.
+  const lastLevelSeenRef=useRef(null);
   const[nowTs,setNowTs]=useState(Date.now()); // tick state for countdown clocks
   const tapGuardRef=useRef(0); // V14: A4 — prevents repeated-click loss during re-render
   // V17: hot target = the timed "next thing to do". {locId, chIdx, deadline, assignedAt}
@@ -2211,12 +2218,19 @@ function App(){
     }
   };
 
-  // V14: level-up watcher (B2)
+  // V14: level-up watcher (B2) — V29 (§1): useRef latch for dedup
   useEffect(()=>{
     const myScoreNow=scores[myTeam?.id]||0;
     const lv=levelFor(myScoreNow);
-    if(lastLevelSeen==null){setLastLevelSeen(lv.level);return;}
-    if(lv.level>lastLevelSeen){
+    // V29: synchronous ref read/write kills the stale-closure race that
+    // caused 3× level-up toasts on rapid score echoes.
+    if(lastLevelSeenRef.current==null){
+      lastLevelSeenRef.current=lv.level;
+      setLastLevelSeen(lv.level); // keep state in sync for any renders that read it
+      return;
+    }
+    if(lv.level>lastLevelSeenRef.current){
+      lastLevelSeenRef.current=lv.level; // latch BEFORE any side-effect fires
       setLastLevelSeen(lv.level);
       celebrate({
         emoji:lv.emoji,
@@ -2765,6 +2779,12 @@ function App(){
 
 
   const startGame=()=>{
+    // V29 (§1): guard against double-fire. The old startGame would run again
+    // if the admin tapped Start twice, or if a BroadcastChannel tab-echo
+    // bounced back to the initiating tab, giving the "Het spel is begonnen! 🎮"
+    // ×2 bug in Mike's screenshot. If phase is already >0 we're mid-game;
+    // the second call is a no-op.
+    if(phase>0)return;
     const now=Date.now();
     setGameStart(now);
     setPhase(1);
@@ -4041,25 +4061,11 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
         <button className={`filter-pill ${filter==='others'?'active':''}`} onClick={()=>setFilter('others')}>👀 Andere teams</button>
       </div>
 
-      {/* Photo grid preview */}
-      {filter==='all'&&photos.length>0&&(
-        <div style={{marginBottom:'var(--sp-5)'}}>
-          <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Recente foto's</div>
-          <div className="photo-grid">
-            {photos.slice(0,9).map((item,i)=>(
-              <div key={i} className="photo-grid-item animate-in" onClick={()=>onPhoto&&onPhoto(item.photo)}>
-                {isVideoData(item.photo)
-                  ?<video src={item.photo} muted/>
-                  :<img src={item.photo} alt="submission"/>}
-                <div className="photo-grid-overlay">
-                  <span>{item.team_emoji||'🎮'}</span>
-                  {item.points>0&&<span className="t-accent">+{item.points}</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* V29 (§3): removed "Recente foto's" grid. Photos already render
+          inline in the activity feed rows below — showing them twice (once
+          in a grid preview, once in the row) gave the duplicate-photo look
+          in Mike's screenshot 3. Filter pill "📸 Foto's" still lets the
+          user see a photos-only view. */}
 
       {filtered.length===0&&(
         <div className="panel text-center" style={{padding:'var(--sp-7)'}}>
@@ -4555,6 +4561,16 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 // CHALLENGE BOTTOM SHEET — V5: dynamic quiz rotation + photo feed
 // ═══════════════════════════════════════════
 function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam}){
+  // V29 (§4): Escape-to-close wasn't wired. Backdrop click was, but the ✕
+  // button was a dim 26px text glyph on no background — Mike couldn't find
+  // it in his screenshots. Below we (a) listen for Escape globally while this
+  // sheet is open, (b) swap the glyph for a high-contrast circular button.
+  React.useEffect(()=>{
+    if(!loc)return;
+    const onKey=(e)=>{if(e.key==='Escape'){e.preventDefault();onClose&&onClose();}};
+    window.addEventListener('keydown',onKey);
+    return()=>window.removeEventListener('keydown',onKey);
+  },[loc,onClose]);
   if(!loc)return null;
   const dist=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):null;
   // V25 (#71): two-radius band classification for this POI
@@ -4587,7 +4603,9 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                 className="chip" style={{background:'rgba(95,216,165,0.14)',borderColor:'rgba(95,216,165,0.3)',color:'var(--creatief-2)',textDecoration:'none'}}>🧭 Route</a>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Sluiten" style={{background:'none',border:'none',color:'var(--text-tertiary)',fontSize:26,cursor:'pointer',padding:'var(--sp-1)',lineHeight:1}}>✕</button>
+          {/* V29 (§4): bigger, higher-contrast close button — circular pill
+              so it reads as a button, not a dim glyph. Sits flush in corner. */}
+          <button onClick={onClose} aria-label="Sluiten" style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.14)',color:'#fff',fontSize:20,cursor:'pointer',width:40,height:40,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,flexShrink:0,marginLeft:'var(--sp-3)'}}>✕</button>
         </div>
         {/* V25 (#71): band-aware proximity panel — mini two-ring map + pill + copy */}
         <div style={{display:'flex',alignItems:'center',gap:'var(--sp-3)',padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',marginBottom:'var(--sp-5)'}}>
