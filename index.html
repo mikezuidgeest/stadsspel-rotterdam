@@ -20,7 +20,7 @@
       --border-strong:rgba(255,255,255,0.14);
       --text-primary:rgba(255,255,255,0.96);
       --text-secondary:rgba(255,255,255,0.62);
-      --text-tertiary:rgba(255,255,255,0.34);
+      --text-tertiary:rgba(255,255,255,0.55);
       /* V13: richer accent — warmer gold + complementary hues */
       --accent:#e4b25c;
       --accent-2:#f0c373;
@@ -168,6 +168,13 @@
     @keyframes celebFade{0%{opacity:1}85%{opacity:1}100%{opacity:0}}
     @keyframes levelRay{0%{transform:translate(-50%,-50%) scale(0.8) rotate(0);opacity:0}25%{opacity:0.9}100%{transform:translate(-50%,-50%) scale(3) rotate(60deg);opacity:0}}
     @keyframes streakFire{0%,100%{transform:scale(1) rotate(-2deg)}50%{transform:scale(1.1) rotate(2deg)}}
+
+    /* V20 a11y P2: prefers-reduced-motion — disable non-essential motion */
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;scroll-behavior:auto!important}
+      .celeb-overlay,.levelRay,.confetti,[class*="pulse"]{animation:none!important}
+    }
+
     /* V14: celebration overlay */
     .celeb-overlay{position:fixed;inset:0;z-index:10006;pointer-events:none;animation:celebFade 2.2s ease forwards}
     .celeb-burst{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);animation:celebPop 0.6s var(--spring) both;display:flex;flex-direction:column;align-items:center;gap:8px}
@@ -455,7 +462,10 @@ const START_POS={lat:51.9179,lng:4.4822}; // Maritiem Museum, Leuvehaven
 const DINNER_ZONE={lat:51.9206,lng:4.4868,r:400}; // Markthal/Bokaal area
 // V17: Hot-target task timer — replaces the "diner countdown"
 const HOT_TARGET_MS=12*60*1000;          // 12 min to complete the active hot target
-const HOT_EXPIRE_PENALTY=5;              // -5 pts when timer expires
+// V20 balance tuning: penalty raised 5 → 15. The old -5 was weaker than any
+// base challenge reward, so teams just ignored hot targets. 15 creates real
+// tension without being crushing.
+const HOT_EXPIRE_PENALTY=15;             // -15 pts when timer expires
 // V17: Extra Tijd — replaces Ghost Mode. Each charge extends the active hot timer by 5 min.
 const TIME_CHARGE_MS=5*60*1000;
 const TIME_CHARGE_MAX=3;
@@ -574,6 +584,23 @@ function dinerTs(){
 // V14: Bar break duration — 15 min default; overlay shows countdown; auto-ends
 const BAR_BREAK_DURATION_MS=15*60*1000;
 
+// V20 balance: CATCH-UP / UNDERDOG BONUS.
+// At each bar-break the current last-place team gets a silent +UNDERDOG_BONUS
+// so a single bad streak in hour 1 doesn't end the game psychologically.
+// Awarded once per bar-break ordinal, tracked in teams.underdog_bonus_last_break.
+const UNDERDOG_BONUS=75;
+
+// V20 balance: JORIK AUTO-ROTATE.
+// If no admin moves Jorik for JORIK_ROTATE_MS, he auto-moves to the
+// *lowest-scoring non-current team* so he keeps travelling and the trailing
+// teams get shots at the Jorik missions too.
+const JORIK_ROTATE_MS=30*60*1000;   // 30 min of no-move → auto-rotate
+
+// V20 balance: FINALE multiplier.
+// During phase 4 (last 20 min of the game) all scoring actions are ×1.5
+// so a trailing team can still surge with a concentrated final push.
+const FINALE_MULTIPLIER=1.5;
+
 // V14: Team level system (B2) — 6 levels during a 4-hour game
 // Thresholds are SCORE-based, not challenges. Balance: first level reachable in ~10 min.
 const TEAM_LEVELS=[
@@ -595,7 +622,10 @@ function nextLevel(score){
 
 // V14/V17: Hot-streak bonuses — consecutive correct quizzes
 const STREAK_REWARDS={3:20, 5:50}; // +bonus pts at these streak lengths
-const STREAK_TIME_UNLOCK=7;        // at 7 in a row → +1 Extra Tijd charge
+// V20 balance tuning: 7 in a row was unreachable in playtest (too many
+// random guesses broke the chain). 5 is a real achievement that a focused
+// team can hit inside the 4-hour window.
+const STREAK_TIME_UNLOCK=5;        // at 5 in a row → +1 Extra Tijd charge
 const STREAK_GHOST_UNLOCK=STREAK_TIME_UNLOCK; // legacy alias
 
 // V7 QUIZ RULE (Mike's design): one shot, wrong = 0 pts + marked done.
@@ -610,8 +640,10 @@ const TIME_CHARGE_BONUSES=[
 // Legacy alias for any lingering references
 const GHOST_BONUS_THRESHOLDS=TIME_CHARGE_BONUSES;
 // Tier badges based on completed challenges
+// V20 balance tuning: Legende threshold raised 20 → 25. 20 was too easily
+// reachable by a bonus-quiz grinder; 25 requires genuine location coverage.
 const TIER_BADGES=[
-  {min:20, badge:'🏆', name:'Legende', color:'var(--accent)'},
+  {min:25, badge:'🏆', name:'Legende', color:'var(--accent)'},
   {min:15, badge:'🥇', name:'Goud',    color:'var(--accent)'},
   {min:10, badge:'🥈', name:'Zilver',  color:'#c0c0c0'},
   {min:5,  badge:'🥉', name:'Brons',   color:'#cd7f32'},
@@ -682,7 +714,7 @@ const L_DATA=[
 {id:15,n:"Standbeeld Erasmus",la:51.9221,lo:4.4859,e:"📚",c:"art",r:10,ch:[
   {t:"photo",ti:"Erasmus Imitatie",d:"Imiteer de pose van Erasmus. Heel team doet mee.",p:20,df:"easy"},
   {t:"quiz",ti:"Erasmus Quiz",d:"Waarvoor is Erasmus het meest bekend?",a:"Lof der Zotheid",o:["Lof der Zotheid","Het Achterhuis","Max Havelaar","De Ontdekking van de Hemel"],p:20,df:"easy"}]},
-{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"creative",ti:"Plein Performance",d:"15-sec sketch: 'Jorik's eerste date'.",p:35,df:"hard"}]},
+{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"video",ti:"Erasmus Fluistert",d:"Erasmus staat hier al sinds 1622 — oudste standbeeld van NL. Film Jorik terwijl hij op zijn knieën gaat en Erasmus om één concreet huwelijksadvies vraagt. Erasmus' antwoord (teamlid off-camera) moet minstens één Latijns-klinkend woord bevatten.",p:35,df:"hard"}]},
 {id:17,n:"Zadkine Monument",la:51.9180,lo:4.4815,e:"🗿",c:"art",r:15,ch:[
   {t:"photo",ti:"Verwoeste Stad Pose",d:"Recreëer de pose: armen omhoog, mond open!",p:25,df:"medium"},
   {t:"quiz",ti:"Monument Quiz",d:"Aan welke gebeurtenis herinnert dit beeld?",a:"Bombardement Rotterdam 1940",o:["Bombardement Rotterdam 1940","Watersnoodramp 1953","Bevrijding 1945","Havenarbeidersstaking 1970"],p:25,df:"medium"}]},
@@ -698,7 +730,7 @@ const L_DATA=[
 {id:23,n:"Kabouter Buttplug",la:51.917066,lo:4.473353,e:"🎅",c:"art",r:15,ch:[
   {t:"photo",ti:"Kerstman Pose",d:"Creatieve foto met het kunstwerk van Paul McCarthy.",p:25,df:"medium"},
   {t:"quiz",ti:"Buttplug Quiz",d:"Hoe heet dit kunstwerk officieel?",a:"Santa Claus",o:["Santa Claus","Gnome","Kabouter","Christmas Tree"],p:20,df:"easy"}]},
-{id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"photo",ti:"Fikkie trouwadvies",d:"Eén teamlid fluistert zijn slechtste huwelijksadvies ooit in Fikkie's oor. Video.",p:25,df:"medium"}]},
+{id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"video",ti:"Fikkie's Vrijgezellenbiecht",d:"Jorik knielt naast Fikkie en biecht één ding op waar hij bang voor is in het huwelijk. Fikkie mag niet lachen. Een teamlid spreekt Fikkie's oordeel uit: schuldig of onschuldig.",p:30,df:"medium"}]},
 {id:25,n:"L'Homme qui Marche",la:51.917633,lo:4.472299,e:"🚶",c:"art",r:15,ch:[{t:"photo",ti:"Wandelende Man",d:"Imiteer het beeld. Heel team dezelfde pose!",p:20,df:"easy"}]},
 {id:26,n:"Sylvette (Picasso)",la:51.9149,lo:4.4735,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Picasso Pose",d:"Kubistische foto geïnspireerd door Picasso.",p:25,df:"medium"}]},
 {id:27,n:"Cascade (Van Lieshout)",la:51.9178,lo:4.4800,e:"🎪",c:"art",r:20,ch:[{t:"photo",ti:"Cascade Climb",d:"Beklim het kunstwerk en maak een epische foto.",p:25,df:"medium"}]},
@@ -721,7 +753,7 @@ const L_DATA=[
 {id:38,n:"Skatepark Westblaak",la:51.916824,lo:4.476183,e:"🛹",c:"landmark",r:20,ch:[{t:"video",ti:"Skatepark Move",d:"Trick, pose, of epic fail. Humor > vaardigheid!",p:30,df:"medium"}]},
 {id:39,n:"Walk of Fame",la:51.9158,lo:4.4820,e:"⭐",c:"landmark",r:10,ch:[{t:"photo",ti:"Ster Selfie",d:"Selfie bij ster van favoriete Rotterdammer.",p:15,df:"easy"}]},
 {id:40,n:"Chinatown Poort",la:51.9215,lo:4.4694,e:"🏮",c:"landmark",r:15,ch:[{t:"photo",ti:"Geheim genootschap",d:"Staan als een maffia-plaatje onder de poort. Serieuze gezichten, één met sigaret (mag fake zijn).",p:25,df:"medium"}]},
-{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Flash Mob",d:"Mini flash mob! Min. 10 sec!",p:35,df:"hard"}]},
+{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Havenkraan Jorik",d:"De vier rode lichtmasten van Adriaan Geuze (1996) zijn een eerbetoon aan de havenkranen. Film Jorik die exact zo'n havenkraan nadoet: stijve benen, één arm omhoog, en hij 'tilt' symbolisch zijn aanstaande op. Min. 15 sec; teamlid geeft commentaar als scheepsagent.",p:35,df:"hard"}]},
 {id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"creative",ti:"Parkbank Biecht",d:"Twee teamleden op een bankje. Een bekent het meest gênante wat ze ooit met/voor Jorik deden. Film het.",p:40,df:"hard"}]},
 {id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Eiland Leven",d:"Meest fotogenieke hoekje.",p:25,df:"medium"}]},
 {id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"Skyline Shot",d:"Mooiste skyline foto.",p:20,df:"easy"}]},
@@ -732,12 +764,12 @@ const L_DATA=[
 {id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[{t:"photo",ti:"Food Foto",d:"Meest Instagram-waardige food foto.",p:20,df:"easy"}]},
 {id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"photo",ti:"Drijvend Bos",d:"Foto met drijvende bomen!",p:20,df:"easy"}]},
 {id:51,n:"Maastunnel",la:51.902719,lo:4.468246,e:"🚇",c:"landmark",r:20,ch:[
-  {t:"video",ti:"Tunnel Echo",d:"Test de echo! Schreeuw iets grappigs.",p:25,df:"medium"},
+  {t:"video",ti:"1070 Meter Gelofte",d:"De voetgangerstunnel is 1070m lang en dateert uit 1942 — eerste autotunnel van NL. Film Jorik halverwege die zijn trouwgelofte één keer hardop oefent. De echo moet hoorbaar zijn. Bonus als de rest van het team in koor 'ja' roept aan het eind.",p:30,df:"medium"},
   {t:"quiz",ti:"Tunnel Quiz",d:"Wanneer werd de Maastunnel geopend?",a:"1942",o:["1942","1935","1950","1960"],p:20,df:"medium"}]},
 {id:52,n:"Het Park",la:51.906157,lo:4.470373,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Park Panorama",d:"Ontspannen groepsfoto in het park.",p:15,df:"easy"}]},
 {id:53,n:"Veerhaven",la:51.907406,lo:4.478667,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Haven Romantiek",d:"Romantische foto bij de zeilschepen.",p:20,df:"easy"}]},
 {id:54,n:"Maastoren",la:51.908768,lo:4.493358,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber",d:"Foto waarbij Maastoren klein lijkt.",p:25,df:"medium"}]},
-{id:55,n:"Rijnhavenbrug",la:51.903332,lo:4.485836,e:"🌁",c:"bridge",r:15,ch:[{t:"photo",ti:"Hoerenloper Foto",d:"Groepsfoto op de bijzondere loopbrug.",p:20,df:"easy"}]},
+{id:55,n:"Rijnhavenbrug",la:51.903332,lo:4.485836,e:"🌁",c:"bridge",r:15,ch:[{t:"photo",ti:"Katendrecht Crossing",d:"Groepsfoto op de brug met Jorik in het midden — iedereen wijst naar Katendrecht alsof jullie een nieuw continent ontdekken. Minstens één persoon in superman-pose. Skyline moet herkenbaar achter jullie staan.",p:20,df:"easy"}]},
 {id:56,n:"Foodhallen",la:51.906033,lo:4.487959,e:"🍽️",c:"food",r:20,ch:[{t:"photo",ti:"Foodie Foto",d:"Groepsfoto met favoriete gerecht.",p:20,df:"easy"}]},
 {id:57,n:"Floating Office",la:51.90408,lo:4.488447,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Drijvend Kantoor",d:"Foto met het drijvende kantoor.",p:20,df:"easy"}]},
 {id:58,n:"Luchtpark Hofbogen",la:51.926834,lo:4.478982,e:"🌿",c:"park",r:15,ch:[{t:"photo",ti:"Rooftop Panorama",d:"Panoramafoto vanaf het dak!",p:25,df:"medium"}]},
@@ -746,7 +778,7 @@ const L_DATA=[
 {id:61,n:"BlueCity",la:51.9198,lo:4.4981,e:"♻️",c:"landmark",r:15,ch:[{t:"quiz",ti:"BlueCity Quiz",d:"BlueCity zit in een voormalig zwembad. Hoe heette het?",a:"Tropicana",o:["Tropicana","Aquarena","De Dolfijn","Waterlinie"],p:25,df:"medium"}]},
 {id:62,n:"Het Slaakhuys",la:51.9255,lo:4.4988,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Art Deco Parel",d:"Foto van dit art deco monument.",p:20,df:"easy"}]},
 {id:63,n:"Gebouw Delftse Poort",la:51.9240,lo:4.4716,e:"🏙️",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber Selfie",d:"Selfie met het hoogste gebouw.",p:20,df:"easy"}]},
-{id:64,n:"Willemswerf",la:51.916963,lo:4.49011,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Glijbaan Raadsel",d:"Welke filmster gleed van de glijbaan hier?",a:"Jackie Chan",o:["Jackie Chan","Jet Li","Bruce Willis","Arnold Schwarzenegger"],p:30,df:"hard"}]},
+{id:64,n:"Willemswerf",la:51.916963,lo:4.49011,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Schuine Gevel Quiz",d:"Welke architect ontwierp dit gebouw met de karakteristieke 45°-schuine gevel waar Jackie Chan in 1998 van naar beneden gleed in de film 'Who Am I?'?",a:"Wim Quist",o:["Wim Quist","Rem Koolhaas","Ben van Berkel","Piet Blom"],p:30,df:"hard"}]},
 {id:65,n:"Concertgebouw De Doelen",la:51.9234,lo:4.4740,e:"🎵",c:"culture",r:20,ch:[{t:"video",ti:"Luchtgitaar",d:"10 sec luchtgitaar voor De Doelen!",p:25,df:"medium"}]},
 {id:66,n:"Oude Luxor Theater",la:51.922997,lo:4.477027,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Broadway Moment",d:"Zing 10 sec musical voor de ingang.",p:30,df:"medium"}]},
 {id:67,n:"Geldersekade Panorama",la:51.9190,lo:4.4915,e:"🌅",c:"viewpoint",r:15,ch:[{t:"photo",ti:"Panorama Shot",d:"Panoramafoto Oude Haven + Witte Huis.",p:20,df:"easy"}]},
@@ -754,13 +786,13 @@ const L_DATA=[
 {id:69,n:"Arminius Kerk",la:51.9155,lo:4.4727,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Kerk Contrast",d:"Foto: contrast oud en nieuw Rotterdam.",p:20,df:"easy"}]},
 {id:70,n:"Binnenwegplein",la:51.918234,lo:4.477439,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Kinetisch Kunstwerk",d:"Foto met het bewegende kunstwerk.",p:20,df:"easy"}]},
 {id:71,n:"THOMS",la:51.921926,lo:4.481385,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Speciaalbier-test",d:"Bestel een speciaalbier dat niemand in het team kent. Foto met het blind-geproefde gezicht van het slachtoffer.",p:30,df:"medium"}]},
-{id:72,n:"Bokaal",la:51.92245,lo:4.488359,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Bar Selfie",d:"Selfie aan de bar!",p:15,df:"easy"}]},
+{id:72,n:"Bokaal",la:51.92245,lo:4.488359,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Jorik's Trouwtoast",d:"Jorik staat op (stoel of krukje, mits veilig) en houdt een 20-sec-toast op zichzelf in de derde persoon. Hij moet minstens drie keer 'die fantastische Jorik' zeggen. Team filmt en klinkt aan het eind.",p:25,df:"medium"}]},
 {id:73,n:"De Après Skihut",la:51.9223,lo:4.4767,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Skihut Sfeer",d:"Doe alsof jullie op wintersport zijn!",p:20,df:"easy"}]},
 {id:74,n:"De Gele Kanarie",la:51.924182,lo:4.489447,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Cheers met vreemden",d:"Klink met twee onbekenden aan de bar. Foto met alle 4 gezichten zichtbaar.",p:30,df:"medium"}]},
 {id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Scheepje Ahoy",d:"Foto op het rode schip!",p:20,df:"easy"}]},
 {id:76,n:"BIRD Rotterdam",la:51.926726,lo:4.478851,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Band Foto",d:"Albumcover-waardige foto voor BIRD.",p:20,df:"easy"}]},
-{id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Vrienden Foto",d:"Jullie zijn de beste vrienden!",p:15,df:"easy"}]},
-{id:78,n:"Hitz",la:51.9224,lo:4.4780,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Hitz Party",d:"Groepsfoto aan de bar!",p:15,df:"easy"}]},
+{id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Vriendenbiecht",d:"Elk teamlid (min. 3) noemt vóór de camera één eigenschap van Jorik die zijn aanstaande waarschijnlijk nog niet kent. Jorik mag niet reageren, alleen kijken. Eén lange take.",p:30,df:"medium"}]},
+{id:78,n:"Hitz",la:51.9224,lo:4.4780,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Jorik's Bruiloftshit",d:"Kies samen één nummer dat de DJ (of speaker) draait. Binnen 30 sec verzinnen jullie nieuwe tekst op het refrein — moet gaan over Jorik's huwelijk. Hele team zingt mee, Jorik vooraan. Filmen.",p:30,df:"medium"}]},
 {id:79,n:"Sijf",la:51.917446,lo:4.474287,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Terras Genieten",d:"Beste terras-selfie van de dag!",p:15,df:"easy"}]},
 {id:80,n:"NRC",la:51.915542,lo:4.476326,e:"🍸",c:"bar",r:15,ch:[{t:"photo",ti:"Cocktail Shot",d:"Meest Instagrambare cocktail-foto.",p:20,df:"easy"}]},
 {id:81,n:"Biergarten",la:51.925686,lo:4.476209,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Duits accent Prosit",d:"Hele team roept 'PROSIT' met zo Duits mogelijk accent tegen de buurtafel. Film de reactie.",p:30,df:"medium"}]},
@@ -869,12 +901,14 @@ function snapToPOI(pos,maxDist=GPS_SNAP_RADIUS){
 // ═══════════════════════════════════════════
 // Generic Rotterdam quizzes — used as fillers if a location has no quiz
 const ROTTERDAM_QUIZ_POOL=[
-  {ti:"Haven Trivia",d:"Welke positie heeft de haven van Rotterdam wereldwijd?",a:"Top 10",o:["Top 10","Nummer 1","Nummer 5","Top 20"],p:15,df:"easy"},
+  // V20: content refresh — dropped ambiguous/easy quizzes, added verified-fact alternatives
   {ti:"Rotterdam Geschiedenis",d:"In welk jaar werd Rotterdam gebombardeerd?",a:"1940",o:["1940","1945","1939","1944"],p:20,df:"easy"},
-  {ti:"Architectuur Weetje",d:"Hoe werd Rotterdam na de oorlog genoemd?",a:"Architectuurstad",o:["Architectuurstad","Poldersstad","Zeemansstad","Handelsstad"],p:20,df:"medium"},
-  {ti:"Sport Kennis",d:"Welke voetbalclub speelt in De Kuip?",a:"Feyenoord",o:["Feyenoord","Sparta","Excelsior","Ajax"],p:10,df:"easy"},
-  {ti:"Rivier Quiz",d:"Door welke rivier wordt Rotterdam doormidden gedeeld?",a:"De Maas",o:["De Maas","De Rijn","De Waal","De Lek"],p:10,df:"easy"},
   {ti:"Bijnaam Rotterdam",d:"Wat is een bekende bijnaam van Rotterdam?",a:"Manhattan aan de Maas",o:["Manhattan aan de Maas","Venetië van het Noorden","Parijs van de Polder","Little London"],p:20,df:"medium"},
+  {ti:"Echte Rivier",d:"Rotterdammers noemen het de Maas, maar door welke rivier loopt het water écht dat onder de Erasmusbrug stroomt?",a:"Nieuwe Maas",o:["Nieuwe Maas","Maas","Rijn","Waal"],p:25,df:"medium"},
+  {ti:"Crowdfund Brug",d:"De Luchtsingel is de eerste openbare infrastructuur ter wereld die via crowdfunding tot stand kwam. Hoeveel planken telt de brug in totaal?",a:"17.000",o:["17.000","8.000","25.000","50.000"],p:25,df:"medium"},
+  {ti:"Oudste Standbeeld",d:"Het Erasmus-standbeeld op het Grotekerkplein is het oudste van Nederland. In welk jaar werd het onthuld?",a:"1622",o:["1622","1700","1566","1815"],p:30,df:"hard"},
+  {ti:"Kubus Telling",d:"Hoeveel kubusvormige paalwoningen ontwierp Piet Blom in het Blaakse Bos (exclusief bedrijfskubussen)?",a:"38",o:["38","74","51","26"],p:30,df:"hard"},
+  {ti:"Markthal Plafond",d:"Het gigantische plafondkunstwerk in de Markthal heet 'Hoorn des Overvloeds'. Hoe groot is het ongeveer?",a:"11.000 m²",o:["11.000 m²","3.000 m²","25.000 m²","500 m²"],p:25,df:"medium"},
 ];
 
 function pickQuiz(loc,seen){
@@ -900,13 +934,37 @@ function compressPhoto(dataURL,maxWidth=480,quality=0.55){
     try{
       const img=new Image();
       img.onload=()=>{
-        const canvas=document.createElement('canvas');
-        const ratio=Math.min(1,maxWidth/img.width);
-        canvas.width=Math.round(img.width*ratio);
-        canvas.height=Math.round(img.height*ratio);
-        const ctx=canvas.getContext('2d');
-        ctx.drawImage(img,0,0,canvas.width,canvas.height);
-        resolve(canvas.toDataURL('image/jpeg',quality));
+        try{
+          // V21 P1-fix #31 + audit fix: guard against Safari/iOS 16.7MP canvas ceiling
+          // WITHOUT cropping. Old code capped each axis independently at 4096, which
+          // cropped a 8000×1200 panorama to 4096×1200 (lost 49% of the frame).
+          // Correct approach: compute one proportional downscale factor against the
+          // larger dimension so aspect ratio is preserved, then apply maxWidth ratio.
+          const SRC_MAX=4096;
+          const origW=Math.max(1,img.width||1);
+          const origH=Math.max(1,img.height||1);
+          const capRatio=Math.min(1,SRC_MAX/Math.max(origW,origH));
+          const srcW=Math.max(1,Math.round(origW*capRatio));
+          const srcH=Math.max(1,Math.round(origH*capRatio));
+          const canvas=document.createElement('canvas');
+          const ratio=Math.min(1,maxWidth/srcW);
+          canvas.width=Math.max(1,Math.round(srcW*ratio));
+          canvas.height=Math.max(1,Math.round(srcH*ratio));
+          const ctx=canvas.getContext('2d');
+          if(!ctx){resolve(dataURL);return;}
+          // draw the full original onto the (already-proportionally-scaled) dest canvas
+          ctx.drawImage(img,0,0,origW,origH,0,0,canvas.width,canvas.height);
+          try{
+            resolve(canvas.toDataURL('image/jpeg',quality));
+          }catch(inner){
+            // Safari throws on huge canvases — return original untouched so upload still happens
+            console.warn('canvas toDataURL failed — returning original',inner?.message||inner);
+            resolve(dataURL);
+          }
+        }catch(e){
+          console.warn('canvas draw failed — returning original',e?.message||e);
+          resolve(dataURL);
+        }
       };
       img.onerror=()=>resolve(dataURL); // fallback
       img.src=dataURL;
@@ -943,13 +1001,50 @@ async function compressPhotoAdaptive(dataURL){
 // Detect whether dataURL is a video (keep raw; don't try to compress)
 function isVideoData(d){return typeof d==='string'&&d.startsWith('data:video')}
 
-// V12: canonical bar-break mini-challenge list (shared by admin trigger and remote subscribers)
-function defaultBarMinis(){
-  return[
-    {emoji:'🍺',title:'Proost!',desc:'Groepsfoto met een biertje op tafel',pts:25},
-    {emoji:'🥃',title:'Shot roulette',desc:'Willekeurig teamlid neemt een shot (of iets soft). Film het!',pts:35},
-    {emoji:'🎤',title:'Bar karaoke',desc:'Eén teamlid zingt 1 minuut lang Nederlandstalige hit. Pub mag meedoen.',pts:40},
-  ];
+// V20: expanded bar-break mini-challenge POOL (6 items). Each bar-break
+// deterministically picks 3 of these based on bar name + started timestamp,
+// so every team sees the SAME 3 for that break, but different breaks
+// feel fresh and no two bars get the same combination by accident.
+const BAR_MINI_POOL=[
+  {emoji:'🍺',title:'Proost!',desc:'Groepsfoto met een biertje op tafel',pts:25},
+  {emoji:'🥃',title:'Shot roulette',desc:'Willekeurig teamlid neemt een shot (of iets soft). Film het!',pts:35},
+  {emoji:'🎤',title:'Bar karaoke',desc:'Eén teamlid zingt 1 minuut lang Nederlandstalige hit. Pub mag meedoen.',pts:40},
+  {emoji:'💍',title:'Jorik-roast',desc:'Eén teamlid brengt een 20-sec roast op Jorik. Video maken.',pts:35},
+  {emoji:'📞',title:'Belletje naar bruid',desc:'Bel de bruid, laat Jorik iets liefs (of doms) zeggen. Met luidspreker op video.',pts:45},
+  {emoji:'🧍',title:'Freeze frame',desc:'Hele team staat 30 sec stijf stil midden in de bar. Film de reacties.',pts:30},
+];
+
+// Simple deterministic string hash (djb2-ish) — stable across clients
+function seedHash(s){
+  let h=5381;
+  const str=String(s||'');
+  for(let i=0;i<str.length;i++){h=((h<<5)+h+str.charCodeAt(i))>>>0;}
+  return h;
+}
+
+// Fisher-Yates with a seeded LCG, picks N items deterministically from `pool`.
+function pickNSeeded(pool,n,seed){
+  if(n>=pool.length)return[...pool];
+  let s=(seed>>>0)||1;
+  const rand=()=>{s=(s*1664525+1013904223)>>>0;return s/0x100000000;};
+  const arr=[...pool];
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(rand()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr.slice(0,n);
+}
+
+// V12/V20: canonical bar-break mini-challenge list. Takes optional (barName, startedAt)
+// so remote clients produce the same 3-of-6 pick as the admin who triggered the break.
+function defaultBarMinis(barName,startedAt){
+  if(barName==null&&startedAt==null){
+    // Legacy caller (no args) — return the full pool (previous behaviour: 3 items).
+    // Used only by pre-break preview; live play always passes the seed args.
+    return BAR_MINI_POOL.slice(0,3);
+  }
+  const seed=seedHash(`${barName||''}|${startedAt||0}`);
+  return pickNSeeded(BAR_MINI_POOL,3,seed);
 }
 
 // V12: bar POIs for the admin dropdown (derived from L_DATA at runtime; fallback list here)
@@ -962,6 +1057,17 @@ function getBarOptions(){
 // ═══════════════════════════════════════════
 // V12: localStorage key for session persistence — single source of truth
 const LS_KEY='stadsspel_v12_session';
+// V22 audit fix (iOS agent): iOS Safari private browsing throws quota errors on
+// localStorage.setItem() even when empty. We preflight once and expose the flag so
+// the UI can warn the player that their progress won't survive a force-quit. Cached
+// on module scope so we only pay the try/catch cost a single time.
+let LS_OK=null;
+function localStorageWorks(){
+  if(LS_OK!==null)return LS_OK;
+  try{const k='__ls_test__';localStorage.setItem(k,'1');localStorage.removeItem(k);LS_OK=true;}
+  catch(e){LS_OK=false;}
+  return LS_OK;
+}
 function loadSession(){
   try{const raw=localStorage.getItem(LS_KEY);return raw?JSON.parse(raw):null;}catch(e){return null;}
 }
@@ -970,7 +1076,7 @@ function saveSession(patch){
     const cur=loadSession()||{};
     const next={...cur,...patch,updated:Date.now()};
     localStorage.setItem(LS_KEY,JSON.stringify(next));
-  }catch(e){}
+  }catch(e){LS_OK=false;}
 }
 function clearSession(){try{localStorage.removeItem(LS_KEY);}catch(e){}}
 
@@ -994,6 +1100,29 @@ function App(){
   const[selLoc,setSelLoc]=useState(null);
   const[toast,setToast]=useState(null);
   const[scorePopup,setScorePopup]=useState(null);
+  // V20 UX P1: promise-based dialog replacing native window.confirm / window.prompt.
+  // Native dialogs block the event loop, look out-of-place on mobile, and on some
+  // iOS Safari versions refuse to render over the Babel-inlined React tree.
+  // { type: 'confirm'|'prompt', msg, defaultVal?, confirmLabel?, cancelLabel?, danger?, resolve }
+  const[dialog,setDialog]=useState(null);
+  const dialogRef=React.useRef(null);
+  dialogRef.current=dialog;
+  const closeDialog=useCallback((value)=>{
+    const d=dialogRef.current;
+    if(!d)return;
+    setDialog(null);
+    d.resolve&&d.resolve(value);
+  },[]);
+  const confirmAsync=useCallback((msg,opts={})=>{
+    return new Promise(resolve=>{
+      setDialog({type:'confirm',msg,confirmLabel:opts.confirmLabel||'Ja',cancelLabel:opts.cancelLabel||'Annuleer',danger:!!opts.danger,resolve});
+    });
+  },[]);
+  const promptAsync=useCallback((msg,defaultVal='')=>{
+    return new Promise(resolve=>{
+      setDialog({type:'prompt',msg,defaultVal,confirmLabel:'OK',cancelLabel:'Annuleer',resolve});
+    });
+  },[]);
   // V17: Extra Tijd charges replace Ghost state
   const[timeCharges,setTimeCharges]=useState(TIME_CHARGE_MAX);
   const[timeChargeMax,setTimeChargeMax]=useState(TIME_CHARGE_MAX);
@@ -1012,16 +1141,22 @@ function App(){
   const[jorikInTeam,setJorikInTeam]=useState(false);
   // V10: admin tracks which team currently has Jorik (by team id, null = between teams)
   const[jorikTeamId,setJorikTeamId]=useState(null);
+  // V20: track when Jorik last moved (local wall clock). Used for the auto-rotate
+  // watcher (admin only) and the visible countdown badge (everyone).
+  const[jorikMovedAt,setJorikMovedAt]=useState(null);
   const[weddingDone,setWeddingDone]=useState(false);
   const[showWedding,setShowWedding]=useState(false);
   // V19+: Jorik-missions done-set; hydrated from session so refresh doesn't wipe progress.
   const[jorikMissionsDone,setJorikMissionsDone]=useState(()=>new Set(Array.isArray(hydrated?.jorikMissionsDone)?hydrated.jorikMissionsDone:[]));
   const[showJorikMissions,setShowJorikMissions]=useState(false);
   const[activityFeed,setActivityFeed]=useState([]);
-  // V10: admin unlock via ?admin=true (legacy) OR ?admin=vriendvanjorik (hardened token)
+  // V10: admin unlock via ?admin=vriendvanjorik (hardened token).
+  // V22 audit fix: dropped the ?admin=true legacy fallback — the app URL is shared in
+  // a group chat, and "?admin=true" is the first thing a curious player would try.
+  // With only the Dutch-phrase token, accidental admin escalation by a player is ~0.
   const[isAdmin]=useState(()=>{
     const v=new URLSearchParams(window.location.search).get('admin');
-    return v==='true' || v==='vriendvanjorik';
+    return v==='vriendvanjorik';
   });
   // V5 FEATURE 1: narrative state
   const[storyShown,setStoryShown]=useState(null); // key of the currently-open story modal
@@ -1066,8 +1201,14 @@ function App(){
   useEffect(()=>{
     let watchId=null;
     let active=true;
+    // V21 P0-fix #13b: track whether watchPosition has already delivered a fix,
+    // so the 10 s belt-and-braces getCurrentPosition doesn't fire redundantly
+    // (the audit caught it: previously the one-shot always fired even after a good fix,
+    // which could reset GPS smoothing state and briefly jitter the snap-to-POI logic).
+    let gotFix=false;
 
     const onPos=(p)=>{
+      gotFix=true;
       const sample={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy||999,ts:Date.now()};
       setGpsSamples(prev=>{
         const next=[...prev,sample].slice(-GPS_SMOOTH_SAMPLES);
@@ -1110,6 +1251,26 @@ function App(){
       motionRef.current.lastMotion=Date.now();
       // Reset visual state immediately so the pill returns to 'weak' until first fix
       setGpsStatus('weak');
+      // V21 P0-fix #13: iOS Safari watchPosition can hang without firing either cb on low-accuracy.
+      // Fire a one-shot getCurrentPosition as a belt-and-braces fallback after 10 s if no fix yet.
+      setTimeout(()=>{
+        if(!active)return;
+        // V21 P0-fix #13b: only fire if watchPosition hasn't already delivered a fix.
+        // This prevents a stale low-accuracy sample from polluting the smoother
+        // after the user already had a good high-accuracy lock.
+        if(gotFix)return;
+        try{
+          navigator.geolocation.getCurrentPosition(
+            (p)=>{try{onPos(p)}catch(e){}},
+            (err)=>{
+              if(err&&err.code===1){setGpsStatus('denied');setGpsErrorSeen({code:err.code,message:err.message||''});}
+              else if(err&&err.code===2){setGpsStatus('unavailable');setGpsErrorSeen({code:err.code,message:err.message||''});}
+              // silent on TIMEOUT — just show weak
+            },
+            {enableHighAccuracy:false,maximumAge:30000,timeout:15000}
+          );
+        }catch(e){}
+      },10000);
     };
     const stopWatch=()=>{
       if(watchId!=null){navigator.geolocation.clearWatch(watchId);watchId=null}
@@ -1239,11 +1400,26 @@ function App(){
         }
         if(gs.bar_break_active){
           // Bar break is currently live
-          const minis=defaultBarMinis();
-          setBarBreakActive({name:gs.bar_break_active,mini:minis,started:gs.bar_break_started_at?new Date(gs.bar_break_started_at).getTime():Date.now()});
+          // V20: seed the mini pick with name + started so every client agrees on 3-of-6
+          const startedMs=gs.bar_break_started_at?new Date(gs.bar_break_started_at).getTime():Date.now();
+          const minis=defaultBarMinis(gs.bar_break_active,startedMs);
+          setBarBreakActive({name:gs.bar_break_active,mini:minis,started:startedMs});
           setBarBreak({name:gs.bar_break_active,time:Date.now()});
         }
-        if(gs.jorik_team_id!=null)setJorikTeamId(gs.jorik_team_id);
+        if(gs.jorik_team_id!=null){
+          setJorikTeamId(gs.jorik_team_id);
+          // V21 P0: hydrate from the persisted `jorik_moved_at` column so the
+          // rotate clock survives admin-refresh and stays in-sync across all
+          // devices. Fallback to Date.now() only on a brand-new row (the first
+          // time this migration-gated column is read from a legacy DB).
+          const persisted=gs.jorik_moved_at?new Date(gs.jorik_moved_at).getTime():null;
+          setJorikMovedAt(persisted&&!isNaN(persisted)?persisted:Date.now());
+        }
+        // V21 P1-fix #35: seed gmLastSeen from initial fetch too
+        if(gs.gm_heartbeat){
+          const hb=new Date(gs.gm_heartbeat).getTime();
+          if(!isNaN(hb))setGmLastSeen(hb);
+        }
       }
     },()=>{});
 
@@ -1304,24 +1480,66 @@ function App(){
           return s;
         });
       }
-      if(gs.jorik_team_id!==undefined)setJorikTeamId(gs.jorik_team_id);
+      if(gs.jorik_team_id!==undefined){
+        // V21: stamp the persisted server-side clock when the Jorik holder
+        // changes. Every device reads the same `jorik_moved_at` so the
+        // countdown no longer drifts per-device. Fallback to Date.now() only
+        // if the column doesn't ship yet (pre-v21 migration).
+        setJorikTeamId(prev=>{
+          if(prev!==gs.jorik_team_id){
+            const persisted=gs.jorik_moved_at?new Date(gs.jorik_moved_at).getTime():null;
+            setJorikMovedAt(persisted&&!isNaN(persisted)?persisted:Date.now());
+          }
+          return gs.jorik_team_id;
+        });
+      }
       if(gs.bar_break_active){
         // Someone (admin) started a bar break — show the overlay
-        const minis=defaultBarMinis();
-        setBarBreakActive({name:gs.bar_break_active,mini:minis,started:gs.bar_break_started_at?new Date(gs.bar_break_started_at).getTime():Date.now()});
+        // V20: seed 3-of-6 pick so every client sees the same minis
+        const startedMs=gs.bar_break_started_at?new Date(gs.bar_break_started_at).getTime():Date.now();
+        const minis=defaultBarMinis(gs.bar_break_active,startedMs);
+        setBarBreakActive({name:gs.bar_break_active,mini:minis,started:startedMs});
         setBarBreak({name:gs.bar_break_active,time:Date.now()});
       }else{
         // Admin cleared the bar break
         setBarBreakActive(null);
       }
+      // V21 P1-fix #35: pick up admin's heartbeat on every game_state UPDATE
+      if(gs.gm_heartbeat){
+        const hb=new Date(gs.gm_heartbeat).getTime();
+        if(!isNaN(hb))setGmLastSeen(hb);
+      }
     }).subscribe();
     const actSub=sb.channel('activity').on('postgres_changes',{event:'INSERT',schema:'public',table:'activity_feed'},payload=>{
-      setActivityFeed(prev=>[payload.new,...prev].slice(0,50));
+      // V21: raised in-memory cap from 50 → 500 (see addActivity for rationale)
+      setActivityFeed(prev=>[payload.new,...prev].slice(0,500));
       // V10: parse Jorik system broadcasts (fallback if game_state field not available)
       const msg=payload.new.message||'';
       const m=msg.match(/^\[JORIK\] team=(\d+|null)/);
       if(m){setJorikTeamId(m[1]==='null'?null:parseInt(m[1],10))}
     }).subscribe();
+
+    // V21 P0: initial fetch of activity_feed. Without this, any late-joining
+    // phone (or anyone who refreshed mid-game) sees an empty feed until new
+    // events trickle in. FinaleScreen's MVP awards iterate the full feed, so
+    // a missing early-game load made Foto-koning / Ontdekkingsreiziger /
+    // Grootste schot incorrect on every reloaded client.
+    sb.from('activity_feed').select('*').order('created_at',{ascending:false}).limit(500).then(res=>{
+      if(res.data&&res.data.length){
+        setActivityFeed(prev=>{
+          // Merge: dedupe by created_at+team_id+message composite key (activity_feed has no PK on the client realtime payload)
+          const seen=new Set(prev.map(a=>`${a.created_at}|${a.team_id}|${a.message}`));
+          const merged=[...prev];
+          res.data.forEach(a=>{
+            const k=`${a.created_at}|${a.team_id}|${a.message}`;
+            if(!seen.has(k)){merged.push(a);seen.add(k);}
+          });
+          // Sort desc by created_at and cap
+          merged.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+          return merged.slice(0,500);
+        });
+      }
+    },()=>{/* table missing / network error — silent */});
 
     // V6: subscribe to photo_reviews — for admin queue + per-team rejection notices
     const reviewInsertSub=sb.channel('reviews_insert').on('postgres_changes',{event:'INSERT',schema:'public',table:'photo_reviews'},payload=>{
@@ -1342,7 +1560,13 @@ function App(){
         setPendingMine(c=>Math.max(0,c-1));
         if(r.status==='rejected'){
           setToast(`❌ Foto "${r.challenge_title}" afgekeurd · -${r.points_awarded} pts`);
-          setScores(prev=>({...prev,[myTeam.id]:Math.max(0,(prev[myTeam.id]||0)-r.points_awarded)}));
+          // V21 P0: DO NOT subtract locally here. The canonical score change is
+          // already applied via the RPC inside rejectReview's `commit` (which calls
+          // applyScoreDelta). That in turn triggers a teams UPDATE realtime event
+          // which reconciles the score. Adding a local subtract here caused a
+          // race-conditional double-penalty (2× the points_awarded) on the
+          // target team because the teams UPDATE could arrive before OR after
+          // this handler. Keep the toast; drop the write.
         }else if(r.status==='approved'){
           setToast(`✅ Foto "${r.challenge_title}" goedgekeurd!`);
         }
@@ -1355,11 +1579,131 @@ function App(){
         if(res.data)setReviewQueue(res.data);
       },()=>{/* table missing — silent */});
     }
+
+    // V21 P0: rehydrate completed_challenges for myTeam on mount. Without this,
+    // a mid-game refresh wiped `completed`/`completedPts` locally → players could
+    // re-open already-solved quizzes and get double-credit before the 23505
+    // unique-constraint catch fired (the RPC had already dispatched the delta).
+    // Also reseeds visitedLocs so the map shows visited POIs correctly.
+    if(myTeam?.id&&!myTeam.spectator&&myTeam.id>0){
+      sb.from('completed_challenges').select('challenge_id,location_id,points_earned').eq('team_id',myTeam.id).then(res=>{
+        if(!res.data||!res.data.length)return;
+        const compMap={};
+        const ptsMap={};
+        const visited=new Set();
+        res.data.forEach(row=>{
+          // challenge_id is "${locId}_${chIdx}" — parse both fields defensively
+          const m=String(row.challenge_id||'').match(/^(-?\d+)_(-?\d+)$/);
+          if(!m)return;
+          const locId=parseInt(m[1],10);
+          const chIdx=parseInt(m[2],10);
+          if(!Number.isFinite(locId)||!Number.isFinite(chIdx))return;
+          compMap[locId]={...(compMap[locId]||{}),[chIdx]:true};
+          ptsMap[locId]={...(ptsMap[locId]||{}),[chIdx]:row.points_earned||0};
+          if(locId>0)visited.add(locId);
+        });
+        // Merge (local state wins for anything it already has — the DB is authoritative for what's persisted)
+        setCompleted(prev=>{
+          const next={...compMap};
+          Object.keys(prev).forEach(k=>{next[k]={...(next[k]||{}),...prev[k]};});
+          return next;
+        });
+        setCompletedPts(prev=>{
+          const next={...ptsMap};
+          Object.keys(prev).forEach(k=>{next[k]={...(next[k]||{}),...prev[k]};});
+          return next;
+        });
+        setVisitedLocs(prev=>{const s=new Set(prev);visited.forEach(v=>s.add(v));return s;});
+      },()=>{/* table missing / network error — silent */});
+    }
     return()=>{
       teamSub.unsubscribe();teamInsertSub.unsubscribe();teamDeleteSub.unsubscribe();gsSub.unsubscribe();actSub.unsubscribe();
       reviewInsertSub.unsubscribe();reviewUpdateSub.unsubscribe();
     };
   },[myTeam,isAdmin]);
+
+  // V22 audit fix (cross-device sweep, iOS+Network agents): when the tab has been
+  // backgrounded, Supabase realtime can miss events (iOS Safari discards WebSockets
+  // aggressively; Android Chrome deprioritizes them). On visibilitychange→visible we
+  // catch up by refetching the four canonical sources of truth. This is additive to the
+  // realtime channels (which will ALSO auto-reconnect) — worst case we do one extra
+  // round-trip, best case we prevent a stale leaderboard / missed bar-break / lost
+  // photo approval.
+  useEffect(()=>{
+    if(OFFLINE||!sb||!myTeam?.id)return;
+    const onVisible=()=>{
+      if(document.hidden)return;
+      // step 1 — game_state: phase, bar-break, jorik, heartbeat
+      sb.from('game_state').select('*').eq('id',1).maybeSingle().then(({data:gs})=>{
+        if(!gs)return;
+        if(typeof gs.phase==='number')setPhase(gs.phase);
+        if(gs.bar_break_active){
+          const startedMs=gs.bar_break_started_at?new Date(gs.bar_break_started_at).getTime():Date.now();
+          if(!barBreakActive||barBreakActive.name!==gs.bar_break_active||barBreakActive.started!==startedMs){
+            setBarBreakActive({name:gs.bar_break_active,mini:defaultBarMinis(gs.bar_break_active,startedMs),started:startedMs});
+          }
+        }else if(barBreakActive){
+          setBarBreakActive(null);
+        }
+        if(gs.jorik_team_id!==undefined)setJorikTeamId(gs.jorik_team_id);
+        if(gs.jorik_moved_at){const t=new Date(gs.jorik_moved_at).getTime();if(!isNaN(t))setJorikMovedAt(t);}
+        if(gs.gm_heartbeat){const t=new Date(gs.gm_heartbeat).getTime();if(!isNaN(t))setGmLastSeen(t);}
+      },()=>{});
+      // step 2 — teams: scores + spectator + underdog_bonus_last_break
+      sb.from('teams').select('*').then(({data})=>{
+        if(!data)return;
+        setTeams(data);
+        const sc={};data.forEach(t=>{sc[t.id]=t.score||0;});
+        setScores(sc);
+      },()=>{});
+      // step 3 — activity_feed tail: catch up missed rows while backgrounded
+      sb.from('activity_feed').select('*').order('created_at',{ascending:false}).limit(100).then(res=>{
+        if(!res.data||!res.data.length)return;
+        setActivityFeed(prev=>{
+          const seen=new Set(prev.map(a=>`${a.created_at}|${a.team_id}|${a.message}`));
+          const merged=[...prev];
+          res.data.forEach(a=>{
+            const k=`${a.created_at}|${a.team_id}|${a.message}`;
+            if(!seen.has(k)){merged.push(a);seen.add(k);}
+          });
+          merged.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+          return merged.slice(0,500);
+        });
+      },()=>{});
+      // step 4 — completed_challenges for myTeam: in case an approval fired while we were away
+      if(myTeam.id>0&&!myTeam.spectator){
+        sb.from('completed_challenges').select('challenge_id,location_id,points_earned').eq('team_id',myTeam.id).then(res=>{
+          if(!res.data||!res.data.length)return;
+          const compMap={};const ptsMap={};const visited=new Set();
+          res.data.forEach(row=>{
+            const m=String(row.challenge_id||'').match(/^(-?\d+)_(-?\d+)$/);
+            if(!m)return;
+            const locId=parseInt(m[1],10);const chIdx=parseInt(m[2],10);
+            if(!Number.isFinite(locId)||!Number.isFinite(chIdx))return;
+            compMap[locId]={...(compMap[locId]||{}),[chIdx]:true};
+            ptsMap[locId]={...(ptsMap[locId]||{}),[chIdx]:row.points_earned||0};
+            if(locId>0)visited.add(locId);
+          });
+          setCompleted(prev=>{const next={...compMap};Object.keys(prev).forEach(k=>{next[k]={...(next[k]||{}),...prev[k]};});return next;});
+          setCompletedPts(prev=>{const next={...ptsMap};Object.keys(prev).forEach(k=>{next[k]={...(next[k]||{}),...prev[k]};});return next;});
+          setVisitedLocs(prev=>{const s=new Set(prev);visited.forEach(v=>s.add(v));return s;});
+        },()=>{});
+      }
+      // step 5 — admin-only: refresh pending review queue
+      if(isAdmin){
+        sb.from('photo_reviews').select('*').eq('status','pending').order('created_at',{ascending:false}).then(res=>{
+          if(res.data)setReviewQueue(res.data);
+        },()=>{});
+      }
+    };
+    document.addEventListener('visibilitychange',onVisible);
+    // Also fire on 'pageshow' — iOS Safari bfcache restore doesn't always trigger visibilitychange
+    window.addEventListener('pageshow',onVisible);
+    return()=>{
+      document.removeEventListener('visibilitychange',onVisible);
+      window.removeEventListener('pageshow',onVisible);
+    };
+  },[myTeam,isAdmin,barBreakActive]);
 
   // V6/V12: admin actions with undo window
   const[reviewUndo,setReviewUndo]=useState(null); // {row, action, deadline, timer, commit}
@@ -1387,6 +1731,23 @@ function App(){
         // V20: atomic negative delta. Also updates local scores immediately if this is my team.
         applyScoreDelta(r.team_id,-r.points_awarded);
       }
+      // V21 P1-fix #19: post a visible reject-activity so the team sees WHY their score dropped.
+      // addActivity() uses myTeam (the admin's team), so build the entry manually for the rejected team.
+      if(!OFFLINE&&sb){
+        const rejectedTeam=teams.find(t=>t.id===r.team_id);
+        const penalty=REVIEW_REJECT_PENALTY?r.points_awarded:0;
+        sb.from('activity_feed').insert({
+          team_id:r.team_id,
+          team_name:rejectedTeam?.name||r.team_name||'Team',
+          team_emoji:rejectedTeam?.emoji||r.team_emoji||'❌',
+          team_color:rejectedTeam?.color||'#ff6b6b',
+          message:penalty>0
+            ?`Foto afgekeurd — "${r.challenge_title||'uitdaging'}" · -${penalty} pts`
+            :`Foto afgekeurd — "${r.challenge_title||'uitdaging'}"`,
+          points:penalty>0?-penalty:0,
+          created_at:new Date().toISOString(),
+        }).then(()=>{},()=>{});
+      }
     };
     setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},REJECT_UNDO_MS); return{row:r,action:'rejected',deadline:Date.now()+REJECT_UNDO_MS,timer,commit};});
   };
@@ -1398,23 +1759,35 @@ function App(){
   };
 
   const addActivity=(msg,pts=0,photoData=null,locId=null)=>{
+    // V22 audit fix (security agent): cap the message at 500 chars client-side so a
+    // crafted broadcast or pack rename can't blow up the feed. Normal activity lines
+    // are 40-120 chars — 500 is plenty of headroom for legitimate admin broadcasts.
+    const safeMsg=String(msg||'').slice(0,500);
     const entry={
-      team_id:myTeam?.id,message:msg,points:pts,
+      team_id:myTeam?.id,message:safeMsg,points:pts,
       created_at:new Date().toISOString(),
       team_emoji:myTeam?.emoji,team_name:myTeam?.name,
       team_color:myTeam?.color,
       photo:photoData||null,
       loc_id:locId, // V18: tagged so finale MVP award can count unique locations
     };
-    setActivityFeed(prev=>[entry,...prev].slice(0,50));
+    // V21: raise in-memory cap from 50 → 500 so FinaleScreen's MVP awards
+    // (which iterate the whole feed) aren't truncated after a 6-hour game.
+    setActivityFeed(prev=>[entry,...prev].slice(0,500));
     // Only send to Supabase if the payload is manageable. Drop raw video blobs
     // (>500KB) to respect row limits; compressed photo thumbnails are fine.
     if(!OFFLINE&&sb){
       const shareable={...entry};
-      // V18: loc_id isn't in the activity_feed schema yet; strip before insert
-      delete shareable.loc_id;
+      // V21: loc_id column is now part of the schema (supabase-v21-schema.sql) — keep it
       if(shareable.photo&&shareable.photo.length>600000){delete shareable.photo}
-      sb.from('activity_feed').insert(shareable);
+      sb.from('activity_feed').insert(shareable).then(()=>{},(err)=>{
+        // Graceful fallback: if the column doesn't exist yet (pre-v21 DB), retry without loc_id
+        const msg=String(err?.message||'').toLowerCase();
+        if(msg.includes('loc_id')||err?.code==='42703'){
+          const retry={...shareable};delete retry.loc_id;
+          sb.from('activity_feed').insert(retry).then(()=>{},()=>{});
+        }
+      });
     }
   };
 
@@ -1491,14 +1864,18 @@ function App(){
       setQuizStreak(newStreak);
     }
 
-    const basePts=pts;
+    // V20: FINALE multiplier — all scoring ×1.5 during phase 4 (last 20 min).
+    // Applied to base + streak (not first-bonus — that races async and applies its own multiplier).
+    const phaseMult=phase===4?FINALE_MULTIPLIER:1;
+    const basePts=Math.round(pts*phaseMult);
+    const appliedStreakBonus=Math.round(streakBonus*phaseMult);
     // V20: FIRST_BONUS is now resolved honestly server-side via challenge_first_finder
     // (see block further down). We no longer award it optimistically — it's a late
     // add-on that fires via a second delta + toast once the race is resolved.
     // OFFLINE mode keeps the old eager behaviour so solo testing still feels complete.
     const isFirstEligible=(!isDynamicBonus&&!isWrongZero);
-    const firstBonus=(OFFLINE&&isFirstEligible)?FIRST_BONUS:0;
-    let totalPts=basePts+firstBonus+streakBonus;
+    const firstBonus=(OFFLINE&&isFirstEligible)?Math.round(FIRST_BONUS*phaseMult):0;
+    let totalPts=basePts+firstBonus+appliedStreakBonus;
 
     if(!isDynamicBonus){
       setCompleted(prev=>({...prev,[locId]:{...prev[locId],[chIdx]:true}}));
@@ -1525,10 +1902,11 @@ function App(){
 
     // V14/V17: celebration on correct answer
     if(!isWrongZero&&loc){
-      const big=streakBonus>0||timeUnlock;
+      const big=appliedStreakBonus>0||timeUnlock;
       const breakdownBits=[`+${basePts} basis`];
       if(firstBonus>0)breakdownBits.push(`+${firstBonus} eerste`);
-      if(streakBonus>0)breakdownBits.push(`+${streakBonus} streak`);
+      if(appliedStreakBonus>0)breakdownBits.push(`+${appliedStreakBonus} streak`);
+      if(phaseMult!==1)breakdownBits.push(`🏁 FINALE ×${phaseMult}`);
       celebrate({
         emoji:timeUnlock?'⏳':big?'🔥':loc.e,
         title:timeUnlock?'Extra Tijd ontgrendeld!':big?`${newStreak} op rij!`:'Goed zo!',
@@ -1544,8 +1922,8 @@ function App(){
         label=`zat ernaast bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · 0 pts`;
       }else if(isDynamicBonus){
         label=`🎲 Bonus quiz bij ${loc.n} gehaald!`;
-      }else if(streakBonus>0){
-        label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid! 🔥 ${newStreak} op rij · +${streakBonus} bonus`;
+      }else if(appliedStreakBonus>0){
+        label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid! 🔥 ${newStreak} op rij · +${appliedStreakBonus} bonus`;
       }else{
         label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid!`;
       }
@@ -1580,14 +1958,16 @@ function App(){
       // Graceful fallback: if the table doesn't exist yet (migration not run),
       // fall back to the eager-everyone-gets-it legacy behaviour so nothing breaks.
       if(isFirstEligible&&FIRST_BONUS>0){
+        // V20: FINALE multiplier also applies to FIRST_BONUS winners
+        const firstBonusPts=Math.round(FIRST_BONUS*phaseMult);
         sb.from('challenge_first_finder').insert({challenge_id:key,team_id:myTeam.id})
           .then(
             ({error})=>{
               if(!error){
                 // We won the race.
-                applyScoreDelta(myTeam.id,FIRST_BONUS);
-                setToast(`🏆 Eerste bij ${loc.n}! +${FIRST_BONUS} pts bonus`);
-                addActivity(`was als eerste bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · +${FIRST_BONUS} pts bonus`,FIRST_BONUS,null,locId);
+                applyScoreDelta(myTeam.id,firstBonusPts);
+                setToast(`🏆 Eerste bij ${loc.n}! +${firstBonusPts} pts bonus`);
+                addActivity(`was als eerste bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · +${firstBonusPts} pts bonus`,firstBonusPts,null,locId);
                 return;
               }
               // Error code 23505 / PGRST duplicate / conflict = we lost the race. Silent no-op.
@@ -1598,7 +1978,7 @@ function App(){
               const msg=String(error.message||'').toLowerCase();
               if(msg.includes('does not exist')||msg.includes('relation')||error.code==='42P01'){
                 console.warn('challenge_first_finder missing — legacy fallback: awarding FIRST_BONUS anyway',error.message);
-                applyScoreDelta(myTeam.id,FIRST_BONUS);
+                applyScoreDelta(myTeam.id,firstBonusPts);
                 return;
               }
               console.warn('challenge_first_finder insert failed',error);
@@ -1682,14 +2062,15 @@ function App(){
   },[nowTs,hotTarget,myTeam]);
 
   // V17: Extra Tijd — add 5 min to the current hot target deadline
-  const activateExtraTime=useCallback(()=>{
+  const activateExtraTime=useCallback(async()=>{
     if(timeCharges<=0||!hotTarget)return;
-    if(!confirm('+5 min extra tijd gebruiken?'))return;
+    const ok=await confirmAsync('+5 min extra tijd gebruiken?',{confirmLabel:'Ja, gebruik'});
+    if(!ok)return;
     setTimeCharges(c=>c-1);
     setHotTarget(h=>h?{...h,deadline:h.deadline+TIME_CHARGE_MS}:h);
     setToast('⏳ +5 min toegevoegd');
     addActivity('heeft Extra Tijd gebruikt · +5 min ⏳');
-  },[timeCharges,hotTarget]);
+  },[timeCharges,hotTarget,confirmAsync]);
 
   // V10: derive jorikInTeam from jorikTeamId (real cross-team sync via Supabase broadcast)
   useEffect(()=>{
@@ -1698,13 +2079,33 @@ function App(){
 
   // V10: admin moves Jorik to a specific team (or nowhere)
   // V12: also persist on game_state so late-joining phones know who has Jorik
+  // V22 audit fix (concurrency agent): client-side rate-limit — two admin tabs / a
+  // double-tap / the auto-rotate effect firing in the same beat would write two
+  // UPDATEs and potentially swap jorik_moved_at backwards. Reject if we already
+  // moved Jorik within the last 5 s. Mike is sole admin so this is defensive.
+  const lastJorikMoveRef=React.useRef(0);
   const moveJorik=useCallback((targetTeamId)=>{
     if(!isAdmin)return;
+    const movedAtTs=Date.now();
+    if(movedAtTs-lastJorikMoveRef.current<5000)return; // guard against double-fire
+    lastJorikMoveRef.current=movedAtTs;
     setJorikTeamId(targetTeamId);
+    setJorikMovedAt(movedAtTs); // V20: reset auto-rotate clock (local optimistic)
     if(!OFFLINE&&sb){
       const team=teams.find(t=>t.id===targetTeamId);
       // V12: canonical source of truth
-      sb.from('game_state').update({jorik_team_id:targetTeamId}).eq('id',1).then(()=>{},()=>{});
+      // V21 P0: also persist jorik_moved_at so the 30-min rotate clock is
+      // authoritative on the server — admin refresh + cross-device reads stay in sync.
+      // Graceful fallback if the column doesn't exist yet (pre-v21 migration).
+      sb.from('game_state').update({jorik_team_id:targetTeamId,jorik_moved_at:new Date(movedAtTs).toISOString()}).eq('id',1).then(
+        ()=>{},
+        (err)=>{
+          const msg=String(err?.message||'').toLowerCase();
+          if(msg.includes('jorik_moved_at')||err?.code==='42703'){
+            sb.from('game_state').update({jorik_team_id:targetTeamId}).eq('id',1).then(()=>{},()=>{});
+          }
+        }
+      );
       // Activity feed as fallback + announcement
       sb.from('activity_feed').insert({
         team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#d4a054',
@@ -1728,15 +2129,80 @@ function App(){
     }
   },[isAdmin,teams]);
 
+  // V20: JORIK auto-rotate watcher (admin only). If the current holder hasn't
+  // been changed for JORIK_ROTATE_MS, pick the lowest-scoring non-holder team
+  // and send Jorik there. Keeps Jorik moving and spreads the mission points.
+  useEffect(()=>{
+    if(!isAdmin)return;
+    if(phase<1||phase>=5)return; // only during active play
+    if(!jorikTeamId||!jorikMovedAt)return;
+    if(nowTs-jorikMovedAt<JORIK_ROTATE_MS)return;
+    const candidates=teams.filter(t=>!t.spectator&&t.id!==jorikTeamId);
+    if(!candidates.length)return;
+    candidates.sort((a,b)=>(scores[a.id]||0)-(scores[b.id]||0));
+    const target=candidates[0];
+    if(target)moveJorik(target.id);
+  },[isAdmin,phase,jorikTeamId,jorikMovedAt,nowTs,teams,scores,moveJorik]);
+
   // V10/V12: bar-break trigger — admin signals a break at specific bar name
   // V12: persisted on game_state so all phones open the overlay at the same moment
   const[barBreakActive,setBarBreakActive]=useState(null); // {name, mini, started}
   const[barBreakHidden,setBarBreakHidden]=useState(false); // V18: minimize overlay, show chip
   useEffect(()=>{setBarBreakHidden(false);},[barBreakActive?.name,barBreakActive?.started]);
-  const triggerBarBreak=useCallback((barName)=>{
+
+  // V21 P0-fix #8: client-side watchdog — if an admin's "end bar break" RPC fails to replicate,
+  // phones would be stuck on the bar-break overlay forever. Auto-clear locally after
+  // BAR_BREAK_DURATION_MS + 120 s grace (admin network/DB hiccup buffer). Server state still wins
+  // when realtime catches up. Non-admins also write back to game_state as a best-effort recovery
+  // so the next device to load doesn't reopen the overlay.
+  useEffect(()=>{
+    if(!barBreakActive?.started)return;
+    const hardDeadline=barBreakActive.started+BAR_BREAK_DURATION_MS+120000;
+    const now=Date.now();
+    if(now>=hardDeadline){
+      setBarBreakActive(null);
+      if(isAdmin&&!OFFLINE&&sb){
+        sb.from('game_state').update({bar_break_active:null,bar_break_started_at:null}).eq('id',1).then(()=>{},()=>{});
+      }
+      return;
+    }
+    const t=setTimeout(()=>{
+      setBarBreakActive(prev=>{
+        // only clear if still this same break
+        if(!prev||prev.started!==barBreakActive.started)return prev;
+        return null;
+      });
+      if(isAdmin&&!OFFLINE&&sb){
+        sb.from('game_state').update({bar_break_active:null,bar_break_started_at:null}).eq('id',1).then(()=>{},()=>{});
+      }
+    },hardDeadline-now);
+    return()=>clearTimeout(t);
+  },[barBreakActive?.started,isAdmin]);
+  const triggerBarBreak=useCallback(async(barName)=>{
     if(!isAdmin||!barName)return;
+    // V21 audit P0 Race-6: two admin tabs could both press "triggerBarBreak"
+    // simultaneously — both would insert activity feed entries AND both would
+    // award an underdog bonus (breakKey differs per tab because startedAt
+    // is per-tab). Guard with a compare-and-set pre-read: if the DB already
+    // has a recent bar_break_started_at (within 45 s) we abort quietly.
+    if(!OFFLINE&&sb){
+      try{
+        const{data:gs}=await sb.from('game_state').select('bar_break_active,bar_break_started_at').eq('id',1).maybeSingle();
+        if(gs?.bar_break_started_at){
+          const existingMs=new Date(gs.bar_break_started_at).getTime();
+          if(!isNaN(existingMs)&&Date.now()-existingMs<45000){
+            // Another admin tab already fired this break — reflect their state locally and bail.
+            const minisExisting=defaultBarMinis(gs.bar_break_active||barName,existingMs);
+            setBarBreakActive({name:gs.bar_break_active||barName,mini:minisExisting,started:existingMs});
+            setBarBreak({name:gs.bar_break_active||barName,time:existingMs});
+            return;
+          }
+        }
+      }catch(e){/* fall through — worst case we do the original behaviour */}
+    }
     const startedAt=Date.now();
-    const minis=defaultBarMinis();
+    // V20: seeded 3-of-6 mini pick
+    const minis=defaultBarMinis(barName,startedAt);
     setBarBreakActive({name:barName,mini:minis,started:startedAt});
     setBarBreak({name:barName,time:startedAt});
     if(!OFFLINE&&sb){
@@ -1745,6 +2211,33 @@ function App(){
         team_id:null, team_name:'Game Master', team_emoji:'🍻', team_color:'#d4a054',
         message:`🍺 BAR BREAK → ${barName}! Alle teams naar deze locatie.`,
         points:0, created_at:new Date().toISOString(),
+      });
+
+      // V20 balance: UNDERDOG BONUS — the current last-place team gets a silent
+      // +UNDERDOG_BONUS so they stay psychologically in the race. Guarded against
+      // double-awarding via teams.underdog_bonus_last_break (set to startedAt's
+      // unix seconds, a unique-per-break integer).
+      const breakKey=Math.floor(startedAt/1000);
+      sb.from('teams').select('id,name,score,underdog_bonus_last_break,spectator').then(({data:allTeams,error})=>{
+        if(error||!allTeams?.length)return;
+        const eligible=allTeams.filter(t=>!t.spectator);
+        if(eligible.length<2)return; // need at least 2 teams to have a "last place"
+        eligible.sort((a,b)=>(a.score||0)-(b.score||0));
+        const last=eligible[0];
+        // Column might not exist yet (migration pending) — in that case underdog_bonus_last_break is undefined; proceed.
+        if(last.underdog_bonus_last_break===breakKey)return;
+        sb.rpc('increment_team_score',{p_team_id:last.id,p_delta:UNDERDOG_BONUS})
+          .then(({error:rpcErr})=>{
+            if(rpcErr){console.warn('underdog bonus RPC failed',rpcErr.message||rpcErr);return;}
+            // Mark this break as claimed so a re-trigger doesn't double-pay.
+            sb.from('teams').update({underdog_bonus_last_break:breakKey}).eq('id',last.id).then(()=>{},()=>{});
+            sb.from('activity_feed').insert({
+              team_id:last.id,team_name:last.name,team_emoji:'💪',team_color:'#d4a054',
+              message:`💪 UNDERDOG BONUS voor ${last.name}! +${UNDERDOG_BONUS} pts (still in it!)`,
+              points:UNDERDOG_BONUS,created_at:new Date().toISOString(),
+            });
+          })
+          .catch(e=>console.warn('underdog bonus threw',e));
       });
     }
   },[isAdmin]);
@@ -1756,6 +2249,25 @@ function App(){
     if(!OFFLINE&&sb){
       sb.from('game_state').update({bar_break_active:null,bar_break_started_at:null}).eq('id',1).then(()=>{},()=>{});
     }
+  },[isAdmin]);
+
+  // V21 P0: phase-4 admin trigger. Previously setPhase jumped from 1 straight
+  // to 5 (ceremony), meaning the advertised "laatste 20 min ×1.5" finale phase
+  // was unreachable — phaseMult=phase===4?1.5:1 always evaluated to 1.
+  // Admin taps this to enter the dramatic final-push sub-phase; the FINALE
+  // multiplier now fires and the phase-4 pulse banner becomes visible.
+  const startFinalePhase=useCallback(()=>{
+    if(!isAdmin)return;
+    setPhase(4);
+    if(!OFFLINE&&sb){
+      sb.from('game_state').update({phase:4,bar_break_active:null,bar_break_started_at:null}).eq('id',1).then(()=>{},()=>{});
+      sb.from('activity_feed').insert({
+        team_id:null, team_name:'Game Master', team_emoji:'🏁', team_color:'#d4a054',
+        message:'🏁 FINALE! Laatste 20 minuten · alle scoring ×1.5',
+        points:0, created_at:new Date().toISOString(),
+      });
+    }
+    setToast('🏁 Finale-fase gestart · ×1.5 multiplier');
   },[isAdmin]);
 
   // V10/V12: finale — admin advances phase to 5 = ceremony, synced to every phone
@@ -1794,27 +2306,42 @@ function App(){
   },[isAdmin,scores,teams]);
 
   // V16: admin broadcasts a free-text message to all teams via activity_feed
+  // V22 audit fix (security agent): strip RTL override + zero-width chars that could
+  // spoof a system message; cap at 300 chars to match the feed's intended density.
+  // V22 P0 fix: add optimistic local append (admin sees it immediately) + surface
+  // insert errors to the console (were being swallowed, masking schema mismatches).
   const broadcastMessage=useCallback((msg)=>{
     if(!isAdmin||!msg)return;
+    // U+202A..U+202E (RTL/LTR overrides), U+2066..U+2069 (isolates), U+200B..U+200D (zero-width)
+    const clean=String(msg).replace(/[\u202A-\u202E\u2066-\u2069\u200B-\u200D\uFEFF]/g,'').trim().slice(0,300);
+    if(!clean)return;
+    const entry={
+      team_id:null, team_name:'Game Master', team_emoji:'📢', team_color:'#d4a054',
+      message:clean, points:0, created_at:new Date().toISOString(),
+    };
+    // Optimistic local append — the admin sees their own broadcast even if
+    // Realtime roundtrip is slow or the insert quietly fails.
+    setActivityFeed(prev=>[entry,...prev].slice(0,500));
     if(!OFFLINE&&sb){
-      sb.from('activity_feed').insert({
-        team_id:null, team_name:'Game Master', team_emoji:'📢', team_color:'#d4a054',
-        message:msg, points:0, created_at:new Date().toISOString(),
-      }).then(()=>{},()=>{});
+      sb.from('activity_feed').insert(entry).then(
+        (res)=>{if(res&&res.error){console.error('[broadcast] insert failed:',res.error)}},
+        (err)=>{console.error('[broadcast] insert threw:',err)}
+      );
     }
     setToast(`📢 Bericht verzonden`);
   },[isAdmin]);
 
   // V12: admin removes a duplicate / rogue team
-  const removeTeam=useCallback((teamId)=>{
+  const removeTeam=useCallback(async(teamId)=>{
     if(!isAdmin||!teamId)return;
-    if(!confirm('Team verwijderen? Dit kan niet ongedaan worden gemaakt.'))return;
+    const ok=await confirmAsync('Team verwijderen? Dit kan niet ongedaan worden gemaakt.',{confirmLabel:'Verwijder',danger:true});
+    if(!ok)return;
     setTeams(prev=>prev.filter(t=>t.id!==teamId));
     setScores(prev=>{const n={...prev};delete n[teamId];return n;});
     if(!OFFLINE&&sb){
       sb.from('teams').delete().eq('id',teamId).then(()=>{},()=>{});
     }
-  },[isAdmin]);
+  },[isAdmin,confirmAsync]);
 
   // V9/V17: Unlock bonus Extra Tijd charges at score milestones
   useEffect(()=>{
@@ -1895,12 +2422,53 @@ function App(){
   },[jorikMissionsDone,myTeam]);
 
   // V12: leaving a team (tap the HUD avatar)
-  const leaveTeam=useCallback(()=>{
-    if(!confirm('Team verlaten? Je komt terug op het splash scherm.'))return;
+  const leaveTeam=useCallback(async()=>{
+    const ok=await confirmAsync('Team verlaten? Je komt terug op het splash scherm.',{confirmLabel:'Verlaat team',danger:true});
+    if(!ok)return;
     clearSession();
     setMyTeam(null);setScreen('splash');setPhase(0);setGameStart(null);
     setCompleted({});setCompletedPts({});setVisitedLocs(new Set());
-  },[]);
+  },[confirmAsync]);
+
+  // V20 UX P1: long-press (500ms) to leave team — prevents accidental taps on HUD avatar
+  const avatarLPTimer=React.useRef(null);
+  const avatarLP=React.useMemo(()=>({
+    start:()=>{if(avatarLPTimer.current)clearTimeout(avatarLPTimer.current);avatarLPTimer.current=setTimeout(()=>{leaveTeam();avatarLPTimer.current=null;},500);},
+    cancel:()=>{if(avatarLPTimer.current){clearTimeout(avatarLPTimer.current);avatarLPTimer.current=null;}},
+  }),[leaveTeam]);
+
+  // V20 UX P1: beforeunload warning while in active game — prevents accidental tab close
+  // V21 P1-fix #20: also attach during phase 5 (finale ceremony) — closing the tab there
+  // causes a freshly-opened tab to re-prompt the wedding video and risk replay of the
+  // teammate's celebratory flow. Stop only once game_ended AND phase beyond ceremony (phase>=6).
+  useEffect(()=>{
+    if(!myTeam||phase<1||phase>=6)return;
+    const handler=(e)=>{e.preventDefault();e.returnValue='';return '';};
+    window.addEventListener('beforeunload',handler);
+    return()=>window.removeEventListener('beforeunload',handler);
+  },[myTeam,phase]);
+
+  // V21 P1-fix #35: GM heartbeat.
+  // Admin writes game_state.gm_heartbeat every 30 s so clients can detect if the
+  // Game Master has disconnected. Non-admin clients read gm_heartbeat (via gmLastSeen
+  // below) and surface a small warning chip when it goes stale (>2 min).
+  const[gmLastSeen,setGmLastSeen]=useState(null); // epoch ms of last admin heartbeat we've seen
+  useEffect(()=>{
+    if(!isAdmin||OFFLINE||!sb||phase<1||phase>=6)return;
+    let cancelled=false;
+    const write=()=>{
+      if(cancelled)return;
+      const ts=new Date().toISOString();
+      sb.from('game_state').update({gm_heartbeat:ts}).eq('id',1).then(()=>{},(err)=>{
+        // Graceful fallback: column missing on pre-v21 DBs — silently skip
+        const msg=String(err?.message||'').toLowerCase();
+        if(!(msg.includes('gm_heartbeat')||err?.code==='42703'))console.warn('gm_heartbeat write failed',err);
+      });
+    };
+    write();
+    const i=setInterval(write,30000);
+    return()=>{cancelled=true;clearInterval(i);};
+  },[isAdmin,phase]);
 
 
   const startGame=()=>{
@@ -1974,7 +2542,7 @@ function App(){
 
   // ═══════════ TEAM SETUP ═══════════
   if(screen==='setup'){
-    return <TeamSetup teams={teams} setTeams={setTeams} onJoin={(team)=>{setMyTeam(team);setScreen('lobby')}} isAdmin={isAdmin}/>;
+    return <TeamSetup teams={teams} setTeams={setTeams} onJoin={(team)=>{setMyTeam(team);setScreen('lobby')}} isAdmin={isAdmin} promptAsync={promptAsync}/>;
   }
 
   // ═══════════ LOBBY ═══════════
@@ -2022,8 +2590,9 @@ function App(){
         {/* V18 (§1.2.6): accidental join escape hatch — switch team before start */}
         {myTeam&&!myTeam.spectator&&(
           <div className="text-center" style={{marginTop:'var(--sp-3)'}}>
-            <button className="btn btn-ghost btn-sm" onClick={()=>{
-              if(!confirm(`Je zit nu in ${myTeam.emoji} ${myTeam.name}. Wil je van team wisselen?`))return;
+            <button className="btn btn-ghost btn-sm" onClick={async()=>{
+              const ok=await confirmAsync(`Je zit nu in ${myTeam.emoji} ${myTeam.name}. Wil je van team wisselen?`,{confirmLabel:'Wissel team'});
+              if(!ok)return;
               // V19: leave the team locally — do NOT delete the Supabase row,
               // because teammates may still be in it. Only the admin can prune
               // teams via the dedicated 🗑 button.
@@ -2037,8 +2606,11 @@ function App(){
 
         {isAdmin?(
           <div className="stack-3">
-            <button className="btn btn-gold btn-lg" onClick={()=>{
-              if(teamCount<2){if(!confirm(`Slechts ${teamCount} team${teamCount===1?'':'s'} in de lobby. Toch starten?`))return;}
+            <button className="btn btn-gold btn-lg" onClick={async()=>{
+              if(teamCount<2){
+                const ok=await confirmAsync(`Slechts ${teamCount} team${teamCount===1?'':'s'} in de lobby. Toch starten?`,{confirmLabel:'Start toch'});
+                if(!ok)return;
+              }
               startGame();
             }} style={{width:'100%'}}>🎮 Start het spel{teamCount>0?` (${teamCount})`:''}</button>
             <div className="t-caption text-center">Jij bent de Game Master — druk zodra iedereen er is</div>
@@ -2059,7 +2631,10 @@ function App(){
   return(
     <div style={{height:'100%',display:'flex',flexDirection:'column'}}>
       {OFFLINE&&<div className="offline-banner">⚡ Offline Mode — Multiplayer uitgeschakeld</div>}
-      {toast&&<div className="toast"><div className="toast-inner">{toast}</div></div>}
+      {/* V22 audit fix: private-browsing warning. localStorage is unavailable (iOS Private
+          mode / locked-down browsers) so progress cannot survive a force-quit. One-shot banner. */}
+      {!OFFLINE&&!localStorageWorks()&&<div className="offline-banner" style={{top:OFFLINE?26:0,color:'#e4b25c',background:'rgba(228,178,92,0.12)',borderBottomColor:'rgba(228,178,92,0.25)'}}>⚠︎ Private browsing actief — voortgang wordt niet bewaard bij tab sluiten</div>}
+      {toast&&<div className="toast" role="status" aria-live="polite" aria-atomic="true"><div className="toast-inner">{toast}</div></div>}
       {scorePopup&&<div className="score-popup">{scorePopup}</div>}
       {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal */}
       {(gpsStatus==='denied'||gpsStatus==='unavailable')&&(
@@ -2159,7 +2734,10 @@ function App(){
 
       {/* V15: HUD — consistent padding + type */}
       <div style={{padding:`var(--sp-4) var(--sp-5)`,paddingTop:OFFLINE?'var(--sp-7)':phase>=1&&phase<5?'var(--sp-9)':'var(--sp-4)',background:'linear-gradient(180deg,rgba(10,11,16,0.92) 0%,rgba(10,11,16,0.85) 100%)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'var(--sp-3)',zIndex:100,backdropFilter:'blur(20px) saturate(1.4)',WebkitBackdropFilter:'blur(20px) saturate(1.4)',position:'relative'}}>
-        <div onClick={leaveTeam} style={{cursor:'pointer',display:'flex',alignItems:'center',gap:'var(--sp-3)',flex:1,minWidth:0}} title="Tik om team te verlaten">
+        <div
+          onMouseDown={avatarLP.start} onMouseUp={avatarLP.cancel} onMouseLeave={avatarLP.cancel}
+          onTouchStart={avatarLP.start} onTouchEnd={avatarLP.cancel} onTouchMove={avatarLP.cancel} onTouchCancel={avatarLP.cancel}
+          style={{cursor:'pointer',display:'flex',alignItems:'center',gap:'var(--sp-3)',flex:1,minWidth:0,userSelect:'none',WebkitUserSelect:'none'}} title="Houd ingedrukt om team te verlaten">
           <div style={{fontSize:28,filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.4))'}}>{myTeam?.emoji}</div>
           <div style={{minWidth:0}}>
             <div className="t-card-label truncate">{myTeam?.name}</div>
@@ -2168,7 +2746,7 @@ function App(){
                 <span className="t-label-sm t-accent">{lv.emoji} L{lv.level}</span>
                 {nxt?<span className="t-label-sm">{nxt.min-myScore} tot L{nxt.level}</span>:<span className="t-label-sm t-accent-2">Max</span>}
               </>;})()}
-              {quizStreak>=2&&<span className="streak-chip">🔥 {quizStreak}</span>}
+              {quizStreak>=3&&<span className="streak-chip">🔥 {quizStreak}</span>}
             </div>
           </div>
         </div>
@@ -2221,12 +2799,21 @@ function App(){
         </div>
       )}
 
+      {/* V21 P1-fix #35: Game-Master offline warning — shows when admin heartbeat is >2 min stale */}
+      {!isAdmin&&phase>=1&&phase<6&&gmLastSeen!=null&&(nowTs-gmLastSeen>120000)&&(
+        <div role="status" aria-live="polite"
+          style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'6px 12px',background:'rgba(255,107,107,0.18)',borderTop:'1px solid rgba(255,107,107,0.35)',borderBottom:'1px solid rgba(255,107,107,0.35)',color:'#fff',fontSize:'var(--fs-12)',letterSpacing:'var(--ls-wider)'}}>
+          <span>⚠️</span>
+          <span>Game Master offline ({Math.floor((nowTs-gmLastSeen)/60000)} min) · scores blijven lokaal</span>
+        </div>
+      )}
+
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} hotTarget={hotTarget} nowTs={nowTs}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
-        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage}/>}
+        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} confirmAsync={confirmAsync}/>}
       </div>
 
       {/* V5: Narrative story modal */}
@@ -2237,12 +2824,45 @@ function App(){
       {/* V5: Photo lightbox */}
       {photoLightbox&&<PhotoLightbox media={photoLightbox} onClose={()=>setPhotoLightbox(null)}/>}
 
+      {/* V20 UX P1: app-level dialog — replaces all native confirm()/prompt() calls */}
+      {dialog&&<DialogSheet {...dialog} onClose={closeDialog}/>}
+
       {/* V10/V16/V18: Bar-break overlay — minimizable, persistent chip when hidden */}
       {barBreakActive&&!barBreakHidden&&<BarBreakOverlay info={barBreakActive} onClose={()=>setBarBreakHidden(true)} onComplete={(mini,pts,photo)=>{
-        // V20: atomic delta — handles both optimistic local update and server write
-        applyScoreDelta(myTeam?.id,pts);
-        setScorePopup(`+${pts}`);
-        addActivity(`haalde "${mini.title}" bij ${barBreakActive.name} · +${pts} pts`,pts,photo);
+        // V21 P1-fix #21: idempotent bar-break mini completion.
+        // A stable pseudo challenge_id lets the completed_challenges UNIQUE index (team_id, challenge_id)
+        // block duplicate submissions after a reload or network retry. 23505 means "already counted" — no-op.
+        const barKey=`bb_${barBreakActive.name||'bar'}_${(mini.title||'mini').replace(/\s+/g,'_')}_${barBreakActive.started||0}`;
+        let awarded=false;
+        const localAward=()=>{
+          if(awarded)return;awarded=true;
+          applyScoreDelta(myTeam?.id,pts);
+          setScorePopup(`+${pts}`);
+          addActivity(`haalde "${mini.title}" bij ${barBreakActive.name} · +${pts} pts`,pts,photo);
+        };
+        if(!OFFLINE&&sb&&myTeam?.id){
+          // Use sentinel location_id=-1 — completed_challenges.location_id is NOT NULL in v14 schema.
+          // The rehydrate regex `/^(-?\d+)_(-?\d+)$/` will reject bar-mini challenge_ids (prefix "bb_")
+          // so compMap/visited won't be polluted. -1 is also filtered from visitedLocs (locId>0 guard).
+          sb.from('completed_challenges').insert({
+            team_id:myTeam.id,
+            challenge_id:barKey,
+            location_id:-1,
+            challenge_type:'bar-mini',
+            points_earned:pts,
+          }).then(({error})=>{
+            if(error&&error.code==='23505'){
+              // already counted — silent no-op
+              return;
+            }
+            localAward();
+          }).catch(()=>{
+            // Network hiccup or DB offline — still apply locally so play continues
+            localAward();
+          });
+        }else{
+          localAward();
+        }
       }}/>}
       {/* V18: persistent bar-break chip — shows at top-left while minimized */}
       {barBreakActive&&barBreakHidden&&(()=>{
@@ -2267,7 +2887,7 @@ function App(){
       {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam}/>}
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
-      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam}/>}
+      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync}/>}
 
       {/* V19+: Jorik-specific missions — mirror of wedding, visible only when Jorik IS in team */}
       {showJorikMissions&&<JorikMissions onClose={()=>setShowJorikMissions(false)} onComplete={completeJorikMission} done={jorikMissionsDone} jorikInTeam={jorikInTeam}/>}
@@ -2293,7 +2913,7 @@ function App(){
 // ═══════════════════════════════════════════
 // TEAM SETUP — V5: starter packs + custom
 // ═══════════════════════════════════════════
-function TeamSetup({teams,setTeams,onJoin,isAdmin}){
+function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync}){
   const[mode,setMode]=useState('quick'); // 'quick' | 'custom'
   const[name,setName]=useState('');
   const[emoji,setEmoji]=useState('');
@@ -2305,13 +2925,22 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
   const parseMembers=()=>membersText.split(/[,\n]/).map(s=>s.trim()).filter(Boolean).slice(0,10);
   // V12/V18: editable name on a starter pack — wired to UI via ✏️ chip on each pack card
   const[packNameOverride,setPackNameOverride]=useState({});
-  const renamePack=(p,e)=>{
+  const renamePack=async(p,e)=>{
     if(e){e.stopPropagation();e.preventDefault();}
     const current=packNameOverride[p.name]||p.name;
-    const input=prompt(`Nieuwe naam voor "${p.name}":`,current);
+    const ask=promptAsync||((msg,def)=>Promise.resolve(window.prompt(msg,def)));
+    const input=await ask(`Nieuwe naam voor "${p.name}":`,current);
     if(input===null)return;
     const trimmed=input.trim();
     if(!trimmed){setPackNameOverride(prev=>{const n={...prev};delete n[p.name];return n;});return;}
+    // V21 P1-fix #26: re-run the conflict check at rename time so the user sees the
+    // "already in use" feedback immediately (case-insensitive via nameConflict) instead of
+    // only when they tap the starter-pack card to create.
+    if(await nameConflict(trimmed)){
+      setErr(`"${trimmed}" is al in gebruik door een ander team`);
+      return;
+    }
+    setErr(''); // clear any stale error
     setPackNameOverride(prev=>({...prev,[p.name]:trimmed}));
   };
   const usedEmojis=teams.map(t=>t.emoji);
@@ -2523,7 +3152,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax,visitedLocs,jorikMissionsDone,onShowJorikMissions}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax,visitedLocs,jorikMissionsDone,onShowJorikMissions}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
   const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
@@ -2629,6 +3258,9 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         const total=JORIK_MISSIONS.length;
         const remaining=total-doneCount;
         const allDone=doneCount>=total;
+        // V20: show countdown to auto-rotation so teams feel the pressure
+        const msLeft=jorikMovedAt?Math.max(0,(jorikMovedAt+JORIK_ROTATE_MS)-(nowTs||Date.now())):null;
+        const minLeft=msLeft!=null?Math.ceil(msLeft/60000):null;
         return(
           <div className="secret-banner" onClick={onShowJorikMissions} style={{marginBottom:'var(--sp-3)',marginTop:0,background:'linear-gradient(155deg,rgba(228,178,92,0.18),rgba(255,107,107,0.08))',borderColor:'rgba(228,178,92,0.4)'}}>
             <div className="secret-badge" style={{background:'rgba(228,178,92,0.25)',borderColor:'rgba(228,178,92,0.5)'}}>💍 Jorik-missies</div>
@@ -2636,6 +3268,30 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
             <div className="t-body" style={{marginTop:'var(--sp-1)'}}>
               {allDone?'🎉 Chapeau — legendarisch team':`Tik voor ${remaining} openstaande missie${remaining===1?'':'s'} · ${doneCount}/${total} gedaan`}
             </div>
+            {minLeft!=null&&!allDone&&(
+              <div className="t-caption" style={{marginTop:'var(--sp-2)',color:'rgba(255,255,255,0.75)'}}>
+                ⏳ Jorik rotateert over ~{minLeft} min — haast je!
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* V20: non-holder chip — shows who has Jorik and when they lose him */}
+      {!jorikInTeam&&jorikTeamId!=null&&(()=>{
+        const holder=teams.find(t=>t.id===jorikTeamId);
+        if(!holder)return null;
+        const msLeft=jorikMovedAt?Math.max(0,(jorikMovedAt+JORIK_ROTATE_MS)-(nowTs||Date.now())):null;
+        const minLeft=msLeft!=null?Math.ceil(msLeft/60000):null;
+        return(
+          <div className="panel-sm panel row-2" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(228,178,92,0.25)'}}>
+            <span style={{fontSize:18}}>💍</span>
+            <span className="t-caption flex-1" style={{color:'var(--text-secondary)'}}>
+              Jorik loopt nu met <span style={{color:holder.color,fontWeight:700}}>{holder.emoji} {holder.name}</span>
+            </span>
+            {minLeft!=null&&(
+              <span className="t-label-sm t-accent" style={{whiteSpace:'nowrap'}}>~{minLeft} min</span>
+            )}
           </div>
         );
       })()}
@@ -3015,17 +3671,24 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter}){
 // V5: NARRATIVE STORY MODAL
 // ═══════════════════════════════════════════
 function StoryModal({story,onClose}){
+  // V21 a11y: escape-to-close + role/aria-modal/aria-labelledby + focus trap
+  React.useEffect(()=>{
+    const onKey=(e)=>{if(e.key==='Escape'){e.stopPropagation();onClose&&onClose();}};
+    window.addEventListener('keydown',onKey);
+    return()=>window.removeEventListener('keydown',onKey);
+  },[onClose]);
+  const titleId=React.useMemo(()=>'story-title-'+Math.random().toString(36).slice(2,8),[]);
   return(
-    <div className="story-overlay" onClick={onClose}>
+    <div className="story-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <div className="story-card" onClick={e=>e.stopPropagation()}>
         <div className="story-chapter">{story.chapter}</div>
-        <div className="story-title">{story.title}</div>
+        <div className="story-title" id={titleId}>{story.title}</div>
         <div style={{textAlign:'left',marginBottom:'var(--sp-6)'}}>
           {story.text.split('\n\n').map((p,i)=>(
             <p key={i} className="t-body" style={{marginBottom:'var(--sp-3)'}}>{p}</p>
           ))}
         </div>
-        <button className="btn btn-cyan" onClick={onClose} style={{width:'100%'}}>
+        <button className="btn btn-cyan" onClick={onClose} style={{width:'100%'}} autoFocus aria-label="Sluit verhaal en ga verder">
           Verder →
         </button>
       </div>
@@ -3037,20 +3700,80 @@ function StoryModal({story,onClose}){
 // V5: PHOTO LIGHTBOX
 // ═══════════════════════════════════════════
 function PhotoLightbox({media,onClose}){
+  // V21 a11y: escape closes + role dialog + aria-label on close
+  React.useEffect(()=>{
+    const onKey=(e)=>{if(e.key==='Escape'){e.stopPropagation();onClose&&onClose();}};
+    window.addEventListener('keydown',onKey);
+    return()=>window.removeEventListener('keydown',onKey);
+  },[onClose]);
   return(
-    <div className="photo-lightbox" onClick={onClose}>
-      <button className="photo-lightbox-close" onClick={onClose}>✕</button>
+    <div className="photo-lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label="Vergrote media">
+      <button className="photo-lightbox-close" onClick={onClose} aria-label="Sluit foto">✕</button>
       {isVideoData(media)
-        ?<video src={media} controls autoPlay style={{maxWidth:'100%',maxHeight:'80vh',borderRadius:12}}/>
-        :<img src={media} alt="enlarged"/>}
+        ?<video src={media} controls autoPlay style={{maxWidth:'100%',maxHeight:'80vh',borderRadius:12}} aria-label="Video"/>
+        :<img src={media} alt="Uitvergrote foto"/>}
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════
+// V20 UX P1: promise-based dialog sheet
+// ═══════════════════════════════════════════
+// Replaces native confirm()/prompt(). Resolves `true`/`input` on OK, `false`/null on cancel.
+function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClose}){
+  const[val,setVal]=React.useState(defaultVal||'');
+  const inputRef=React.useRef(null);
+  React.useEffect(()=>{
+    if(type==='prompt'){
+      const t=setTimeout(()=>inputRef.current?.focus(),30);
+      return()=>clearTimeout(t);
+    }
+  },[type]);
+  const onOk=()=>{
+    if(type==='prompt')onClose(val);
+    else onClose(true);
+  };
+  const onCancel=()=>{
+    if(type==='prompt')onClose(null);
+    else onClose(false);
+  };
+  const onKey=(e)=>{
+    if(e.key==='Enter'&&(type==='confirm'||(type==='prompt'&&val.trim()))){
+      e.preventDefault();onOk();
+    }else if(e.key==='Escape'){
+      e.preventDefault();onCancel();
+    }
+  };
+  return(
+    <>
+      <div className="sheet-overlay" onClick={onCancel} role="presentation"/>
+      <div role="alertdialog" aria-modal="true" aria-labelledby="dialog-msg"
+        style={{position:'fixed',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:10050,maxWidth:420,width:'92%',padding:'var(--sp-6) var(--sp-6) var(--sp-5)',borderRadius:'var(--r-lg)',background:'var(--bg-elevated,#17181f)',border:'1px solid var(--border)',boxShadow:'0 20px 60px rgba(0,0,0,0.6)',color:'#fff'}}
+        onKeyDown={onKey}>
+        <div id="dialog-msg" className="t-body" style={{marginBottom:'var(--sp-5)',lineHeight:'var(--lh-relaxed)',whiteSpace:'pre-wrap'}}>{msg}</div>
+        {type==='prompt'&&(
+          <input ref={inputRef} value={val} onChange={e=>setVal(e.target.value)} autoFocus
+            style={{width:'100%',padding:'12px 14px',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',fontFamily:'inherit',fontSize:'var(--fs-15)',marginBottom:'var(--sp-5)'}}/>
+        )}
+        <div style={{display:'flex',gap:'var(--sp-2)',justifyContent:'flex-end'}}>
+          <button type="button" onClick={onCancel}
+            className="btn btn-sm"
+            style={{background:'rgba(255,255,255,0.06)',color:'#fff',border:'1px solid var(--border)'}}>{cancelLabel||'Annuleer'}</button>
+          <button type="button" onClick={onOk}
+            className={`btn btn-sm ${danger?'btn-danger':'btn-gold'}`}
+            disabled={type==='prompt'&&!val.trim()}>{confirmLabel||'OK'}</button>
+        </div>
+      </div>
+    </>
   );
 }
 
 // ═══════════════════════════════════════════
 // V6: ADMIN REVIEW QUEUE
 // ═══════════════════════════════════════════
-function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,reviewUndo,onUndoReview,onBroadcast}){
+function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinalePhase,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,reviewUndo,onUndoReview,onBroadcast,confirmAsync}){
+  // V20 UX P1: fallback to native confirm if prop missing (for isolated testing)
+  const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
   const[barChoice,setBarChoice]=React.useState('');
   const[barCustom,setBarCustom]=React.useState('');
   const[showTeamAdmin,setShowTeamAdmin]=React.useState(false);
@@ -3118,7 +3841,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
         <div>
           <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Bar break {barBreakActive?<span className="t-accent">· actief · {barBreakActive.name}</span>:''}</div>
           {barBreakActive?(
-            <button onClick={()=>{if(confirm('Bar break nu beëindigen?'))onEndBarBreak&&onEndBarBreak()}} className="btn btn-danger btn-sm" style={{width:'100%'}}>
+            <button onClick={async()=>{if(await ask('Bar break nu beëindigen?',{danger:true}))onEndBarBreak&&onEndBarBreak()}} className="btn btn-danger btn-sm" style={{width:'100%'}}>
               🛑 Bar break beëindigen
             </button>
           ):(
@@ -3194,7 +3917,12 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
         {/* Finale */}
         <div>
           <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Finale & uitslag</div>
-          <button onClick={()=>{if(confirm('Spel beëindigen en naar de eindceremonie? Dit kan niet ongedaan worden gemaakt.'))onStartFinale&&onStartFinale()}}
+          {/* V21 P0-fix: two-step finale — first activate phase 4 (×1.5 multiplier), then the ceremony */}
+          <button onClick={async()=>{if(await ask('Start de finale-fase? Alle scoring krijgt ×1.5 voor de laatste 20 minuten.',{confirmLabel:'Start finale-fase'}))onStartFinalePhase&&onStartFinalePhase()}}
+            className="btn btn-cyan" disabled={phase>=4} style={{width:'100%',marginBottom:'var(--sp-2)'}}>
+            🏁 {phase===4?'Finale-fase loopt · ×1.5':phase>=5?'Spel beëindigd':'Start finale-fase (×1.5)'}
+          </button>
+          <button onClick={async()=>{if(await ask('Spel beëindigen en naar de eindceremonie? Dit kan niet ongedaan worden gemaakt.',{danger:true,confirmLabel:'Start finale'}))onStartFinale&&onStartFinale()}}
             className="btn btn-gold" disabled={phase>=5} style={{width:'100%'}}>
             🏆 {phase>=5?'Finale loopt':'Start finale & ceremonie'}
           </button>
@@ -3270,13 +3998,13 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
             </div>
 
             <div className="review-actions">
-              <button className="btn btn-danger btn-sm" onClick={()=>{if(confirm(`Foto van ${r.team_name} afkeuren? -${r.points_awarded} pts.`))onReject(r)}}>✗ Afkeuren</button>
+              <button className="btn btn-danger btn-sm" onClick={async()=>{if(await ask(`Foto van ${r.team_name} afkeuren? -${r.points_awarded} pts.`,{danger:true,confirmLabel:'Afkeuren'}))onReject(r)}}>✗ Afkeuren</button>
               {/* V18 (§1.9.4): confirm approve only when submission is suspicious (no photo OR >100m off) */}
-              <button className="btn btn-cyan btn-sm" onClick={()=>{
+              <button className="btn btn-cyan btn-sm" onClick={async()=>{
                 const suspicious=!r.photo_url||(typeof r.gps_distance==='number'&&r.gps_distance>100);
                 if(suspicious){
                   const reason=!r.photo_url?'er is geen foto bijgevoegd':`de afstand was ${r.gps_distance}m (>100m)`;
-                  if(!confirm(`Weet je zeker dat je deze goedkeurt? ${reason}.`))return;
+                  if(!await ask(`Weet je zeker dat je deze goedkeurt? ${reason}.`,{confirmLabel:'Toch goedkeuren'}))return;
                 }
                 onApprove(r);
               }}>✓ Goedkeuren</button>
@@ -3493,7 +4221,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
               onClick={()=>handleQuiz(opt)}
               aria-label={`Antwoord ${letter}: ${opt}`}
               disabled={!!quizAnswer}>
-              <span style={{display:'inline-block',width:22,height:22,lineHeight:'22px',borderRadius:11,background:'rgba(255,255,255,0.06)',textAlign:'center',fontWeight:800,fontSize:11,marginRight:10,color:'var(--text-secondary)'}}>{letter}</span>
+              <span aria-hidden="true" style={{display:'inline-block',width:22,height:22,lineHeight:'22px',borderRadius:11,background:'rgba(255,255,255,0.06)',textAlign:'center',fontWeight:800,fontSize:11,marginRight:10,color:'var(--text-secondary)'}}>{letter}</span>
               {opt}{revealRight&&<span style={{marginLeft:8,fontSize:11,fontWeight:700}}>← juist</span>}
             </button>
           );
@@ -3538,6 +4266,12 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
       <button className="btn btn-cyan" onClick={()=>fileRef.current?.click()} disabled={processing} style={{width:'100%'}}>
         {processing?'⏳ Verwerken...':preview?(ch.t==='video'?'🎬 Opnieuw opnemen':'📸 Opnieuw proberen'):(ch.t==='video'?'🎬 Video opnemen of kiezen':ch.t==='creative'?'📸 Foto/video opnemen of kiezen':'📸 Foto opnemen of kiezen')}
       </button>
+      {/* V21 P1-fix #29: hint text explaining the native picker has both camera & library options */}
+      {!preview&&!processing&&(
+        <div className="t-caption t-muted" style={{marginTop:6,textAlign:'center',opacity:0.75}}>
+          Tik om te kiezen: direct opnemen via camera óf uit fotogalerij
+        </div>
+      )}
       {!isAdmin&&isMedia&&dist!=null&&dist<=gateRadius&&(
         <div style={{fontSize:11,color:'var(--success)',marginTop:6,textAlign:'center'}}>✓ Je bent op locatie ({Math.round(dist)}m)</div>
       )}
@@ -3554,20 +4288,30 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
 // ═══════════════════════════════════════════
 // WEDDING VIDEO MISSION
 // ═══════════════════════════════════════════
-function WeddingMission({onClose,onComplete,done,jorikInTeam}){
+function WeddingMission({onClose,onComplete,done,jorikInTeam,confirmAsync}){
+  const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
   const fileRef=useRef(null);
   const retakeRef=useRef(null);
   const[uploaded,setUploaded]=useState(false);
   const[retakeCount,setRetakeCount]=useState(0); // V18: show confirmation when retaking
+  const[retakeAck,setRetakeAck]=useState(false); // V20: transient success after retake
+
+  // V21 a11y: escape to close + dialog role
+  React.useEffect(()=>{
+    const onKey=(e)=>{if(e.key==='Escape'){e.stopPropagation();onClose&&onClose();}};
+    window.addEventListener('keydown',onKey);
+    return()=>window.removeEventListener('keydown',onKey);
+  },[onClose]);
+  const titleId='wedding-title';
 
   return(
     <>
       <div className="sheet-overlay" onClick={onClose}/>
-      <div className="sheet" style={{background:'linear-gradient(180deg,#1a0e30 0%,var(--bg) 100%)'}}>
+      <div className="sheet" style={{background:'linear-gradient(180deg,#1a0e30 0%,var(--bg) 100%)'}} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="sheet-handle"/>
         <div style={{textAlign:'center',marginBottom:'var(--sp-5)'}}>
           <div style={{fontSize:56}}>🤫🎬</div>
-          <h2 className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,var(--quiz-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Geheime missie</h2>
+          <h2 id="wedding-title" className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,var(--quiz-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Geheime missie</h2>
           <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Bruiloftsvideo voor Jorik</div>
         </div>
 
@@ -3610,9 +4354,14 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam}){
             </div>
             {/* V18: retake button — new take replaces the previous; no extra points */}
             <input ref={retakeRef} type="file" accept="video/*" style={{display:'none'}}
-              onChange={e=>{if(e.target.files[0]){setRetakeCount(c=>c+1)}}}/>
+              onChange={e=>{if(e.target.files[0]){setRetakeCount(c=>c+1);setRetakeAck(true);setTimeout(()=>setRetakeAck(false),2500)}}}/>
+            {retakeAck&&(
+              <div className="panel-sm text-center t-success t-label" style={{background:'rgba(95,216,165,0.12)',borderColor:'rgba(95,216,165,0.4)',animation:'pulseGlow 0.4s ease-out'}}>
+                ✨ Nieuwe opname vervangen!
+              </div>
+            )}
             <button className="btn btn-ghost btn-sm"
-              onClick={()=>{if(jorikInTeam)return;if(confirm('Nieuwe opname vervangt de vorige (geen extra punten). Doorgaan?'))retakeRef.current?.click()}}
+              onClick={async()=>{if(jorikInTeam)return;if(await ask('Nieuwe opname vervangt de vorige (geen extra punten). Doorgaan?',{confirmLabel:'Opnieuw opnemen'}))retakeRef.current?.click()}}
               disabled={jorikInTeam} style={{width:'100%'}}>
               {jorikInTeam?'🚫 Wacht tot Jorik weg is':'🔁 Nieuwe opname maken'}
             </button>
@@ -3637,6 +4386,13 @@ function JorikMissions({onClose,onComplete,done,jorikInTeam}){
   const doneSet=done instanceof Set?done:new Set(done||[]);
   const earnedPts=JORIK_MISSIONS.filter(m=>doneSet.has(m.id)).reduce((s,m)=>s+m.pts,0);
 
+  // V21 a11y: escape closes + role dialog
+  React.useEffect(()=>{
+    const onKey=(e)=>{if(e.key==='Escape'){e.stopPropagation();onClose&&onClose();}};
+    window.addEventListener('keydown',onKey);
+    return()=>window.removeEventListener('keydown',onKey);
+  },[onClose]);
+
   const handleFile=(m,file)=>{
     if(!file||doneSet.has(m.id))return;
     // Compress photos; drop large video blobs before shipping to feed
@@ -3658,11 +4414,11 @@ function JorikMissions({onClose,onComplete,done,jorikInTeam}){
   return(
     <>
       <div className="sheet-overlay" onClick={onClose}/>
-      <div className="sheet" style={{background:'linear-gradient(180deg,#2a1d0a 0%,var(--bg) 100%)'}}>
+      <div className="sheet" style={{background:'linear-gradient(180deg,#2a1d0a 0%,var(--bg) 100%)'}} role="dialog" aria-modal="true" aria-labelledby="jorik-missions-title">
         <div className="sheet-handle"/>
         <div style={{textAlign:'center',marginBottom:'var(--sp-4)'}}>
           <div style={{fontSize:56}}>💍🎭</div>
-          <h2 className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,#e4b25c,#ff6b6b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Jorik-missies</h2>
+          <h2 id="jorik-missions-title" className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,#e4b25c,#ff6b6b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Jorik-missies</h2>
           <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Alleen mogelijk terwijl Jorik bij jullie team is</div>
           <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{doneSet.size}/{JORIK_MISSIONS.length} voltooid · {earnedPts}/{totalPts} pts</div>
         </div>
@@ -3732,6 +4488,12 @@ function BarBreakOverlay({info,onClose,onComplete}){
   const[nowTs,setNowTs]=useState(Date.now());
   const fileRefs=useRef({}); // V16: per-mini file input refs for photo upload
   useEffect(()=>{const i=setInterval(()=>setNowTs(Date.now()),1000);return()=>clearInterval(i);},[]);
+  // V21 a11y: escape closes overlay (minimizes) + dialog role
+  React.useEffect(()=>{
+    const onKey=(e)=>{if(e.key==='Escape'){e.stopPropagation();onClose&&onClose();}};
+    window.addEventListener('keydown',onKey);
+    return()=>window.removeEventListener('keydown',onKey);
+  },[onClose]);
   const endsAt=(info.started||Date.now())+BAR_BREAK_DURATION_MS;
   const msLeft=Math.max(0,endsAt-nowTs);
   const secLeft=Math.floor(msLeft/1000);
@@ -3754,10 +4516,10 @@ function BarBreakOverlay({info,onClose,onComplete}){
   };
 
   return(
-    <div className="barbreak-overlay" onClick={()=>{}}>
-      <div className="barbreak-card" style={{maxWidth:460,width:'92%'}}>
+    <div className="barbreak-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="barbreak-title">
+      <div className="barbreak-card" style={{maxWidth:460,width:'92%'}} onClick={e=>e.stopPropagation()}>
         <div className="t-label t-accent" style={{textAlign:'center'}}>🍻 Bar break</div>
-        <div className="t-title" style={{marginTop:'var(--sp-2)',background:'linear-gradient(135deg,var(--accent-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
+        <div id="barbreak-title" className="t-title" style={{marginTop:'var(--sp-2)',background:'linear-gradient(135deg,var(--accent-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
         <div className="chip" style={{margin:`var(--sp-4) auto var(--sp-5)`,color:urgent?'var(--danger)':'var(--accent-2)',borderColor:urgent?'rgba(255,107,107,0.4)':'rgba(228,178,92,0.35)',background:urgent?'rgba(255,107,107,0.12)':'var(--accent-glow)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>⏱ {secLeft>=60?`${Math.floor(secLeft/60)}m ${secLeft%60}s`:`${secLeft}s`} over</div>
         <div className="t-body" style={{textAlign:'center',fontStyle:'italic',marginBottom:'var(--sp-5)'}}>Drie bonus-opdrachten · doe er zoveel als je wilt · elke telt apart</div>
         <div className="stack-3" style={{textAlign:'left'}}>
@@ -3904,7 +4666,7 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
             <div className="photo-grid">
               {photos.map((p,i)=>(
                 <div key={i} className="photo-grid-item" style={{animationDelay:`${Math.min(i,20)*0.05}s`}}>
-                  {isVideoData(p.photo)?<video src={p.photo} muted/>:<img src={p.photo} alt=""/>}
+                  {isVideoData(p.photo)?<video src={p.photo} muted preload="metadata"/>:<img src={p.photo} alt="" loading="lazy" decoding="async"/>}
                   <div className="photo-grid-overlay"><span>{p.team_emoji||'🎮'}</span>{p.points>0&&<span className="t-accent">+{p.points}</span>}</div>
                 </div>
               ))}
