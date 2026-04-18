@@ -522,6 +522,24 @@ const NARRATIVE={
 };
 
 // ═══════════════════════════════════════════
+// V19+ JORIK-SPECIFIC MISSIONS
+// ═══════════════════════════════════════════
+// Only the team currently holding Jorik sees these. When Jorik switches teams,
+// the previous team loses access (their done-list is preserved so they keep
+// the points). Each mission is a one-shot video/photo capture — mirror of the
+// wedding mission but opposite visibility.
+const JORIK_MISSIONS=[
+  {id:'advice',   emoji:'💍', cat:'Social',      title:'Huwelijksadvies van vreemden', desc:'Vraag 3 onbekenden om hun beste óf slechtste huwelijksadvies. Film het.', media:'video', pts:40},
+  {id:'compliment',emoji:'🌹',cat:'Social',      title:'Overdreven compliment',        desc:'Jorik geeft drie vreemden een absurd overdreven compliment. Film hun reactie.', media:'video', pts:25},
+  {id:'accent',   emoji:'🎭', cat:'Performance', title:'Vraag de weg in accent',       desc:'Jorik vraagt een voorbijganger de weg in een compleet fout buitenlands accent.', media:'video', pts:30},
+  {id:'speech',   emoji:'🎤', cat:'Performance', title:'Nep-trouwtoespraak',           desc:'Jorik houdt spontaan een 30s trouwtoespraak op een druk plein. Publiek mag meedoen.', media:'video', pts:50},
+  {id:'pushups',  emoji:'💪', cat:'Physical',    title:'Publieke push-ups',            desc:'Jorik doet 20 push-ups op een openbaar plein terwijl het team telt.', media:'video', pts:20},
+  {id:'trade',    emoji:'🤝', cat:'Interaction', title:'Ruil omhoog',                  desc:'Start met een paperclip. Ruil drie keer op met vreemden naar iets grotere waarde.', media:'photo', pts:40},
+  {id:'sing',     emoji:'🎵', cat:'Funny',       title:'Zing voor een vreemde',        desc:'Jorik zingt 30 sec. een liefdeslied voor een willekeurige voorbijganger.', media:'video', pts:35},
+  {id:'shout',    emoji:'📣', cat:'Funny',       title:'"Ik ga trouwen!"',             desc:'Jorik schreeuwt luidkeels "Ik ga trouwen!" in een volle straat.', media:'video', pts:30},
+];
+
+// ═══════════════════════════════════════════
 // V5 FEATURE 3: OPEN TRIVIA DB (optional fillers)
 // ═══════════════════════════════════════════
 const OPENTDB_URL='https://opentdb.com/api.php?amount=10&category=22&type=multiple';
@@ -896,6 +914,32 @@ function compressPhoto(dataURL,maxWidth=480,quality=0.55){
   });
 }
 
+// V20 P0: adaptive tiered compression. Some phones (especially old iPhones
+// shooting HEIC-converted giant JPEGs, or Android panoramas) still exceed
+// Supabase row-size limits even after the default 640/0.6 pass. Retry with
+// progressively smaller targets before giving up and returning null.
+// Target = ~220 kB dataURL, which comfortably fits inside a 500kB row ceiling.
+const COMPRESS_TARGET_BYTES=220000;
+const COMPRESS_HARD_CAP_BYTES=500000;
+async function compressPhotoAdaptive(dataURL){
+  if(typeof dataURL!=='string')return dataURL;
+  // Try 3 tiers before bailing. Each tier halves-ish the budget.
+  const tiers=[[640,0.6],[480,0.5],[320,0.4]];
+  let out=dataURL;
+  for(const [w,q] of tiers){
+    out=await compressPhoto(dataURL,w,q);
+    if((out?.length||0)<=COMPRESS_TARGET_BYTES)return out;
+  }
+  // Final safety net: if we're still over the hard cap, drop the thumbnail
+  // rather than nuking the whole feed insert. Challenge still completes;
+  // photo just won't show in the live feed.
+  if((out?.length||0)>COMPRESS_HARD_CAP_BYTES){
+    console.warn('photo still too large after 3 compression tiers — dropping thumbnail',out?.length);
+    return null;
+  }
+  return out;
+}
+
 // Detect whether dataURL is a video (keep raw; don't try to compress)
 function isVideoData(d){return typeof d==='string'&&d.startsWith('data:video')}
 
@@ -970,6 +1014,9 @@ function App(){
   const[jorikTeamId,setJorikTeamId]=useState(null);
   const[weddingDone,setWeddingDone]=useState(false);
   const[showWedding,setShowWedding]=useState(false);
+  // V19+: Jorik-missions done-set; hydrated from session so refresh doesn't wipe progress.
+  const[jorikMissionsDone,setJorikMissionsDone]=useState(()=>new Set(Array.isArray(hydrated?.jorikMissionsDone)?hydrated.jorikMissionsDone:[]));
+  const[showJorikMissions,setShowJorikMissions]=useState(false);
   const[activityFeed,setActivityFeed]=useState([]);
   // V10: admin unlock via ?admin=true (legacy) OR ?admin=vriendvanjorik (hardened token)
   const[isAdmin]=useState(()=>{
@@ -986,7 +1033,8 @@ function App(){
   const[seenQuizzes,setSeenQuizzes]=useState(new Set());
   // V5 FEATURE 5: GPS smoothing buffer
   const[gpsSamples,setGpsSamples]=useState([]);
-  const[gpsStatus,setGpsStatus]=useState('weak'); // good / weak / sleep
+  const[gpsStatus,setGpsStatus]=useState('weak'); // good / weak / sleep / denied / unavailable
+  const[gpsErrorSeen,setGpsErrorSeen]=useState(null); // {code,message} — latest GeolocationPositionError
   const[gpsSnap,setGpsSnap]=useState(null); // snapped-to POI name
   // V5 FEATURE 6: motion tracking
   const motionRef=useRef({lastMotion:Date.now(),still:false});
@@ -1044,7 +1092,19 @@ function App(){
 
     const startWatch=()=>{
       if(watchId!=null||!active)return;
-      watchId=navigator.geolocation.watchPosition(onPos,()=>{},
+      // V20 P0: handle errback honestly. PERMISSION_DENIED=1, POSITION_UNAVAILABLE=2, TIMEOUT=3.
+      // Without this, a denied permission silently left the app in "GPS zoekt…" forever
+      // and every photo-gated challenge was blocked.
+      const onGpsError=(err)=>{
+        if(!err)return;
+        setGpsErrorSeen({code:err.code,message:err.message||''});
+        if(err.code===1){        // PERMISSION_DENIED
+          setGpsStatus('denied');
+        }else if(err.code===2){  // POSITION_UNAVAILABLE
+          setGpsStatus('unavailable');
+        }// TIMEOUT (3) is transient — let the 'weak' status stand
+      };
+      watchId=navigator.geolocation.watchPosition(onPos,onGpsError,
         {enableHighAccuracy:true,maximumAge:3000,timeout:10000});
       motionRef.current.still=false;
       motionRef.current.lastMotion=Date.now();
@@ -1324,10 +1384,8 @@ function App(){
     const commit=()=>{
       sb.from('photo_reviews').update({status:'rejected',reviewed_at:new Date().toISOString()}).eq('id',r.id);
       if(REVIEW_REJECT_PENALTY){
-        sb.from('teams').select('score').eq('id',r.team_id).single().then(res=>{
-          const newScore=Math.max(0,(res.data?.score||0)-r.points_awarded);
-          sb.from('teams').update({score:newScore}).eq('id',r.team_id);
-        });
+        // V20: atomic negative delta. Also updates local scores immediately if this is my team.
+        applyScoreDelta(r.team_id,-r.points_awarded);
       }
     };
     setReviewUndo(prev=>{flushPendingUndo(prev); const timer=setTimeout(()=>{commit();setReviewUndo(null);},REJECT_UNDO_MS); return{row:r,action:'rejected',deadline:Date.now()+REJECT_UNDO_MS,timer,commit};});
@@ -1358,6 +1416,47 @@ function App(){
       if(shareable.photo&&shareable.photo.length>600000){delete shareable.photo}
       sb.from('activity_feed').insert(shareable);
     }
+  };
+
+  // V20 P0: atomic score delta. Replaces 6 client-side R-M-W call sites that
+  // lost updates under concurrent teammate completions (two phones same team
+  // completing within the same realtime round would clobber each other).
+  // - Sets local state optimistically so UI stays snappy
+  // - Calls the atomic Postgres RPC (supabase-v20-schema.sql) for the canonical value
+  // - Reconciles local state to server return on success
+  // - Falls back to legacy direct-update if the RPC isn't deployed yet (graceful)
+  const applyScoreDelta=(teamId,delta)=>{
+    if(!teamId||!Number.isFinite(delta))return;
+    // Optimistic local bump (covers OFFLINE mode too)
+    setScores(prev=>({...prev,[teamId]:Math.max(0,(prev[teamId]||0)+delta)}));
+    if(OFFLINE||!sb)return;
+    sb.rpc('increment_team_score',{p_team_id:teamId,p_delta:delta})
+      .then(({data,error})=>{
+        if(error){
+          // Fallback for Supabase projects that haven't run v20 migration yet
+          console.warn('increment_team_score RPC missing — using legacy R-M-W',error.message||error);
+          const fallback=(scores[teamId]||0)+delta;
+          sb.from('teams').update({score:Math.max(0,fallback)}).eq('id',teamId).then(()=>{},()=>{});
+          return;
+        }
+        if(typeof data==='number'){
+          // Reconcile local state to the canonical server value
+          setScores(prev=>({...prev,[teamId]:data}));
+        }
+      })
+      .catch(e=>console.warn('score delta RPC threw',e));
+  };
+
+  // V19+ Jorik-specific missions (only team holding Jorik can do these)
+  const completeJorikMission=(id,pts,photoData=null)=>{
+    if(jorikMissionsDone.has(id))return;
+    const m=JORIK_MISSIONS.find(x=>x.id===id);
+    if(!m)return;
+    setJorikMissionsDone(prev=>new Set([...prev,id]));
+    setScorePopup(`+${pts}`);
+    addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${pts} pts`,pts,photoData);
+    // V20: atomic delta — replaces manual setScores + sb.from('teams').update
+    applyScoreDelta(myTeam?.id,pts);
   };
 
   const completeChallenge=(locId,chIdx,pts,photoData=null)=>{
@@ -1393,7 +1492,12 @@ function App(){
     }
 
     const basePts=pts;
-    const firstBonus=(!isDynamicBonus&&!isWrongZero)?FIRST_BONUS:0;
+    // V20: FIRST_BONUS is now resolved honestly server-side via challenge_first_finder
+    // (see block further down). We no longer award it optimistically — it's a late
+    // add-on that fires via a second delta + toast once the race is resolved.
+    // OFFLINE mode keeps the old eager behaviour so solo testing still feels complete.
+    const isFirstEligible=(!isDynamicBonus&&!isWrongZero);
+    const firstBonus=(OFFLINE&&isFirstEligible)?FIRST_BONUS:0;
     let totalPts=basePts+firstBonus+streakBonus;
 
     if(!isDynamicBonus){
@@ -1402,7 +1506,8 @@ function App(){
     }
     if(locId>0)setVisitedLocs(prev=>new Set([...prev,locId]));
     if(totalPts>0){
-      setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+totalPts}));
+      // V20: atomic delta — no more lost updates when two teammates race
+      applyScoreDelta(myTeam?.id,totalPts);
       setScorePopup(`+${totalPts}`);
     }
     if(timeUnlock){
@@ -1452,14 +1557,55 @@ function App(){
     }
 
     // Update Supabase
+    // V20: score writes are now handled atomically by applyScoreDelta above.
+    // Here we only need the completed_challenges insert — which also benefits
+    // from the v20 unique constraint on (team_id, challenge_id): a duplicate
+    // insert (two teammates racing) now fails with 23505 and we treat it as
+    // "already done, no-op" rather than double-counting.
     if(!OFFLINE&&sb&&myTeam&&loc&&!isDynamicBonus){
-      // V14: catch errors so a failing insert doesn't poison subsequent writes
-      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts}).then(()=>{},(e)=>console.warn('completed_challenges insert failed',e));
-      if(totalPts>0){
-        sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id).then(()=>{},(e)=>console.warn('teams update failed',e));
+      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts}).then(
+        ()=>{},
+        (e)=>{
+          // Unique-constraint conflict (v20 migration) = the other teammate got there first. Silent ignore.
+          if(e&&(e.code==='23505'||String(e.message||'').includes('duplicate'))){
+            return;
+          }
+          console.warn('completed_challenges insert failed',e);
+        }
+      );
+
+      // V20: FIRST_BONUS honest race. One winner per challenge, period. If the
+      // insert into challenge_first_finder succeeds, this team was first and
+      // gets +FIRST_BONUS. If it conflicts (409), another team beat us — no-op.
+      // Graceful fallback: if the table doesn't exist yet (migration not run),
+      // fall back to the eager-everyone-gets-it legacy behaviour so nothing breaks.
+      if(isFirstEligible&&FIRST_BONUS>0){
+        sb.from('challenge_first_finder').insert({challenge_id:key,team_id:myTeam.id})
+          .then(
+            ({error})=>{
+              if(!error){
+                // We won the race.
+                applyScoreDelta(myTeam.id,FIRST_BONUS);
+                setToast(`🏆 Eerste bij ${loc.n}! +${FIRST_BONUS} pts bonus`);
+                addActivity(`was als eerste bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · +${FIRST_BONUS} pts bonus`,FIRST_BONUS,null,locId);
+                return;
+              }
+              // Error code 23505 / PGRST duplicate / conflict = we lost the race. Silent no-op.
+              if(error.code==='23505'||String(error.message||'').toLowerCase().includes('duplicate')||String(error.code||'').startsWith('23')){
+                return;
+              }
+              // Table missing (migration pending) → fall back to legacy "everyone first" behaviour.
+              const msg=String(error.message||'').toLowerCase();
+              if(msg.includes('does not exist')||msg.includes('relation')||error.code==='42P01'){
+                console.warn('challenge_first_finder missing — legacy fallback: awarding FIRST_BONUS anyway',error.message);
+                applyScoreDelta(myTeam.id,FIRST_BONUS);
+                return;
+              }
+              console.warn('challenge_first_finder insert failed',error);
+            }
+          )
+          .catch(e=>console.warn('challenge_first_finder threw',e));
       }
-    }else if(!OFFLINE&&sb&&myTeam&&isDynamicBonus&&totalPts>0){
-      sb.from('teams').update({score:(scores[myTeam.id]||0)+totalPts}).eq('id',myTeam.id).then(()=>{},(e)=>console.warn('teams update failed',e));
     }
 
     // V17: if this was the hot target, clear it so the effect picks a new one
@@ -1528,12 +1674,10 @@ function App(){
     if(nowTs<hotTarget.deadline)return;
     // Expired
     const loc=L_DATA.find(l=>l.id===hotTarget.locId);
-    setScores(prev=>({...prev,[myTeam?.id]:Math.max(0,(prev[myTeam?.id]||0)-HOT_EXPIRE_PENALTY)}));
     setToast(`⏱ Te laat bij ${loc?.n||'target'} · −${HOT_EXPIRE_PENALTY} pts`);
     addActivity(`miste de deadline bij ${loc?.n||'target'} · −${HOT_EXPIRE_PENALTY} pts`,-HOT_EXPIRE_PENALTY);
-    if(!OFFLINE&&sb&&myTeam){
-      sb.from('teams').update({score:Math.max(0,(scores[myTeam.id]||0)-HOT_EXPIRE_PENALTY)}).eq('id',myTeam.id).then(()=>{},()=>{});
-    }
+    // V20: atomic negative delta — no more lost penalties under races
+    applyScoreDelta(myTeam?.id,-HOT_EXPIRE_PENALTY);
     setHotTarget(null); // triggers the assign effect
   },[nowTs,hotTarget,myTeam]);
 
@@ -1629,6 +1773,10 @@ function App(){
   },[isAdmin]);
 
   // V12: admin score override
+  // V20 NOTE: this is kept as an absolute-set (not atomic delta) because it's
+  // admin-only, low-frequency, and used for judgment calls where "I want team X
+  // to have exactly N" is the mental model. If concurrency becomes an issue
+  // (unlikely — single GM device), rewrite to use applyScoreDelta(teamId,delta).
   const adjustScore=useCallback((teamId,delta)=>{
     if(!isAdmin||!teamId)return;
     const cur=scores[teamId]||0;
@@ -1740,6 +1888,11 @@ function App(){
   useEffect(()=>{
     if(myTeam)saveSession({storySeen:[...storySeen]});
   },[storySeen,myTeam]);
+
+  // V19+: persist Jorik-mission completion state
+  useEffect(()=>{
+    if(myTeam)saveSession({jorikMissionsDone:[...jorikMissionsDone]});
+  },[jorikMissionsDone,myTeam]);
 
   // V12: leaving a team (tap the HUD avatar)
   const leaveTeam=useCallback(()=>{
@@ -1908,6 +2061,52 @@ function App(){
       {OFFLINE&&<div className="offline-banner">⚡ Offline Mode — Multiplayer uitgeschakeld</div>}
       {toast&&<div className="toast"><div className="toast-inner">{toast}</div></div>}
       {scorePopup&&<div className="score-popup">{scorePopup}</div>}
+      {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal */}
+      {(gpsStatus==='denied'||gpsStatus==='unavailable')&&(
+        <div className="sheet-overlay" style={{zIndex:10000}}>
+          <div className="sheet" style={{background:'linear-gradient(180deg,#3a0e0e 0%,var(--bg) 100%)',position:'fixed',left:'50%',top:'50%',transform:'translate(-50%,-50%)',maxWidth:440,width:'92%',maxHeight:'88vh',overflowY:'auto'}} role="alertdialog" aria-live="assertive" aria-labelledby="gps-error-title">
+            <div style={{textAlign:'center',marginBottom:'var(--sp-4)'}}>
+              <div style={{fontSize:56}}>📍🚫</div>
+              <h2 id="gps-error-title" className="t-title" style={{marginTop:'var(--sp-3)',color:'var(--video-2)'}}>
+                {gpsStatus==='denied'?'Locatie-toegang geweigerd':'GPS niet beschikbaar'}
+              </h2>
+              <div className="t-body" style={{marginTop:'var(--sp-2)'}}>
+                {gpsStatus==='denied'
+                  ?'Het spel heeft je locatie nodig om opdrachten vrij te geven bij POIs. Zonder GPS werkt vrijwel niets.'
+                  :'Je toestel kan op dit moment geen GPS-signaal vinden. Probeer naar buiten te lopen.'}
+              </div>
+            </div>
+
+            {gpsStatus==='denied'&&(
+              <div className="panel" style={{marginBottom:'var(--sp-3)'}}>
+                <div className="t-label" style={{marginBottom:'var(--sp-2)'}}>Zo zet je het weer aan:</div>
+                <div className="stack-2 t-body">
+                  <div>📱 <b>iPhone (Safari):</b> Instellingen → Safari → Locatie → <i>Sta toe</i>. Daarna ververs deze pagina.</div>
+                  <div>🤖 <b>Android (Chrome):</b> Tik op het 🔒-slotje in de adresbalk → <i>Locatie → Toestaan</i>. Daarna ververs.</div>
+                  <div className="t-caption t-muted" style={{marginTop:'var(--sp-2)'}}>
+                    Browsers onthouden een weigering — je moet dit handmatig omkeren. Daarna deze pagina opnieuw laden.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {gpsErrorSeen?.message&&(
+              <div className="t-caption t-muted" style={{marginBottom:'var(--sp-3)',textAlign:'center',opacity:0.7}}>
+                Debug: code {gpsErrorSeen.code}{gpsErrorSeen.message?` — ${gpsErrorSeen.message}`:''}
+              </div>
+            )}
+
+            <div className="stack-2">
+              <button className="btn btn-cyan btn-lg" onClick={()=>{setGpsStatus('weak');wakeGps()}} style={{width:'100%'}}>
+                🔁 Probeer opnieuw
+              </button>
+              <button className="btn btn-ghost" onClick={()=>{setGpsStatus('weak');setGpsErrorSeen(null)}} style={{width:'100%'}}>
+                Sluiten (zonder GPS spelen — niet aanbevolen)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* V9: unlock popup */}
       {unlockPopup&&(
         <div className="tier-unlock-popup">
@@ -2024,7 +2223,7 @@ function App(){
 
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} onShowStory={(k)=>setStoryShown(k)} pendingMine={pendingMine} completed={completed} ghostMax={ghostMax} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} hotTarget={hotTarget} nowTs={nowTs}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage}/>}
@@ -2040,12 +2239,10 @@ function App(){
 
       {/* V10/V16/V18: Bar-break overlay — minimizable, persistent chip when hidden */}
       {barBreakActive&&!barBreakHidden&&<BarBreakOverlay info={barBreakActive} onClose={()=>setBarBreakHidden(true)} onComplete={(mini,pts,photo)=>{
-        setScores(prev=>({...prev,[myTeam?.id]:(prev[myTeam?.id]||0)+pts}));
+        // V20: atomic delta — handles both optimistic local update and server write
+        applyScoreDelta(myTeam?.id,pts);
         setScorePopup(`+${pts}`);
         addActivity(`haalde "${mini.title}" bij ${barBreakActive.name} · +${pts} pts`,pts,photo);
-        if(!OFFLINE&&sb&&myTeam){
-          sb.from('teams').update({score:(scores[myTeam.id]||0)+pts}).eq('id',myTeam.id).then(()=>{},()=>{});
-        }
       }}/>}
       {/* V18: persistent bar-break chip — shows at top-left while minimized */}
       {barBreakActive&&barBreakHidden&&(()=>{
@@ -2071,6 +2268,9 @@ function App(){
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
       {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam}/>}
+
+      {/* V19+: Jorik-specific missions — mirror of wedding, visible only when Jorik IS in team */}
+      {showJorikMissions&&<JorikMissions onClose={()=>setShowJorikMissions(false)} onComplete={completeJorikMission} done={jorikMissionsDone} jorikInTeam={jorikInTeam}/>}
 
       {/* Tab bar */}
       <div className="tab-bar">
@@ -2323,7 +2523,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin}){
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax,visitedLocs}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,weddingDone,onShowWedding,onShowStory,pendingMine,completed,ghostMax,visitedLocs,jorikMissionsDone,onShowJorikMissions}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
   const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
@@ -2422,6 +2622,23 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
           ✅ Geheime missie voltooid
         </div>
       )}
+
+      {/* V19+: Jorik-missions banner — ONLY shows when Jorik is in this team (inverse of wedding) */}
+      {jorikInTeam&&(()=>{
+        const doneCount=(jorikMissionsDone&&jorikMissionsDone.size)||0;
+        const total=JORIK_MISSIONS.length;
+        const remaining=total-doneCount;
+        const allDone=doneCount>=total;
+        return(
+          <div className="secret-banner" onClick={onShowJorikMissions} style={{marginBottom:'var(--sp-3)',marginTop:0,background:'linear-gradient(155deg,rgba(228,178,92,0.18),rgba(255,107,107,0.08))',borderColor:'rgba(228,178,92,0.4)'}}>
+            <div className="secret-badge" style={{background:'rgba(228,178,92,0.25)',borderColor:'rgba(228,178,92,0.5)'}}>💍 Jorik-missies</div>
+            <div className="t-card-label" style={{marginTop:'var(--sp-2)'}}>{allDone?'Alle Jorik-missies voltooid!':'Jorik is NU bij jullie team'}</div>
+            <div className="t-body" style={{marginTop:'var(--sp-1)'}}>
+              {allDone?'🎉 Chapeau — legendarisch team':`Tik voor ${remaining} openstaande missie${remaining===1?'':'s'} · ${doneCount}/${total} gedaan`}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Leaderboard cards */}
       {sorted.map((t,i)=>{
@@ -3205,7 +3422,8 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
       const raw=ev.target.result;
       let shareable=raw;
       if(!isVideoData(raw)){
-        shareable=await compressPhoto(raw,640,0.6);
+        // V20: adaptive tiered compression (falls back to null only if 3 tiers still fail)
+        shareable=await compressPhotoAdaptive(raw);
       }else if(raw.length>700000){
         shareable=null;
       }
@@ -3314,9 +3532,11 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   const accept=ch.t==='video'?'video/*':ch.t==='creative'?'image/*,video/*':'image/*';
   return(
     <div style={{marginTop:12}}>
-      <input ref={fileRef} type="file" accept={accept} capture="environment" style={{display:'none'}} onChange={handleFile}/>
+      {/* V19+: drop capture="environment" so iOS/Android show the native
+          take-photo-or-pick-from-library sheet. Desktop keeps the regular picker. */}
+      <input ref={fileRef} type="file" accept={accept} style={{display:'none'}} onChange={handleFile}/>
       <button className="btn btn-cyan" onClick={()=>fileRef.current?.click()} disabled={processing} style={{width:'100%'}}>
-        {processing?'⏳ Verwerken...':preview?(ch.t==='video'?'🎬 Opnieuw opnemen':'📸 Opnieuw proberen'):(ch.t==='video'?'🎬 Video Opnemen':ch.t==='creative'?'📸 Foto/Video Maken':'📸 Foto Maken')}
+        {processing?'⏳ Verwerken...':preview?(ch.t==='video'?'🎬 Opnieuw opnemen':'📸 Opnieuw proberen'):(ch.t==='video'?'🎬 Video opnemen of kiezen':ch.t==='creative'?'📸 Foto/video opnemen of kiezen':'📸 Foto opnemen of kiezen')}
       </button>
       {!isAdmin&&isMedia&&dist!=null&&dist<=gateRadius&&(
         <div style={{fontSize:11,color:'var(--success)',marginTop:6,textAlign:'center'}}>✓ Je bent op locatie ({Math.round(dist)}m)</div>
@@ -3375,10 +3595,11 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam}){
 
         {!done&&!uploaded&&(
           <>
-            <input ref={fileRef} type="file" accept="video/*" capture="environment" style={{display:'none'}}
+            {/* V19+: drop capture so users can pick from their photo library too */}
+            <input ref={fileRef} type="file" accept="video/*" style={{display:'none'}}
               onChange={e=>{if(e.target.files[0]){setUploaded(true);onComplete&&onComplete()}}}/>
             <button className="btn btn-cyan btn-lg" onClick={()=>!jorikInTeam&&fileRef.current?.click()} disabled={jorikInTeam} style={{width:'100%'}}>
-              {jorikInTeam?'🚫 Wacht tot Jorik weg is':`🎬 Video opnemen (+${WEDDING_VIDEO_BONUS} pts)`}
+              {jorikInTeam?'🚫 Wacht tot Jorik weg is':`🎬 Video opnemen of kiezen (+${WEDDING_VIDEO_BONUS} pts)`}
             </button>
           </>
         )}
@@ -3388,7 +3609,7 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam}){
               ✅ Video opgenomen! Dankjewel!{retakeCount>0&&<div className="t-label-sm" style={{marginTop:4,opacity:0.8}}>· {retakeCount}× opnieuw gedaan</div>}
             </div>
             {/* V18: retake button — new take replaces the previous; no extra points */}
-            <input ref={retakeRef} type="file" accept="video/*" capture="environment" style={{display:'none'}}
+            <input ref={retakeRef} type="file" accept="video/*" style={{display:'none'}}
               onChange={e=>{if(e.target.files[0]){setRetakeCount(c=>c+1)}}}/>
             <button className="btn btn-ghost btn-sm"
               onClick={()=>{if(jorikInTeam)return;if(confirm('Nieuwe opname vervangt de vorige (geen extra punten). Doorgaan?'))retakeRef.current?.click()}}
@@ -3400,6 +3621,104 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam}){
         )}
 
         <button className="btn btn-ghost" onClick={onClose} style={{width:'100%',marginTop:'var(--sp-3)'}}>Sluiten</button>
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// V19+: JORIK MISSIONS OVERLAY
+// Only visible to the team currently holding Jorik (inverse of WeddingMission).
+// Each mission is one-shot; previous done-list is preserved when Jorik rotates away.
+// ═══════════════════════════════════════════
+function JorikMissions({onClose,onComplete,done,jorikInTeam}){
+  const fileRefs=useRef({});
+  const totalPts=JORIK_MISSIONS.reduce((s,m)=>s+m.pts,0);
+  const doneSet=done instanceof Set?done:new Set(done||[]);
+  const earnedPts=JORIK_MISSIONS.filter(m=>doneSet.has(m.id)).reduce((s,m)=>s+m.pts,0);
+
+  const handleFile=(m,file)=>{
+    if(!file||doneSet.has(m.id))return;
+    // Compress photos; drop large video blobs before shipping to feed
+    const r=new FileReader();
+    r.onload=async(ev)=>{
+      const raw=ev.target.result;
+      let shareable=raw;
+      if(m.media==='video'){
+        if(raw.length>700000)shareable=null;
+      }else{
+        // V20: adaptive tiered compression
+        shareable=await compressPhotoAdaptive(raw);
+      }
+      onComplete&&onComplete(m.id,m.pts,shareable);
+    };
+    r.readAsDataURL(file);
+  };
+
+  return(
+    <>
+      <div className="sheet-overlay" onClick={onClose}/>
+      <div className="sheet" style={{background:'linear-gradient(180deg,#2a1d0a 0%,var(--bg) 100%)'}}>
+        <div className="sheet-handle"/>
+        <div style={{textAlign:'center',marginBottom:'var(--sp-4)'}}>
+          <div style={{fontSize:56}}>💍🎭</div>
+          <h2 className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,#e4b25c,#ff6b6b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Jorik-missies</h2>
+          <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Alleen mogelijk terwijl Jorik bij jullie team is</div>
+          <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{doneSet.size}/{JORIK_MISSIONS.length} voltooid · {earnedPts}/{totalPts} pts</div>
+        </div>
+
+        {!jorikInTeam&&(
+          <div className="panel" style={{marginBottom:'var(--sp-4)',background:'linear-gradient(155deg,rgba(255,107,107,0.12),rgba(255,107,107,0.03))',borderColor:'rgba(255,107,107,0.35)'}}>
+            <div className="row-3">
+              <div style={{fontSize:28}}>🚫</div>
+              <div className="flex-1">
+                <div className="t-card-label t-danger">Jorik is nu bij een ander team</div>
+                <div className="t-body" style={{marginTop:'var(--sp-1)'}}>Wacht tot hij terug rouleert — reeds gescoorde punten blijven staan.</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="stack-3" style={{marginBottom:'var(--sp-4)'}}>
+          {JORIK_MISSIONS.map(m=>{
+            const isDone=doneSet.has(m.id);
+            const locked=!jorikInTeam||isDone;
+            return(
+              <div key={m.id} className="panel" style={{borderColor:isDone?'rgba(95,216,165,0.35)':'rgba(228,178,92,0.25)',background:isDone?'rgba(95,216,165,0.08)':'rgba(228,178,92,0.05)'}}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
+                  <div style={{fontSize:28,flexShrink:0}}>{m.emoji}</div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div className="t-card-title" style={{display:'flex',alignItems:'center',gap:'var(--sp-2)',flexWrap:'wrap'}}>
+                      <span>{m.title}</span>
+                      <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',background:'rgba(255,255,255,0.05)'}}>{m.cat}</span>
+                      <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'var(--accent-2)',borderColor:'var(--accent)'}}>+{m.pts} pts</span>
+                    </div>
+                    <div className="t-body" style={{marginTop:'var(--sp-1)',opacity:0.9}}>{m.desc}</div>
+                    <div style={{marginTop:'var(--sp-2)'}}>
+                      {isDone?(
+                        <div className="panel-sm text-center t-success t-body-emph" style={{background:'rgba(95,216,165,0.1)',borderColor:'rgba(95,216,165,0.3)'}}>
+                          ✅ Voltooid · +{m.pts} pts
+                        </div>
+                      ):(
+                        <>
+                          <input ref={el=>{fileRefs.current[m.id]=el}} type="file" accept={m.media==='video'?'video/*':'image/*'} style={{display:'none'}}
+                            onChange={e=>{if(e.target.files[0])handleFile(m,e.target.files[0])}}/>
+                          <button className={`btn btn-sm ${m.media==='video'?'btn-cyan':'btn-gold'}`}
+                            onClick={()=>!locked&&fileRefs.current[m.id]?.click()}
+                            disabled={locked} style={{width:'100%'}}>
+                            {!jorikInTeam?'🚫 Wacht tot Jorik terug is':(m.media==='video'?`🎬 Video opnemen of kiezen`:`📸 Foto maken of kiezen`)}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button className="btn btn-ghost" onClick={onClose} style={{width:'100%'}}>Sluiten</button>
       </div>
     </>
   );
@@ -3425,7 +3744,8 @@ function BarBreakOverlay({info,onClose,onComplete}){
     r.onload=async(ev)=>{
       const raw=ev.target.result;
       let shareable=raw;
-      if(!isVideoData(raw))shareable=await compressPhoto(raw,640,0.6);
+      // V20: adaptive tiered compression for photos
+      if(!isVideoData(raw))shareable=await compressPhotoAdaptive(raw);
       else if(raw.length>700000)shareable=null;
       setDone(prev=>new Set([...prev,i]));
       onComplete&&onComplete(m,m.pts,shareable);
@@ -3455,7 +3775,8 @@ function BarBreakOverlay({info,onClose,onComplete}){
                   <div className="t-num t-accent" style={{fontSize:'var(--fs-17)'}}>+{m.pts}</div>
                 </div>
                 {!isDone&&<>
-                  <input ref={el=>{fileRefs.current[i]=el}} type="file" accept={accept} capture="environment" style={{display:'none'}} onChange={e=>handleUpload(m,i,e.target.files[0])}/>
+                  {/* V19+: no capture attribute — library uploads allowed */}
+                  <input ref={el=>{fileRefs.current[i]=el}} type="file" accept={accept} style={{display:'none'}} onChange={e=>handleUpload(m,i,e.target.files[0])}/>
                   <button className="btn btn-cyan btn-sm" style={{width:'100%'}} onClick={()=>fileRefs.current[i]?.click()}>
                     📸 Foto of video — +{m.pts} pts
                   </button>
