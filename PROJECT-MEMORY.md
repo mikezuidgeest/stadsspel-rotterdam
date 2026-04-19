@@ -268,12 +268,42 @@ Babel transform passes clean on the full single-file JSX.
 
 **Deploy:** `DEPLOY-V18.md` — one step (drag index.html onto GitHub upload).
 
-### V19 — session resilience hotfixes (rolled into v18.html)
+### V18-hotfixes — session resilience (rolled into v18.html; originally labelled "V19" — retitled after the real v19.html shipped)
 Four fixes on top of V18: `storySeen` persistence across reload, team-delete bug where
 re-creating a deleted team ID left the old row live, `myTeam` re-link after reload when
 the local stored team id still exists on server, and a `teams` DELETE realtime channel
 so a GM-deleted team disappears on every phone instantly. No new HTML file — all
 patches applied directly to `stadsspel-rotterdam-v18.html`.
+
+### V19 — Jorik bar-break rotation + discoverability + never-twice guarantee (19 Apr 2026, evening)
+**File:** `stadsspel-rotterdam-v19.html` (SHA256 `cdc57cedf61a5b490f27e8028ab8aa41278541f0cb2eee74f820923203aa9f83`, 329,805 B — includes never-twice guarantee addendum). `index.html` byte-identical.
+
+Mike flagged that the Jorik mechanic was effectively invisible: players never knew which team started with him, the wedding-mission banner seemed to always show, and the 8 Jorik-specific missions were hidden behind a single banner on the leaderboard tab. He also wanted the rotation rule to be bar-break-only, not timer-based.
+
+**Changes:**
+- **Removed 30-min `JORIK_ROTATE_MS` auto-rotate watcher.** Jorik no longer moves on a timer. Constant deleted, useEffect stub commented at `v19:2240-2241`.
+- **Added bar-break → random non-holder Jorik swap.** Inside `triggerBarBreak`, fetches `jorik_team_id` + team list from Supabase, filters out current holder + spectators, picks random, calls `moveJorik`. Routed via `moveJorikRef` to keep the callback's deps array stable (`v19:2319-2344`).
+- **Admin manual swap preserved.** All admin UI wiring unchanged — onMoveJorik still active.
+- **Random starting team** (was first non-spectator — now random). `v19:2646-2652`.
+- **Loud start announcement** — activity_feed gets `💍 Jorik begint bij {emoji} {name}! Veel succes met de 8 Jorik-missies!` plus the canonical `[JORIK] team={id}` marker for late-join sync. `v19:2662-2674`.
+- **Jorik-arrival toast + haptic** — rising-edge detect on `jorikInTeam`, fires `setToast('💍 Jorik komt bij jullie team — 8 extra missies beschikbaar!')` + 5-pulse vibration. First-mount suppressed via undefined-sentinel ref. `v19:2172-2187`.
+- **Kaart tab mirror banner** — compact copy of the leaderboard Jorik-missies banner placed above the TaskList so players out hunting see it without switching tabs. `v19:3775-3796`.
+- **Countdown UI removed** — leaderboard banner now says "🍻 Hij blijft tot de volgende bar break — haast je!" and non-holder chip shows static "tot bar break". `v19:3516`, `v19:3535`.
+
+**No schema migration.** `jorik_team_id` + `jorik_moved_at` already exist since V21 P0 / V27 P0-A.
+
+**Decision log (AskUserQuestion 19 Apr):**
+- Rotation rule: RANDOM non-holder, NEVER-TWICE (every non-spectator team holds Jorik at most once per game).
+- Starting team: RANDOM eligible.
+- Timer fallback: REMOVED entirely.
+- Overtime (hypothetical — Mike's plan is 4 teams × 3 breaks = never triggers): pool falls back to "any non-current-holder" so Jorik still moves.
+- Admin override: UNRESTRICTED. Manual moveJorik can target any team; the [JORIK] marker it writes keeps history coherent.
+
+**Never-twice implementation (`v19:2319-2364`):** derives history from the `activity_feed` `[JORIK] team={id}` markers (already written by both `startGame` and `moveJorik` — zero schema change). `Promise.allSettled` so a flaky feed query degrades to V19 base rule instead of skipping the rotation. Monte-Carlo verified: 5 000 trials of 4-teams × 3-breaks produced 0 duplicate-visit sequences.
+
+**Audit:** see `audit-v19-jorik-rotation-20260419.md` — Layer A ✅ PASS (JSX transpiles clean, all 6 changes verified with line refs), Layer B ✅ PASS (this entry documents it), Layer C ⏳ pending Mike's git push.
+
+**Deploy:** `git add index.html stadsspel-rotterdam-v19.html && git commit -m "V19: bar-break-only Jorik rotation + start announcement + arrival toast" && git push`. After push, run the live Layer C probes documented in the audit file.
 
 ### V20 — full P0 batch + SQL migration (18 Apr morning)
 Driven by `AUDIT-V20.md` which catalogued 17 P0 blockers. Applied:
@@ -381,13 +411,17 @@ V31.1 replaces the function body with a **recompute-from-scratch** approach: eve
 - Inventory row for `SUPABASE-CATCHUP-PATCH-V31.1.sql` added in §5.
 - v18.html inventory row updated with new SHA + byte count + V32 note.
 
-**Layer C (runtime, live):** ⏳ pending. Two prerequisites before the ghost smoke audit v2 can run:
-  1. Mike pushes the updated `index.html` + `stadsspel-rotterdam-v18.html` + SQL patch to GitHub (no git repo is mounted inside the Cowork folder, so this is a Mike-side action).
-  2. Mike pastes `SUPABASE-CATCHUP-PATCH-V31.1.sql` into Supabase → SQL Editor → Run. Expected output: `is_v31_1 = true`, `tgenabled = 'O'`, every `drift check` row shows `status = 'OK'`.
+**Layer C (runtime, live — 19 Apr 2026 afternoon post-push + post-SQL-apply, verified on tab 242407895 + Supabase project `kybcndicweuxjxkfzxud`):** ✅ all 6 probes green.
+  1. Phantom-team guard: seeded `myTeam.id=99999` → post-reload `screen="splash"`, `myTeam=null`, localStorage cleared, toast element present, splash UI rendered ✅
+  2. pendingMine mount rehydrate: inserted 1 pending `photo_reviews` row for team 4 → post-reload DOM banner `"1 foto in check"` rendered (requires `pendingMine > 0`) ✅
+  3. visibilitychange step 6: installed a proxy on `sb.from`, dispatched `visibilitychange` → `photoReviewsCalls=1` alongside the four pre-existing steps ✅
+  4. V31.1 multi-row INSERT `[7, 7, 12]` → `cc=3, lv=2` (V31 would have returned `lv=1`) ✅
+  5. V31.1 single-row INSERT `[20]` → `cc=4, lv=3` ✅
+  6. V31.1 duplicate location `[7]` → `cc=5, lv=3` unchanged; sentinel `[-1]` → `cc=6, lv=3` unchanged ✅
 
-Once both are confirmed, a fresh ghost smoke audit will run against the live deploy covering: (a) regression of every V30 smoke scenario, (b) a re-run of the six refresh-persistence scenarios to confirm the three V32 fixes hold, (c) a deliberate multi-row INSERT to confirm V31.1 counters correctly, (d) an admin-reset→stale-tab scenario to confirm the phantom-team guard fires.
+Cleanup: all 6 test `completed_challenges` rows DELETEd (anon DELETE works on this table), `photo_reviews` id=18 UPDATEd to `'rejected'` (anon can't DELETE — RLS), team 4 counters reset to 0/0, test tab's localStorage cleared. Final drift check: all 4 teams `status = OK`. See `ghost-smoke-audit-v2-20260419.md` §9 for full evidence.
 
-**Status:** Code-complete + SQL-complete. Awaiting Mike's push + SQL apply before Layer C verification.
+**V32 + V31.1 Master Audit Cross-Check verdict — ✅ 3/3 DONE** (19 Apr 2026 afternoon, client + SQL delivery, live-verified via supabase-js round-trip + React fiber-state inspection + DOM probes on the deployed tab).
 
 ### V31 — Smoke-test bug fixes (19 Apr 2026, post-V30.1, SQL-only, awaiting Mike's paste into SQL Editor)
 **Trigger:** 19 April smoke-test run (see `smoke-test-v30-20260419.md`) surfaced three medium-severity visible-UX bugs plus schema drift. All fixes are server-side (SQL patch only — no client churn, no HTML re-push needed). The v18 HTML stays at V30.1 byte-parity with GitHub Pages; V31 lives entirely in the Supabase schema.
@@ -852,7 +886,7 @@ reference is the folder name.
 | `SUPABASE-CATCHUP-PATCH-V30.sql` | **V30 migration.** Idempotent SQL that creates `feed_reactions` (feed_key TEXT, device_id TEXT, team_id INTEGER NULL, emoji TEXT, UNIQUE composite), sets `REPLICA IDENTITY FULL` so DELETE realtime payloads carry the full old row (needed to decrement the counter on un-react), adds permissive RLS policies matching the rest of the project, and registers the table in the `supabase_realtime` publication. MUST be run in the Supabase SQL editor before the V30 client is deployed — otherwise reaction taps 400 on every INSERT and the realtime channel has no table to subscribe to. Verify queries at bottom of the file. |
 | `SUPABASE-CATCHUP-PATCH-V31.sql` | **V31 migration (19 Apr 2026 morning, APPLIED + live-verified).** Idempotent. Four fixes: (a) `ALTER TABLE teams ADD COLUMN IF NOT EXISTS members TEXT[]` — closes BUG-SIM-001 (client had graceful fallback but rosters were client-state only); (b) `CREATE TRIGGER trg_update_team_stats AFTER INSERT ON completed_challenges` that increments `teams.challenges_completed` unconditionally and `teams.locations_visited` on first-completion-per-(team,location), skipping sentinel `location_id=-1` — closes BUG-SIM-005 + 005b (other-team tier/locaties always showed 0 on leaderboard); (c) backfill `UPDATE teams … FROM (GROUP BY team_id)` for any pre-existing rows; (d) `DROP COLUMN IF EXISTS` on the V14→V30 orphan columns: `completed_challenges.{first_to_complete, is_first, photo_data, photo, points, first_bonus, loc_id}` and `photo_reviews.photo` — closes BUG-SIM-002 (schema drift). TRUNCATE bypasses row triggers so `SUPABASE-GAMEDAY-RESET.sql` Block A remains unaffected. Trailing comment block has step-by-step post-apply verification recipe. **Superseded in part by V31.1** — the `locations_visited` NOT-EXISTS increment path in V31 under-counts on multi-row INSERTs. V31.1 replaces only the trigger function body (recompute-from-scratch). |
 | `SUPABASE-CATCHUP-PATCH-V31.1.sql` | **V31.1 trigger-function fix (19 Apr 2026 afternoon, awaiting Mike's paste into Supabase SQL Editor).** 7,793 B. Idempotent. Replaces `update_team_stats_on_completion()` with a recompute-from-scratch body: every trigger invocation sets `challenges_completed = (SELECT COUNT(*) …)` and `locations_visited = (SELECT COUNT(DISTINCT location_id) … WHERE location_id >= 0)` against the full `completed_challenges` table for the affected team. Correct under any insert shape (single-row, multi-row, COPY, bulk-import, manual SQL). ~sub-ms at gameday scale. Defensive `DROP TRIGGER IF EXISTS` + `CREATE TRIGGER` follows so a fresh DB that skipped V31 still ends up wired. Includes a one-time heal UPDATE (for drifted rows under V31) + a zero-out pass for teams with no completions + three sanity SELECTs (function body contains DISTINCT, trigger exists, per-team drift check) + a commented post-apply multi-row-INSERT verification recipe. Block A of `SUPABASE-GAMEDAY-RESET.sql` remains unaffected. Trigger semantics issue discovered 19 Apr 2026 during the refresh-persistence deep test — a 3-row INSERT of locations [7, 7, 12] produced `locations_visited=1` where the correct answer is 2. Gameday impact of the original V31 bug: none (real gameplay always inserts one row at a time); patch still worth shipping for robustness + future test harnesses. |
-| `ghost-smoke-audit-v2-20260419.md` | **19 Apr 2026 afternoon ghost smoke audit v2, post-V32 + V31.1.** Master Audit Cross-Check report. Layer A (static code) + Layer B (regression trace over 10 V30 smoke scenarios + 8 refresh-persistence scenarios + 8 V31.1 trigger semantic cases) both ✅ PASS — no code defects, no regressions. Layer C (runtime/live) ⏳ BLOCKED on two Mike-side actions: (1) git push from his local checkout to update the GitHub Pages deploy, (2) paste `SUPABASE-CATCHUP-PATCH-V31.1.sql` into Supabase SQL Editor. §6 of the report contains six copy-pasteable Layer C probes (phantom-team guard trigger via JS console, pendingMine mount rehydrate, visibilitychange step-6, V31.1 multi-row INSERT + expected counter values, single-row gameplay regression, Block A reset regression). Net verdict: 2/3 DONE, 1/3 BLOCKED-ON-MIKE. |
+| `ghost-smoke-audit-v2-20260419.md` | **19 Apr 2026 afternoon ghost smoke audit v2, post-V32 + V31.1.** Master Audit Cross-Check report. All three layers ✅ PASS. Layer A (static code) + Layer B (regression trace over 10 V30 smoke scenarios + 8 refresh-persistence scenarios + 8 V31.1 trigger semantic cases): no code defects, no regressions. Layer C (runtime/live) ran end-to-end after Mike's push + SQL apply on 19 Apr afternoon: (1) phantom-team guard fires on seeded id=99999 → splash + cleared session + Dutch toast + null myTeam; (2) pendingMine=1 banner correctly renders after reload with 1 seeded pending row; (3) visibilitychange step 6 fires the photo_reviews fetch alongside the four pre-existing steps; (4) V31.1 multi-row INSERT [7,7,12] produces cc=3, lv=2 (V31 would have produced lv=1); (5) single-row regression passes; (6) duplicate-location + sentinel location_id=-1 edge cases both correct. Final drift check: all 4 teams OK. Net verdict: 3/3 DONE. |
 | `refresh-persistence-test-20260419.md` | **19 Apr 2026 deep refresh-persistence test (Layer C, live deploy).** 11,661 B. Six scenarios run via Chrome MCP `javascript_tool` + React-fiber-state walking: Test 1 happy-path reload (PASS — all 8 hook slots hydrated correctly, V21 P0 + V22 catch-up verified), Test 2 reload during active bar break (PASS), Test 3 reload with pending photo submission (GAP — player loses the "X foto's in check" counter until next realtime echo, no data loss), Test 4 empty localStorage (PASS — splash), Test 5 iOS private-browsing quota throw (PASS — detection logic live-verified, banner rendering code-verified), Test 6 12-hour session expiry (PASS — stale session correctly rejected). Side finding during seeding: V31 trigger multi-row INSERT under-counts `locations_visited` (→ V31.1). Side observation: anon key has SELECT+INSERT+UPDATE but NOT DELETE on `photo_reviews`; a pre-existing phantom localStorage session rendered an id=10 team that didn't exist in the DB (→ V32 phantom-team guard). Decision/open items section at the end distinguishes gameday-blocking from polish. All three "action" findings became V32 + V31.1. |
 | `smoke-test-v30-20260419.md` | **19 Apr 2026 smoke test report.** Compressed full-code-path simulation via Chrome MCP `javascript_tool` injection: 4 sim teams (De Zeehelden / Kralingse Kapers / Hofpleinlopers / Maashaven Mafia), all 6 phase transitions, all 3 bar breaks, 3 Jorik rotations, finale + game_ended, photo review approve/reject, feed reactions incl. DELETE+reinsert (V30.1 path), UNIQUE constraint duplicates, underdog bonus, GPS hide/reveal. 0 runtime errors across ~70 REST/RPC calls. Surfaced 5 bugs (2 medium UX / 1 medium schema / 2 low-severity) — feeds directly into V31 SQL patch. |
 | `SUPABASE-GAMEDAY-RESET.sql` | **V26 + V27 addition.** Standalone SQL snippet for Mike to paste into the Supabase SQL editor on gameday eve or between practice runs. Block A soft-reset (keeps teams), Block B full-reset (commented out). Idempotent, includes sanity-check SELECTs inside each transaction. **V27 P0-D fix:** both blocks now compute `jorik_team_id = (SELECT MIN(id) FROM teams WHERE COALESCE(spectator,FALSE)=FALSE)` instead of hardcoding `1`, so the reset works correctly regardless of where the teams SERIAL has advanced. |
