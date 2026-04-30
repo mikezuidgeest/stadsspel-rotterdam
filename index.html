@@ -162,6 +162,8 @@
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
     @keyframes scoreFloat{0%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-80px) scale(1.35)}}
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+    /* V24 — admin broadcast banner entry animation */
+    @keyframes broadcastIn{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
     @keyframes breathing{0%,100%{opacity:0.6}50%{opacity:1}}
     /* V14: celebration animations */
     @keyframes confettiFall{0%{transform:translateY(-20vh) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
@@ -584,6 +586,21 @@ const PHOTO_GATE_RADIUS=50;        // meters — must be within this to take a p
 const PHOTO_GATE_GRACE=20;         // extra meters allowed (GPS noise tolerance)
 const REVIEW_REJECT_PENALTY=true;  // when admin rejects, deduct points awarded
 // Status enum for photo_reviews table: 'pending' | 'approved' | 'rejected'
+
+// V24 — admin broadcast + auto-approval thresholds
+// BROADCAST_EMOJI is the canonical detection rule for [📢 Game Master] activity_feed
+// rows; `broadcastMessage` (App.jsx) inserts every announcement with team_emoji='📢'.
+// Every client subscribes to activity_feed via realtime; the V24 banner state listens
+// for new rows where team_emoji===BROADCAST_EMOJI and shows them as a top toast.
+const BROADCAST_EMOJI='📢';
+const BROADCAST_BANNER_MS=12000;
+// V24 — auto-approve photo submissions whose GPS distance is within this radius.
+// Mike's spec: "within 100m or 200m … should generally be accepted as correct without
+// requiring manual approval." Submissions further than this still go to pending so
+// the admin queue + GPS hysteresis (V22) keep their anti-cheat value. When GPS_GATE_BYPASS
+// (V23) is on AND the device has no GPS fix at all, dist will be null and we fall back
+// to 'pending' — so the admin can spot-check or `mass-approve` via the agent harness.
+const AUTO_APPROVE_RADIUS=200;
 
 // V23 TESTING TOGGLES — flip TEST_MODE to false before gameday to restore live behavior.
 // Live restrictions disabled by TEST_MODE:
@@ -1198,6 +1215,25 @@ function App(){
   useEffect(()=>()=>{pendingRetryTimersRef.current.forEach(id=>clearTimeout(id));pendingRetryTimersRef.current.clear();},[]);
   const[selLoc,setSelLoc]=useState(null);
   const[toast,setToast]=useState(null);
+  // V24: cross-device broadcast banner. broadcastMessage (admin) inserts a row
+  // with team_emoji===BROADCAST_EMOJI; the activity_feed realtime sub watches
+  // for that emoji and surfaces the message as a top-of-viewport gold banner
+  // on every connected device. Auto-clears after BROADCAST_BANNER_MS, or
+  // tap-to-dismiss. Late joiners see any broadcast within the last 30 sec on
+  // initial fetch (handled below). Distinct from `toast` because broadcasts
+  // need their own visual weight + persist longer + the message body can be
+  // multi-line ("Iedereen naar Markthal binnen 15 min!").
+  const[broadcastBanner,setBroadcastBanner]=useState(null);
+  const broadcastTimerRef=useRef(null);
+  const showBroadcast=useCallback((message,createdAt)=>{
+    if(!message)return;
+    const id=createdAt||Date.now();
+    setBroadcastBanner({id,message,ts:Date.now()});
+    if(broadcastTimerRef.current)clearTimeout(broadcastTimerRef.current);
+    broadcastTimerRef.current=setTimeout(()=>{
+      setBroadcastBanner(b=>(b&&b.id===id)?null:b);
+    },BROADCAST_BANNER_MS);
+  },[]);
   const[scorePopup,setScorePopup]=useState(null);
   // V20 UX P1: promise-based dialog replacing native window.confirm / window.prompt.
   // Native dialogs block the event loop, look out-of-place on mobile, and on some
@@ -1707,6 +1743,15 @@ function App(){
       const msg=payload.new.message||'';
       const m=msg.match(/^\[JORIK\] team=(\d+|null)/);
       if(m){setJorikTeamId(m[1]==='null'?null:parseInt(m[1],10))}
+      // V24: cross-device broadcast banner. Detect rows authored by the admin
+      // broadcastMessage() helper — it always stamps team_emoji='📢' on the
+      // activity_feed insert. Skip [JORIK]/[BROADCAST]-tagged system rows
+      // (they're internal markers, not announcements). Skip if this is the
+      // admin's own optimistic-prepend echoing back (created_at + same
+      // session) — broadcastMessage already toasts locally on send.
+      if(payload.new.team_emoji===BROADCAST_EMOJI&&!msg.startsWith('[')){
+        showBroadcast(msg,payload.new.created_at);
+      }
     }).subscribe();
 
     // V21 P0: initial fetch of activity_feed. Without this, any late-joining
@@ -1716,6 +1761,18 @@ function App(){
     // Grootste schot incorrect on every reloaded client.
     sb.from('activity_feed').select('*').order('created_at',{ascending:false}).limit(500).then(res=>{
       if(res.data&&res.data.length){
+        // V24: surface a recent broadcast on initial mount so a player who
+        // joins mid-announcement still sees it. Threshold: within the last
+        // 30 sec of activity_feed time. Older broadcasts stay in the feed
+        // tab but don't re-fire as a banner (would be confusing).
+        const recentBroadcast=res.data.find(a=>{
+          if(a.team_emoji!==BROADCAST_EMOJI)return false;
+          const msg=a.message||'';
+          if(msg.startsWith('['))return false;
+          const ageMs=Date.now()-new Date(a.created_at).getTime();
+          return ageMs<30000;
+        });
+        if(recentBroadcast)showBroadcast(recentBroadcast.message,recentBroadcast.created_at);
         setActivityFeed(prev=>{
           // Merge: dedupe by created_at+team_id+message composite key (activity_feed has no PK on the client realtime payload)
           const seen=new Set(prev.map(a=>`${a.created_at}|${a.team_id}|${a.message}`));
@@ -3159,6 +3216,29 @@ function App(){
           mode / locked-down browsers) so progress cannot survive a force-quit. One-shot banner. */}
       {!OFFLINE&&!localStorageWorks()&&<div className="offline-banner" style={{top:OFFLINE?26:0,color:'#e4b25c',background:'rgba(228,178,92,0.12)',borderBottomColor:'rgba(228,178,92,0.25)'}}>⚠︎ Private browsing actief — voortgang wordt niet bewaard bij tab sluiten</div>}
       {toast&&<div className="toast" role="status" aria-live="polite" aria-atomic="true"><div className="toast-inner">{toast}</div></div>}
+      {/* V24: cross-device admin broadcast banner. Renders above everything
+          else (z-index above toast/modal/sheet). Tap to dismiss; auto-clears
+          after BROADCAST_BANNER_MS via the timer in showBroadcast(). */}
+      {broadcastBanner&&(
+        <div role="alertdialog" aria-live="assertive" aria-label="Bericht van de Game Master"
+          onClick={()=>setBroadcastBanner(null)}
+          style={{position:'fixed',top:'env(safe-area-inset-top, 0px)',left:0,right:0,zIndex:11000,
+            padding:'var(--sp-3) var(--sp-5)',
+            background:'linear-gradient(180deg,rgba(228,178,92,0.95) 0%,rgba(212,160,84,0.92) 100%)',
+            color:'#0a0b10',cursor:'pointer',
+            boxShadow:'0 8px 24px rgba(0,0,0,0.45)',
+            borderBottom:'2px solid rgba(255,255,255,0.35)',
+            animation:'broadcastIn 0.35s ease-out'}}>
+          <div style={{display:'flex',alignItems:'flex-start',gap:'var(--sp-3)',maxWidth:520,margin:'0 auto'}}>
+            <div style={{fontSize:24,flexShrink:0,lineHeight:1}}>📢</div>
+            <div style={{flex:1,minWidth:0}}>
+              <div className="t-label-sm" style={{letterSpacing:'0.14em',opacity:0.7,marginBottom:2}}>GAME MASTER</div>
+              <div className="t-body-emph" style={{lineHeight:'var(--lh-relaxed)',whiteSpace:'pre-wrap',wordBreak:'break-word'}}>{broadcastBanner.message}</div>
+            </div>
+            <div style={{fontSize:18,flexShrink:0,opacity:0.6,marginLeft:'var(--sp-2)'}} aria-hidden="true">×</div>
+          </div>
+        </div>
+      )}
       {scorePopup&&<div className="score-popup">{scorePopup}</div>}
       {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal */}
       {(gpsStatus==='denied'||gpsStatus==='unavailable')&&(
@@ -5245,7 +5325,13 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
       setProcessing(false);
 
       // V6: Insert a photo_review row into Supabase for the admin queue
+      // V24: auto-approve when GPS distance is within AUTO_APPROVE_RADIUS (200m).
+      // Mike's spec: in-range submissions skip the manual queue. Distant or no-GPS
+      // submissions still go to 'pending' so the admin (or agent harness mass-approve)
+      // can spot-check. The admin queue UI already filters status='pending', so
+      // approved rows just don't appear there — points are awarded the same way.
       if(!OFFLINE&&sb&&myTeam&&isMedia){
+        const autoApprove=dist!=null&&dist<=AUTO_APPROVE_RADIUS;
         const reviewRow={
           team_id:myTeam.id,
           team_name:myTeam.name,
@@ -5259,7 +5345,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
           gps_distance:dist!=null?Math.round(dist):null,
           points_awarded:ch.p,
           photo_url:shareable&&shareable.length<800000?shareable:null,
-          status:'pending',
+          status:autoApprove?'approved':'pending',
         };
         sb.from('photo_reviews').insert(reviewRow).then(()=>{},()=>{/* table may not exist yet — silent */});
       }
