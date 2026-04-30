@@ -510,6 +510,8 @@ const TEAM_COLORS=[
 // ═══════════════════════════════════════════
 // V5 FEATURE 4: STARTER PACKS (one-tap team creation)
 // ═══════════════════════════════════════════
+// V23: pool of 8 starter packs — only 4 can ever be active at once (MAX_TEAMS).
+// Players pick 4 of 8; once full, remaining packs render as locked/cap-reached.
 const STARTER_PACKS=[
   {name:'De Maffiosi',emoji:'🦁',color:'var(--accent)'},
   {name:'Haven Helden',emoji:'🦈',color:'var(--foto)'},
@@ -517,6 +519,8 @@ const STARTER_PACKS=[
   {name:'De Kubus Kids',emoji:'🦊',color:'var(--quiz)'},
   {name:'Erasmus Elite',emoji:'🦅',color:'var(--success)'},
   {name:'Markthal Monsters',emoji:'🐙',color:'#ec4899'},
+  {name:'Biervrienden',emoji:'🍻',color:'#e4b25c'},
+  {name:'Havenrotten',emoji:'⚓',color:'#6ea3ff'},
 ];
 
 // V30 (Less-is-More): NARRATIVE chapter-modal constant removed. The full proloog +
@@ -529,15 +533,33 @@ const STARTER_PACKS=[
 // the previous team loses access (their done-list is preserved so they keep
 // the points). Each mission is a one-shot video/photo capture — mirror of the
 // wedding mission but opposite visibility.
+// V21: expanded 8 → 16 missions. Added priority + context fields so the Jorik
+// panel can curate which missions show prominently in which moment:
+//   priority: 'high' | 'normal' | 'low'  (panel sorts high → normal → low)
+//   context : 'any' | 'bar' | 'loc:N'    (bar = only render during bar break;
+//                                         loc:N = only render when team is in
+//                                         preview band of POI N)
+//   weddingPipeline: true               (counts toward the 4-shot wedding edit)
+//   running: true                       (day-long arc, not one-shot completion)
 const JORIK_MISSIONS=[
-  {id:'advice',   emoji:'💍', cat:'Social',      title:'Huwelijksadvies van vreemden', desc:'Vraag 3 onbekenden om hun beste óf slechtste huwelijksadvies. Film het.', media:'video', pts:40},
-  {id:'compliment',emoji:'🌹',cat:'Social',      title:'Overdreven compliment',        desc:'Jorik geeft drie vreemden een absurd overdreven compliment. Film hun reactie.', media:'video', pts:25},
-  {id:'accent',   emoji:'🎭', cat:'Performance', title:'Vraag de weg in accent',       desc:'Jorik vraagt een voorbijganger de weg in een compleet fout buitenlands accent.', media:'video', pts:30},
-  {id:'speech',   emoji:'🎤', cat:'Performance', title:'Nep-trouwtoespraak',           desc:'Jorik houdt spontaan een 30s trouwtoespraak op een druk plein. Publiek mag meedoen.', media:'video', pts:50},
-  {id:'pushups',  emoji:'💪', cat:'Physical',    title:'Publieke push-ups',            desc:'Jorik doet 20 push-ups op een openbaar plein terwijl het team telt.', media:'video', pts:20},
-  {id:'trade',    emoji:'🤝', cat:'Interaction', title:'Ruil omhoog',                  desc:'Start met een paperclip. Ruil drie keer op met vreemden naar iets grotere waarde.', media:'photo', pts:40},
-  {id:'sing',     emoji:'🎵', cat:'Funny',       title:'Zing voor een vreemde',        desc:'Jorik zingt 30 sec. een liefdeslied voor een willekeurige voorbijganger.', media:'video', pts:35},
-  {id:'shout',    emoji:'📣', cat:'Funny',       title:'"Ik ga trouwen!"',             desc:'Jorik schreeuwt luidkeels "Ik ga trouwen!" in een volle straat.', media:'video', pts:30},
+  // existing 8 — IDs preserved for back-compat
+  {id:'advice',   emoji:'💍', cat:'Social',      title:'Huwelijksadvies van vreemden', desc:'Vraag 3 onbekenden om hun beste óf slechtste huwelijksadvies. Film het.', media:'video', pts:40, priority:'high', context:'any', weddingPipeline:true},
+  {id:'compliment',emoji:'🌹',cat:'Social',      title:'Compliment aan 5 voorbijgangers', desc:'Jorik geeft 5 verschillende vreemden een absurd overdreven compliment. Film hun reactie. Houd ze bij in één video of een reeks korte clips.', media:'video', pts:25, priority:'normal', context:'any'},
+  {id:'accent',   emoji:'🎭', cat:'Performance', title:'Vraag de weg in accent',       desc:'Jorik vraagt een voorbijganger de weg in een compleet fout buitenlands accent.', media:'video', pts:30, priority:'normal', context:'any'},
+  {id:'speech',   emoji:'🎤', cat:'Performance', title:'Nep-trouwtoespraak',           desc:'Jorik houdt spontaan een 30s trouwtoespraak op een druk plein. Publiek mag meedoen.', media:'video', pts:50, priority:'high', context:'any', weddingPipeline:true},
+  {id:'pushups',  emoji:'💪', cat:'Physical',    title:'Publieke push-ups',            desc:'Jorik doet 20 push-ups op een openbaar plein terwijl het team hardop telt.', media:'video', pts:20, priority:'normal', context:'any'},
+  {id:'trade',    emoji:'🤝', cat:'Running',     title:'Ruil-omhoog (de hele dag)',    desc:'Mike geeft Jorik bij start een klein object. Maak 4 ruils — één tijdens elke teamronde — met vreemden. Eindwaarde moet hoger zijn dan startwaarde. Foto van elke ruil + de vreemde.', media:'photo', pts:60, priority:'high', context:'any', running:true, tradeTarget:4},
+  {id:'sing',     emoji:'🎵', cat:'Funny',       title:'Italiaanse aria voor een vreemde', desc:'Jorik zingt 30 sec. een Italiaanse aria (O Sole Mio / Volare / Nessun Dorma) voor een willekeurige voorbijganger. Mag schaamteloos vals.', media:'video', pts:35, priority:'low', context:'any'},
+  {id:'shout',    emoji:'📣', cat:'Funny',       title:'"Ik ga trouwen!"',             desc:'Jorik schreeuwt luidkeels "Ik ga trouwen!" in een volle straat. Bonus voor publieke reactie.', media:'video', pts:30, priority:'normal', context:'any'},
+  // new 8 — V21 additions from Mike's prior-bachelor triage + audit
+  {id:'redhead',       emoji:'🔥', cat:'Find',        title:'Foto met een roodharige',         desc:'Vind een vrijwillige roodharige in Rotterdam en maak een foto met Jorik. Vraag toestemming.', media:'photo', pts:30, priority:'low', context:'any'},
+  {id:'bar-proposal',  emoji:'💍', cat:'Bar',         title:'Aanzoek aan de barvrouw',         desc:'Bar-set-piece. Brief eerst even het personeel — daarna gaat Jorik op één knie en doet een nep-aanzoek aan de barvrouw, met ring (bierdopje, deksel, alles werkt). Film van begin tot reactie.', media:'video', pts:50, priority:'high', context:'bar', weddingPipeline:true},
+  {id:'chicken-dance', emoji:'🐔', cat:'Performance', title:'Kipdans op een plein',            desc:'Jorik danst de kipdans (armen als vleugels, enthousiast flapperen) op een druk plein. Team voert aan. Probeer minstens 3 voorbijgangers mee te slepen.', media:'video', pts:25, priority:'normal', context:'any'},
+  {id:'cop-photo',     emoji:'👮', cat:'Find',        title:'Foto met een politieagent',       desc:'Vind een politieagent (of boa / handhaver) en vraag vriendelijk of er een foto met Jorik mag. Géén grappen tijdens het vragen.', media:'photo', pts:40, priority:'low', context:'any'},
+  {id:'markthal-anthem',emoji:'🎶',cat:'Set-piece',   title:'Hand in Hand Kameraden — Markthal solo', desc:'Jorik staat midden in de Markthal en zingt SOLO "Hand in Hand Kameraden". Bewijs dat hij echt Feyenoorder is. Team filmt vanaf de zijkant. Min. 1 couplet.', media:'video', pts:45, priority:'high', context:'loc:2'},
+  {id:'high-five-ten', emoji:'🙌', cat:'Social',      title:'10 high-fives in 5 minuten',      desc:'Jorik moet 10 verschillende vreemden een high-five geven binnen 5 minuten. Team filmt en telt hardop. Klok loopt vanaf de eerste high-five.', media:'video', pts:30, priority:'normal', context:'any'},
+  {id:'bar-rating',    emoji:'⭐', cat:'Bar',         title:'Trouwmateriaal-rating',           desc:'Bar-set-piece. Vraag de barkeeper om Jorik publiekelijk te beoordelen als trouwmateriaal — schaal 1-10 met grappige of sarcastische onderbouwing ("Hij snurkt 24/7, maar hij betaalt de dranken"). Film van vraag tot verdict, reactie included.', media:'video', pts:35, priority:'high', context:'bar'},
+  {id:'bar-toast',     emoji:'🥂', cat:'Bar',         title:'Spontane proost met onbekende tafel', desc:'Bar-set-piece. Loop naar een onbekende tafel, leg uit dat Jorik volgende week trouwt, en organiseer een spontane groepsproost. Film de hele tafel.', media:'video', pts:30, priority:'high', context:'bar', weddingPipeline:true},
 ];
 
 // ═══════════════════════════════════════════
@@ -563,6 +585,24 @@ const PHOTO_GATE_GRACE=20;         // extra meters allowed (GPS noise tolerance)
 const REVIEW_REJECT_PENALTY=true;  // when admin rejects, deduct points awarded
 // Status enum for photo_reviews table: 'pending' | 'approved' | 'rejected'
 
+// V23 TESTING TOGGLES — flip TEST_MODE to false before gameday to restore live behavior.
+// Live restrictions disabled by TEST_MODE:
+//   1. admin-only "Start spel" button (LOBBY_OPEN_TO_ALL → anyone can start)
+//   2. GPS distance gate on photo capture (GPS_GATE_BYPASS → camera always opens)
+//   3. splash + lobby copy switches to "🧪 TESTMODUS" labels
+// Always-on V23 changes (independent of TEST_MODE):
+//   - hard cap of 4 active teams (MAX_TEAMS, also enforced by SUPABASE-V23-RESET.sql trigger)
+//   - 8 starter-pack pool to pick 4 from (TEAM_POOL_SIZE)
+//   - mission list under map capped to N nearest (TASKLIST_NEARBY_ONLY)
+//   - all L_DATA photo/video/creative tasks rewritten to require team-in-frame
+const TEST_MODE=true;
+const MAX_TEAMS=4;
+const TEAM_POOL_SIZE=8;
+const LOBBY_OPEN_TO_ALL=TEST_MODE;
+const GPS_GATE_BYPASS=TEST_MODE;
+const TASKLIST_NEARBY_ONLY=true;
+const TASKLIST_NEARBY_N=3;
+
 // V25 (#71): Two-radius task discovery UX.
 // PREVIEW_RADIUS — "getting warm" band. Task is close enough to plan a path to.
 // UNLOCK_RADIUS  — "you're here" band. Challenge copy + CTAs communicate actionable state.
@@ -581,7 +621,8 @@ function dinerTs(){
 }
 
 // V14: Bar break duration — 15 min default; overlay shows countdown; auto-ends
-const BAR_BREAK_DURATION_MS=15*60*1000;
+// V21: bumped to 30 min to match Mike's brief ("3 bar stops, each ~30 min").
+const BAR_BREAK_DURATION_MS=30*60*1000;
 
 // V20 balance: CATCH-UP / UNDERDOG BONUS.
 // At each bar-break the current last-place team gets a silent +UNDERDOG_BONUS
@@ -672,157 +713,157 @@ const MOTION_AVAILABLE=typeof DeviceMotionEvent!=='undefined'&&
 // ═══════════════════════════════════════════
 const L_DATA=[
 {id:1,n:"Erasmusbrug",la:51.907792,lo:4.489798,e:"🌉",c:"bridge",r:25,ch:[
-  {t:"photo",ti:"Erasmusbrug Pose",d:"Maak de meest epische foto op de brug. Filmaffiche waardig!",p:25,df:"medium"},
-  {t:"video",ti:"Brug Catwalk",d:"Loop als een model over de Erasmusbrug. Hele team, min. 10 sec.",p:35,df:"hard"},
+  {t:"photo",ti:"Erasmusbrug Pose",d:"Heel team in beeld op de brug, filmaffiche-pose. Jorik vooraan in held-houding, rest in V-formatie achter hem. Erasmusbrug duidelijk in beeld.",p:25,df:"medium"},
+  {t:"video",ti:"Brug Catwalk",d:"Bruidegom-loop over de Erasmusbrug — Jorik vooraan, team achter hem aan in plechtige stoet. Min. 10 sec, vanaf de andere kant van de brug filmen.",p:35,df:"hard",wp:1},
   {t:"quiz",ti:"Brug Kennis",d:"Wat is de bijnaam van de Erasmusbrug?",a:"De Zwaan",o:["De Zwaan","De Harp","De Naald","Het Zeil"],p:15,df:"easy"}]},
 {id:2,n:"Markthal",la:51.920109,lo:4.486957,e:"🏗️",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Plafond Selfie",d:"Spectaculaire foto van het beschilderde plafond.",p:20,df:"easy"},
-  {t:"creative",ti:"Proeverij Challenge",d:"Koop het raarste ding, laat iemand het blind proeven op video.",p:35,df:"hard"},
+  {t:"photo",ti:"Plafond Selfie",d:"Heel team plat op de rug op de Markthalvloer, beschilderd plafond als achtergrond. Jorik centraal, iedereen wijst omhoog. Allemaal in beeld.",p:20,df:"easy"},
+  {t:"creative",ti:"Proeverij Challenge",d:"Koop het raarste ding in de Markthal. Jorik geblinddoekt, team eromheen, allemaal in beeld terwijl hij blind proeft. Reacties van het team meefilmen.",p:35,df:"hard"},
   {t:"quiz",ti:"Markthal Trivia",d:"Hoeveel m² is het kunstwerk op het plafond?",a:"11.000 m²",o:["11.000 m²","5.000 m²","8.500 m²","15.000 m²"],p:25,df:"medium"}]},
 {id:3,n:"Kubuswoningen",la:51.920394,lo:4.490127,e:"🎲",c:"architecture",r:15,ch:[
-  {t:"photo",ti:"Schuine Pose",d:"Hele team schuin, net als de kubussen.",p:20,df:"easy"},
+  {t:"photo",ti:"Scheef Huwelijk",d:"Team staat 45 graden gekanteld onder een kubus. Jorik in het midden roept: 'Net als mijn huwelijk: scheef maar staat als een huis.'",p:20,df:"easy"},
   {t:"quiz",ti:"Kubus Quiz",d:"Wie ontwierp de kubuswoningen?",a:"Piet Blom",o:["Piet Blom","Rem Koolhaas","Berlage","Rietveld"],p:25,df:"medium"}]},
 {id:4,n:"Euromast",la:51.905405,lo:4.466604,e:"🗼",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Toren Perspectief",d:"Perspectieffoto: iemand 'houdt' de Euromast vast of 'eet' hem op.",p:25,df:"medium"},
+  {t:"photo",ti:"Toren Perspectief",d:"Heel team in beeld: één persoon 'houdt' of 'eet' de Euromast in perspectief, de rest reageert overdreven. Jorik centraal, iedereen erop.",p:25,df:"medium"},
   {t:"quiz",ti:"Euromast Hoogte",d:"Hoe hoog is de Euromast?",a:"185 meter",o:["185 meter","165 meter","200 meter","150 meter"],p:20,df:"easy"}]},
 {id:5,n:"Hotel New York",la:51.904092,lo:4.484505,e:"🏨",c:"historic",r:15,ch:[
-  {t:"creative",ti:"Emigranten Scene",d:"Speel afscheidsscène na alsof jullie naar Amerika vertrekken!",p:35,df:"hard"},
-  {t:"photo",ti:"New York Stijl",d:"Foto in 'Roaring Twenties' stijl bij de ingang.",p:25,df:"medium"}]},
+  {t:"creative",ti:"Emigranten Scene",d:"Heel team speelt afscheidsscène voor Hotel New York: Jorik vertrekt naar Amerika, team zwaait dramatisch met zakdoeken. Iedereen in beeld, één take.",p:35,df:"hard"},
+  {t:"photo",ti:"New York Stijl",d:"Heel team in 'Roaring Twenties' pose bij de ingang van Hotel New York. Jorik als gangster-bruidegom, team als entourage. Allemaal erop.",p:25,df:"medium"}]},
 {id:6,n:"SS Rotterdam",la:51.8978,lo:4.473277,e:"🚢",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Titanic Pose",d:"Titanic-pose bij het schip. 'I'm the king of the world!'",p:25,df:"medium"},
+  {t:"photo",ti:"Titanic Pose",d:"Heel team Titanic-pose voor de SS Rotterdam: Jorik vooraan met armen wijd, team achter hem als bemanning. Allemaal in beeld, schip duidelijk zichtbaar.",p:25,df:"medium"},
   {t:"quiz",ti:"Schip Kennis",d:"In welk jaar maakte de SS Rotterdam haar laatste reis?",a:"2000",o:["2000","1997","2005","1990"],p:25,df:"medium"}]},
 {id:7,n:"Rotterdam Centraal",la:51.924639,lo:4.469133,e:"🚂",c:"landmark",r:20,ch:[
-  {t:"photo",ti:"Station Selfie",d:"Groepsfoto voor het iconische puntdak.",p:15,df:"easy"},
+  {t:"video",ti:"Verloren Bagage",d:"Team interviewt Jorik bij de bagagebanken: wat laat hij achter in zijn vrijgezellenleven? Captain + minstens 2 teamleden in beeld naast Jorik. Min. 20 sec.",p:30,df:"medium"},
   {t:"quiz",ti:"Station Kennis",d:"Wanneer werd het huidige Rotterdam Centraal geopend?",a:"2014",o:["2014","2010","2018","2012"],p:20,df:"easy"}]},
 {id:8,n:"De Hef",la:51.913745,lo:4.498184,e:"🏗️",c:"bridge",r:15,ch:[
-  {t:"photo",ti:"Hef Silhouet",d:"Silhouetfoto met De Hef op de achtergrond.",p:25,df:"medium"},
+  {t:"photo",ti:"Hef Silhouet",d:"Team vormt een silhouet-rij voor De Hef bij tegenlicht. Jorik vooraan, armen omhoog, rest in een lijn. Allemaal in beeld.",p:25,df:"medium"},
   {t:"quiz",ti:"Hef Quiz",d:"Jeff Bezos wilde De Hef demonteren. Hoe reageerde Rotterdam?",a:"Dreigde met eieren gooien",o:["Dreigde met eieren gooien","Ging akkoord","Eiste 10 miljoen","Negeerde het"],p:30,df:"hard"}]},
-{id:9,n:"Willemsbrug",la:51.917202,lo:4.491591,e:"🔴",c:"bridge",r:15,ch:[{t:"photo",ti:"Rode Brug Foto",d:"Groepsfoto op de rode brug met skyline.",p:20,df:"easy"}]},
+{id:9,n:"Willemsbrug",la:51.917202,lo:4.491591,e:"🔴",c:"bridge",r:15,ch:[{t:"photo",ti:"Rode Loper",d:"Jorik loopt over de brug als bruidegom, team vormt erehaag aan beide kanten. Skyline zichtbaar achter hem.",p:20,df:"easy"}]},
 {id:10,n:"Laurenskerk",la:51.921551,lo:4.485452,e:"⛪",c:"historic",r:20,ch:[
-  {t:"photo",ti:"Kerktoren Shot",d:"Creatieve foto: iemand 'houdt' de kerktoren vast.",p:25,df:"medium"},
+  {t:"photo",ti:"Kerktoren Shot",d:"Heel team in beeld: één persoon 'houdt' de Laurenskerk-toren in perspectief, de rest helpt hem dragen of kijkt vol bewondering. Iedereen erop.",p:25,df:"medium"},
   {t:"quiz",ti:"Kerk Kennis",d:"De Laurenskerk overleefde 1940. Wanneer begon de bouw?",a:"1449",o:["1449","1352","1510","1601"],p:25,df:"medium"}]},
 {id:11,n:"POST Rotterdam",la:51.922067,lo:4.480053,e:"📮",c:"landmark",r:20,ch:[
-  {t:"photo",ti:"Postkantoor Pose",d:"Groepsfoto alsof jullie een pakketje ophalen.",p:20,df:"easy"},
+  {t:"photo",ti:"Trouwuitnodiging Bezorgd",d:"Jorik houdt een denkbeeldige envelop omhoog voor de gevel. Team wijst er allemaal naar: 'Trouwuitnodiging — 14 juni, last call.'",p:20,df:"easy"},
   {t:"quiz",ti:"POST Kennis",d:"Wat was dit gebouw oorspronkelijk?",a:"Hoofdpostkantoor",o:["Hoofdpostkantoor","Stadhuis","Bibliotheek","Rechtbank"],p:15,df:"easy"}]},
 {id:12,n:"Stadhuis Rotterdam",la:51.923237,lo:4.478512,e:"🏛️",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Burgemeester Pose",d:"Eén teamlid houdt toespraak als burgemeester.",p:25,df:"medium"},
-  {t:"video",ti:"Raadsvergadering",d:"15-sec nep-raadsvergadering over belachelijk onderwerp.",p:30,df:"medium"}]},
+  {t:"photo",ti:"Burgemeester Pose",d:"Eén teamlid op een denkbeeldig podium voor het Stadhuis als burgemeester. Rest van het team eromheen als raadsleden, Jorik als bruidegom in het midden. Allemaal in beeld.",p:25,df:"medium"},
+  {t:"video",ti:"Raadsvergadering",d:"Heel team speelt 15-sec nep-raadsvergadering voor het Stadhuis: Jorik als voorzitter, rest als raadsleden die heftig debatteren over een belachelijk onderwerp. Allemaal in beeld.",p:30,df:"medium"}]},
 {id:13,n:"Koopgoot",la:51.9201,lo:4.4795,e:"🛍️",c:"landmark",r:30,ch:[
-  {t:"creative",ti:"Interview-opdracht",d:"Interview een echte shopper: 'Wat is jouw slechtste aankoop ooit?' Film het antwoord. Minimaal 15 sec.",p:35,df:"medium"},
+  {t:"creative",ti:"Interview-opdracht",d:"Team interviewt een echte shopper in de Koopgoot: 'Wat is jouw slechtste aankoop ooit?' Captain + minstens 2 teamleden naast de shopper in beeld. Min. 15 sec.",p:35,df:"medium"},
   {t:"quiz",ti:"Koopgoot Trivia",d:"Hoe heet de Koopgoot officieel?",a:"Beurstraverse",o:["Beurstraverse","Cooltraverse","Winkeltraverse","Lijnbaanpassage"],p:15,df:"easy"}]},
-{id:14,n:"Hofplein",la:51.924788,lo:4.477553,e:"⛲",c:"square",r:35,ch:[{t:"photo",ti:"Fontein Foto",d:"Groepsfoto bij de fontein!",p:20,df:"easy"}]},
+{id:14,n:"Hofplein",la:51.924788,lo:4.477553,e:"⛲",c:"square",r:35,ch:[{t:"video",ti:"Bachelor's Wishing Fountain",d:"Jorik gooit een muntje in de Hofplein-fontein en spreekt 1 huwelijkswens hardop uit. Heel team eromheen in beeld, handen gevouwen alsof ze meebidden. Film van begin tot wens.",p:30,df:"medium"}]},
 {id:15,n:"Standbeeld Erasmus",la:51.9221,lo:4.4859,e:"📚",c:"art",r:10,ch:[
   {t:"photo",ti:"Erasmus Imitatie",d:"Imiteer de pose van Erasmus. Heel team doet mee.",p:20,df:"easy"},
   {t:"quiz",ti:"Erasmus Quiz",d:"Waarvoor is Erasmus het meest bekend?",a:"Lof der Zotheid",o:["Lof der Zotheid","Het Achterhuis","Max Havelaar","De Ontdekking van de Hemel"],p:20,df:"easy"}]},
-{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"video",ti:"Erasmus Fluistert",d:"Erasmus staat hier al sinds 1622 — oudste standbeeld van NL. Film Jorik terwijl hij op zijn knieën gaat en Erasmus om één concreet huwelijksadvies vraagt. Erasmus' antwoord (teamlid off-camera) moet minstens één Latijns-klinkend woord bevatten.",p:35,df:"hard"}]},
+{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"video",ti:"Erasmus Fluistert",d:"Erasmus staat hier al sinds 1622 — oudste standbeeld van NL. Film Jorik op zijn knieën die Erasmus om huwelijksadvies vraagt. Captain + minstens 2 teamleden in beeld als ooggetuigen. Erasmus' antwoord (teamlid off-camera) moet minstens één Latijns-klinkend woord bevatten.",p:35,df:"hard",wp:1}]},
 {id:17,n:"Zadkine Monument",la:51.9180,lo:4.4815,e:"🗿",c:"art",r:15,ch:[
-  {t:"photo",ti:"Verwoeste Stad Pose",d:"Recreëer de pose: armen omhoog, mond open!",p:25,df:"medium"},
+  {t:"photo",ti:"Verwoeste Stad Pose",d:"Heel team recreëert de Zadkine-pose: armen omhoog, mond open, gezichten van schrik. Jorik centraal voor het beeld, allemaal in beeld.",p:25,df:"medium"},
   {t:"quiz",ti:"Monument Quiz",d:"Aan welke gebeurtenis herinnert dit beeld?",a:"Bombardement Rotterdam 1940",o:["Bombardement Rotterdam 1940","Watersnoodramp 1953","Bevrijding 1945","Havenarbeidersstaking 1970"],p:25,df:"medium"}]},
-{id:18,n:"Het Schielandshuis",la:51.918933,lo:4.481813,e:"🏰",c:"historic",r:20,ch:[{t:"photo",ti:"Historisch Portret",d:"'Schilderachtig' portret voor het oudste gebouw.",p:20,df:"easy"}]},
-{id:19,n:"Binnenrotte",la:51.921313,lo:4.486875,e:"🎪",c:"square",r:25,ch:[{t:"creative",ti:"Markt Bingo",d:"Vind: iets roods, een buitenlander, een straatmuzikant, iets gratis, een hond.",p:35,df:"hard"}]},
+{id:18,n:"Het Schielandshuis",la:51.918933,lo:4.481813,e:"🏰",c:"historic",r:20,ch:[{t:"photo",ti:"Bruidsportret 1665",d:"Stilstaand groepsportret als 17e-eeuwse regenten. Jorik vooraan, hand op het hart, blik plechtig. Niemand mag lachen.",p:20,df:"easy"}]},
+{id:19,n:"Binnenrotte",la:51.921313,lo:4.486875,e:"🎪",c:"square",r:25,ch:[{t:"creative",ti:"Markt Bingo",d:"Markt-bingo op de Binnenrotte: vind iets roods, een buitenlander, een straatmuzikant, iets gratis, een hond. Per vondst foto met heel team in beeld naast het object/persoon. Allemaal erop, elke keer.",p:35,df:"hard"}]},
 {id:20,n:"Oude Haven",la:51.919257,lo:4.492419,e:"⛵",c:"landmark",r:15,ch:[
-  {t:"video",ti:"Shanty Zingen",d:"Zing een piraten-lied bij de schepen. Min. 15 sec!",p:30,df:"medium"},
-  {t:"photo",ti:"Zeeman Pose",d:"Poseer als stoere zeeman.",p:15,df:"easy"}]},
+  {t:"video",ti:"Shanty Zingen",d:"Heel team zingt een piraten-lied bij de schepen van de Oude Haven. Jorik vooraan als kapitein, team als bemanning. Allemaal in beeld, min. 15 sec.",p:30,df:"medium"},
+  {t:"photo",ti:"Zeeman Pose",d:"Heel team poseert als stoere zeemannen bij de Oude Haven. Jorik vooraan met denkbeeldige pijp, team eromheen met zeemansblik. Allemaal in beeld.",p:15,df:"easy"}]},
 {id:21,n:"Luchtsingel",la:51.925534,lo:4.476293,e:"🌉",c:"landmark",r:15,ch:[
-  {t:"photo",ti:"Gele Brug Groep",d:"Groepsfoto op de gele brug!",p:20,df:"easy"},
+  {t:"photo",ti:"Gele Brug Groep",d:"Heel team in beeld op de gele Luchtsingel-brug. Jorik centraal, team in kleurrijke ketting eromheen. Iedereen erop, gele brug duidelijk zichtbaar.",p:20,df:"easy"},
   {t:"quiz",ti:"Luchtsingel Feit",d:"Hoe is de Luchtsingel gefinancierd?",a:"Crowdfunding",o:["Crowdfunding","Gemeente Rotterdam","EU subsidie","Loterij"],p:25,df:"medium"}]},
-{id:22,n:"Marten Toonder",la:51.919729,lo:4.488082,e:"🐻",c:"art",r:15,ch:[{t:"photo",ti:"Bommel Ode",d:"Jullie verst-van-nuchtere teamlid houdt een toespraak tegen Heer Bommel. Film het.",p:25,df:"medium"}]},
+{id:22,n:"Marten Toonder",la:51.919729,lo:4.488082,e:"🐻",c:"art",r:15,ch:[{t:"photo",ti:"Bommel Ode",d:"Jullie verst-van-nuchtere teamlid houdt een toespraak tegen Heer Bommel. Heel team eromheen in beeld, Jorik knikkend instemmend. Iedereen erop. Film het.",p:25,df:"medium"}]},
 {id:23,n:"Kabouter Buttplug",la:51.917066,lo:4.473353,e:"🎅",c:"art",r:15,ch:[
-  {t:"photo",ti:"Kerstman Pose",d:"Creatieve foto met het kunstwerk van Paul McCarthy.",p:25,df:"medium"},
+  {t:"photo",ti:"Kerstman Pose",d:"Heel team creatief met het Paul McCarthy-kunstwerk: Jorik op zijn knieën in aanbidding, team eromheen kerstman-pose. Allemaal in beeld.",p:25,df:"medium"},
   {t:"quiz",ti:"Buttplug Quiz",d:"Hoe heet dit kunstwerk officieel?",a:"Santa Claus",o:["Santa Claus","Gnome","Kabouter","Christmas Tree"],p:20,df:"easy"}]},
-{id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"video",ti:"Fikkie's Vrijgezellenbiecht",d:"Jorik knielt naast Fikkie en biecht één ding op waar hij bang voor is in het huwelijk. Fikkie mag niet lachen. Een teamlid spreekt Fikkie's oordeel uit: schuldig of onschuldig.",p:30,df:"medium"}]},
-{id:25,n:"L'Homme qui Marche",la:51.917633,lo:4.472299,e:"🚶",c:"art",r:15,ch:[{t:"photo",ti:"Wandelende Man",d:"Imiteer het beeld. Heel team dezelfde pose!",p:20,df:"easy"}]},
-{id:26,n:"Sylvette (Picasso)",la:51.9149,lo:4.4735,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Picasso Pose",d:"Kubistische foto geïnspireerd door Picasso.",p:25,df:"medium"}]},
-{id:27,n:"Cascade (Van Lieshout)",la:51.9178,lo:4.4800,e:"🎪",c:"art",r:20,ch:[{t:"photo",ti:"Cascade Climb",d:"Beklim het kunstwerk en maak een epische foto.",p:25,df:"medium"}]},
-{id:28,n:"Make It Happen Mural",la:51.9149,lo:4.4789,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Mural Foto",d:"Foto waarbij jullie het muurschildering 'aanvullen'.",p:20,df:"easy"}]},
-{id:29,n:"ZOHO Letters",la:51.9290,lo:4.4765,e:"🔤",c:"art",r:20,ch:[{t:"photo",ti:"Letter Pose",d:"Spel 'JORIK' met jullie lichamen!",p:35,df:"hard"}]},
+{id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"video",ti:"Fikkie's Vrijgezellenbiecht",d:"Jorik knielt naast Fikkie en biecht één huwelijksangst op. Heel team eromheen in beeld als jury. Een teamlid spreekt Fikkie's oordeel uit: schuldig of onschuldig. Iedereen erop.",p:30,df:"medium"}]},
+{id:25,n:"L'Homme qui Marche",la:51.917633,lo:4.472299,e:"🚶",c:"art",r:15,ch:[{t:"video",ti:"Volgende Stap",d:"Jorik loopt naast het beeld in dezelfde pose, voice-over: \"mijn volgende stap is het altaar\". Heel team loopt synchroon mee in dezelfde houding. Allemaal in beeld, min. 10 sec.",p:25,df:"medium"}]},
+{id:26,n:"Sylvette (Picasso)",la:51.9149,lo:4.4735,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Picasso Pose",d:"Heel team in kubistische pose voor Sylvette: hoeken, gekantelde hoofden, scherpe houdingen. Jorik centraal als bruidegom-Picasso. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:27,n:"Cascade (Van Lieshout)",la:51.9178,lo:4.4800,e:"🎪",c:"art",r:20,ch:[{t:"photo",ti:"Cascade Climb",d:"Heel team beklimt (waar veilig) of poseert rond Cascade. Jorik bovenop als koning, team gedrapeerd eronder als veroverd volk. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:28,n:"Make It Happen Mural",la:51.9149,lo:4.4789,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Make It Happen",d:"Jorik staat onder de tekst en wijst ernaar. Team eromheen, duimen omhoog: dit is zijn motto richting 14 juni.",p:20,df:"easy"}]},
+{id:29,n:"ZOHO Letters",la:51.9290,lo:4.4765,e:"🔤",c:"art",r:20,ch:[{t:"photo",ti:"Letter Pose",d:"Heel team spelt 'JORIK' met de lichamen, voor de ZOHO-letters als achtergrond. Iedereen één letter, allemaal in beeld.",p:35,df:"hard"}]},
 {id:30,n:"Maritiem Museum",la:51.917627,lo:4.481887,e:"⚓",c:"culture",r:15,ch:[
-  {t:"photo",ti:"Kapitein Pose",d:"Poseer als scheepskapitein.",p:20,df:"easy"},
+  {t:"photo",ti:"Kapitein Pose",d:"Heel team poseert als scheepsbemanning bij het Maritiem Museum. Jorik vooraan als kapitein-bruidegom, team in rij erachter, hand-aan-pet. Allemaal in beeld.",p:20,df:"easy"},
   {t:"quiz",ti:"Maritiem Kennis",d:"Rotterdam is de grootste haven van Europa. Welke plek wereldwijd?",a:"Top 10",o:["Top 10","Top 3","Nummer 1","Top 20"],p:25,df:"medium"}]},
 {id:31,n:"Kunsthal",la:51.910803,lo:4.473427,e:"🖼️",c:"culture",r:20,ch:[{t:"creative",ti:"Levend Kunstwerk",d:"Creëer een 'levend kunstwerk' met het hele team.",p:30,df:"medium"}]},
 {id:32,n:"Depot Boijmans",la:51.913803,lo:4.471221,e:"🪞",c:"culture",r:15,ch:[
-  {t:"photo",ti:"Spiegel Selfie",d:"Selfie in de spiegelende gevel!",p:25,df:"medium"},
+  {t:"photo",ti:"Spiegel Selfie",d:"Heel team in de spiegelende gevel van het Depot. Jorik in het midden, team eromheen wijzend naar hun eigen reflectie. Allemaal in beeld, gevel duidelijk zichtbaar.",p:25,df:"medium"},
   {t:"quiz",ti:"Depot Feit",d:"Hoeveel kunstwerken in het Depot?",a:"151.000",o:["151.000","50.000","200.000","75.000"],p:25,df:"medium"}]},
-{id:33,n:"Wereldmuseum",la:51.9079,lo:4.4804,e:"🌍",c:"culture",r:15,ch:[{t:"photo",ti:"Wereldreis Foto",d:"Foto alsof jullie op wereldreis gaan.",p:20,df:"easy"}]},
-{id:34,n:"Nieuwe Instituut",la:51.914708,lo:4.471158,e:"📐",c:"culture",r:15,ch:[{t:"photo",ti:"Architectuur Shot",d:"Meest artistieke architectuurfoto.",p:25,df:"medium"}]},
-{id:35,n:"Huis Sonneveld",la:51.915611,lo:4.472337,e:"🏠",c:"culture",r:10,ch:[{t:"photo",ti:"Art Deco Pose",d:"Art deco stijl voor het functionalistische huis.",p:20,df:"easy"}]},
-{id:36,n:"Mariniersmuseum",la:51.918716,lo:4.491564,e:"🎖️",c:"culture",r:15,ch:[{t:"photo",ti:"Marinier Pose",d:"Sta in de houding als een marinier!",p:20,df:"easy"}]},
+{id:33,n:"Wereldmuseum",la:51.9079,lo:4.4804,e:"🌍",c:"culture",r:15,ch:[{t:"video",ti:"Drie Talen Advies",d:"Vraag drie vreemden (verschillende nationaliteiten zo mogelijk) om huwelijksadvies in hun moedertaal. Captain + minstens 2 teamleden in beeld bij elke clip naast de geïnterviewde. Film alle drie.",p:35,df:"hard"}]},
+{id:34,n:"Nieuwe Instituut",la:51.914708,lo:4.471158,e:"📐",c:"culture",r:15,ch:[{t:"photo",ti:"Architectuur Shot",d:"Heel team in artistieke pose voor het Nieuwe Instituut. Jorik tegen de gevel, team in geometrische formatie eromheen. Iedereen in beeld, architectuur als achtergrond.",p:25,df:"medium"}]},
+{id:35,n:"Huis Sonneveld",la:51.915611,lo:4.472337,e:"🏠",c:"culture",r:10,ch:[{t:"photo",ti:"Bauhaus Bachelor",d:"Team in strakke lijn voor het huis, armen langs het lichaam, gezichten neutraal. Jorik centraal — alsof jullie de meubels zijn.",p:20,df:"easy"}]},
+{id:36,n:"Mariniersmuseum",la:51.918716,lo:4.491564,e:"🎖️",c:"culture",r:15,ch:[{t:"video",ti:"Mariniersbiecht",d:"Eén teamlid in marinierhouding biecht het 'gevaarlijkste' op wat Jorik ooit deed (echt of verzonnen, mag absurd). Jorik en de rest van het team in beeld als publiek. Iedereen erop, min. 15 sec.",p:30,df:"medium"}]},
 {id:37,n:"Witte de Withstraat",la:51.915524,lo:4.476784,e:"🎨",c:"street",r:20,ch:[
-  {t:"creative",ti:"Terras Interview",d:"Interview terrasbezoeker: 'Advies voor een bruidegom?'",p:40,df:"hard"},
-  {t:"photo",ti:"Street Art Hunt",d:"Vind street art, maak foto die het 'aanvult'.",p:25,df:"medium"}]},
-{id:38,n:"Skatepark Westblaak",la:51.916824,lo:4.476183,e:"🛹",c:"landmark",r:20,ch:[{t:"video",ti:"Skatepark Move",d:"Trick, pose, of epic fail. Humor > vaardigheid!",p:30,df:"medium"}]},
-{id:39,n:"Walk of Fame",la:51.9158,lo:4.4820,e:"⭐",c:"landmark",r:10,ch:[{t:"photo",ti:"Ster Selfie",d:"Selfie bij ster van favoriete Rotterdammer.",p:15,df:"easy"}]},
-{id:40,n:"Chinatown Poort",la:51.9215,lo:4.4694,e:"🏮",c:"landmark",r:15,ch:[{t:"photo",ti:"Geheim genootschap",d:"Staan als een maffia-plaatje onder de poort. Serieuze gezichten, één met sigaret (mag fake zijn).",p:25,df:"medium"}]},
-{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Havenkraan Jorik",d:"De vier rode lichtmasten van Adriaan Geuze (1996) zijn een eerbetoon aan de havenkranen. Film Jorik die exact zo'n havenkraan nadoet: stijve benen, één arm omhoog, en hij 'tilt' symbolisch zijn aanstaande op. Min. 15 sec; teamlid geeft commentaar als scheepsagent.",p:35,df:"hard"}]},
-{id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"creative",ti:"Parkbank Biecht",d:"Twee teamleden op een bankje. Een bekent het meest gênante wat ze ooit met/voor Jorik deden. Film het.",p:40,df:"hard"}]},
-{id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Eiland Leven",d:"Meest fotogenieke hoekje.",p:25,df:"medium"}]},
-{id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"Skyline Shot",d:"Mooiste skyline foto.",p:20,df:"easy"}]},
-{id:45,n:"KPN Toren",la:51.907179,lo:4.489141,e:"📡",c:"architecture",r:20,ch:[{t:"photo",ti:"Leunende Toren",d:"Perspectieffoto: toren 'tegenhouden'.",p:25,df:"medium"}]},
+  {t:"creative",ti:"Terras Interview",d:"Team interviewt een terrasbezoeker: 'Advies voor een bruidegom?' Captain + minstens 2 teamleden in beeld naast de bezoeker, Jorik mag erbij. Film de reactie.",p:40,df:"hard"},
+  {t:"photo",ti:"Street Art Hunt",d:"Vind street art op de Witte de Withstraat. Heel team poseert ervoor zo dat ze het kunstwerk visueel 'aanvullen' — ledematen of poses die de tekening uitbreiden. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:38,n:"Skatepark Westblaak",la:51.916824,lo:4.476183,e:"🛹",c:"landmark",r:20,ch:[{t:"video",ti:"Skatepark Move",d:"Eén teamlid (mag Jorik zijn) probeert een skate-trick of pose op Westblaak. Rest van het team in beeld als entourage of jury, duimen omhoog/omlaag. Iedereen erop. Humor > vaardigheid.",p:30,df:"medium"}]},
+{id:39,n:"Walk of Fame",la:51.9158,lo:4.4820,e:"⭐",c:"landmark",r:10,ch:[{t:"video",ti:"Bachelor Handprint",d:"Jorik drukt zijn handen naast een ster en spreekt: \"Vrijgezel sinds [jaar]. Trouwt 14 juni. Laatste handafdruk als vrij man.\" Heel team eromheen geknield als fans, allemaal in beeld. Film.",p:25,df:"medium"}]},
+{id:40,n:"Chinatown Poort",la:51.9215,lo:4.4694,e:"🏮",c:"landmark",r:15,ch:[{t:"photo",ti:"Geheim genootschap",d:"Heel team staat als een maffia-plaatje onder de Chinatown-poort. Jorik vooraan als capo, serieuze gezichten, één met sigaret (mag fake zijn). Allemaal in beeld.",p:25,df:"medium"}]},
+{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Havenkraan Jorik",d:"De vier rode lichtmasten van Adriaan Geuze (1996) zijn een eerbetoon aan de havenkranen. Film Jorik die een havenkraan nadoet: stijve benen, arm omhoog, 'tilt' zijn aanstaande symbolisch op. Captain + minstens 2 teamleden in beeld als havenpersoneel met commentaar. Min. 15 sec.",p:35,df:"hard"}]},
+{id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"creative",ti:"Singel Biecht",d:"Twee teamleden op een bankje aan het water. Eén bekent on-camera het meest gênante moment ooit met Jorik. Min. 20 sec. Niet stoppen voor er gelachen wordt.",p:40,df:"hard"}]},
+{id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Eilandbewoners",d:"Team poseert voor een typisch Noordereiland-stoepje of voordeur. Jorik draagt iemand op de rug — bachelor wordt het eiland op gedragen.",p:25,df:"medium"}]},
+{id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"Manhattan aan de Maas",d:"Jorik vooraan, team in V-formatie achter hem, skyline in beeld. Allemaal zonnebril op — ook als het regent.",p:20,df:"easy"}]},
+{id:45,n:"KPN Toren",la:51.907179,lo:4.489141,e:"📡",c:"architecture",r:20,ch:[{t:"photo",ti:"Houd 'm Recht",d:"Jorik leunt schuin tegen de schuine gevel — perspectief zo dat hij de toren 'overeind' duwt. Team eromheen in panische pose.",p:25,df:"medium"}]},
 {id:46,n:"Spido Kade",la:51.9098,lo:4.4818,e:"🚤",c:"landmark",r:15,ch:[{t:"quiz",ti:"Spido Kennis",d:"Hoe lang duurt een Spido rondvaart?",a:"75 minuten",o:["75 minuten","45 minuten","60 minuten","90 minuten"],p:15,df:"easy"}]},
-{id:47,n:"Monument De Boeg",la:51.912273,lo:4.484558,e:"🚢",c:"monument",r:10,ch:[{t:"photo",ti:"Titanic Moment",d:"Titanic-pose bij De Boeg!",p:25,df:"medium"}]},
-{id:48,n:"Nieuwe Luxor",la:51.906782,lo:4.491185,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Theater Scene",d:"Speel filmscène na. Oscar-waardig!",p:30,df:"medium"}]},
-{id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[{t:"photo",ti:"Food Foto",d:"Meest Instagram-waardige food foto.",p:20,df:"easy"}]},
-{id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"photo",ti:"Drijvend Bos",d:"Foto met drijvende bomen!",p:20,df:"easy"}]},
+{id:47,n:"Monument De Boeg",la:51.912273,lo:4.484558,e:"🚢",c:"monument",r:10,ch:[{t:"photo",ti:"Titanic Moment",d:"Heel team Titanic-pose bij De Boeg. Jorik vooraan met armen wijd, team achter hem als bemanning, monument als achtergrond. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:48,n:"Nieuwe Luxor",la:51.906782,lo:4.491185,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Theater Scene",d:"Heel team speelt een filmscène na voor de Nieuwe Luxor. Jorik in de hoofdrol als bruidegom, team in bijrol. Allemaal in beeld, Oscar-waardig.",p:30,df:"medium"}]},
+{id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[{t:"video",ti:"Blind Bruidegom",d:"Team voert Jorik geblinddoekt 1 onbekend hapje uit Fenix. Hij beschrijft de smaak met huwelijks-metaforen (\"zuur als de schoonmoeder\"). Captain + minstens 2 teamleden zichtbaar in beeld naast Jorik. Film.",p:30,df:"medium"}]},
+{id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"photo",ti:"Boom Knuffelen",d:"Jorik knuffelt over de reling een drijvende boom. Team eromheen met handen op het hart — 'een laatste boom voor de bruiloft'.",p:20,df:"easy"}]},
 {id:51,n:"Maastunnel",la:51.902719,lo:4.468246,e:"🚇",c:"landmark",r:20,ch:[
-  {t:"video",ti:"1070 Meter Gelofte",d:"De voetgangerstunnel is 1070m lang en dateert uit 1942 — eerste autotunnel van NL. Film Jorik halverwege die zijn trouwgelofte één keer hardop oefent. De echo moet hoorbaar zijn. Bonus als de rest van het team in koor 'ja' roept aan het eind.",p:30,df:"medium"},
+  {t:"video",ti:"1070 Meter Gelofte",d:"De voetgangerstunnel is 1070m lang en dateert uit 1942. Film Jorik halverwege die zijn trouwgelofte hardop oefent — echo moet hoorbaar zijn. Heel team in beeld achter hem in een rij, roept aan het eind in koor 'ja'. Allemaal erop.",p:30,df:"medium",wp:1},
   {t:"quiz",ti:"Tunnel Quiz",d:"Wanneer werd de Maastunnel geopend?",a:"1942",o:["1942","1935","1950","1960"],p:20,df:"medium"}]},
-{id:52,n:"Het Park",la:51.906157,lo:4.470373,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Park Panorama",d:"Ontspannen groepsfoto in het park.",p:15,df:"easy"}]},
-{id:53,n:"Veerhaven",la:51.907406,lo:4.478667,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Haven Romantiek",d:"Romantische foto bij de zeilschepen.",p:20,df:"easy"}]},
-{id:54,n:"Maastoren",la:51.908768,lo:4.493358,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber",d:"Foto waarbij Maastoren klein lijkt.",p:25,df:"medium"}]},
-{id:55,n:"Rijnhavenbrug",la:51.903332,lo:4.485836,e:"🌁",c:"bridge",r:15,ch:[{t:"photo",ti:"Katendrecht Crossing",d:"Groepsfoto op de brug met Jorik in het midden — iedereen wijst naar Katendrecht alsof jullie een nieuw continent ontdekken. Minstens één persoon in superman-pose. Skyline moet herkenbaar achter jullie staan.",p:20,df:"easy"}]},
-{id:56,n:"Foodhallen",la:51.906033,lo:4.487959,e:"🍽️",c:"food",r:20,ch:[{t:"photo",ti:"Foodie Foto",d:"Groepsfoto met favoriete gerecht.",p:20,df:"easy"}]},
-{id:57,n:"Floating Office",la:51.90408,lo:4.488447,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Drijvend Kantoor",d:"Foto met het drijvende kantoor.",p:20,df:"easy"}]},
-{id:58,n:"Luchtpark Hofbogen",la:51.926834,lo:4.478982,e:"🌿",c:"park",r:15,ch:[{t:"photo",ti:"Rooftop Panorama",d:"Panoramafoto vanaf het dak!",p:25,df:"medium"}]},
-{id:59,n:"DakAkker",la:51.925465,lo:4.476699,e:"🌱",c:"landmark",r:15,ch:[{t:"photo",ti:"Dakboerderij",d:"Foto op de hoogste dakboerderij van Europa.",p:25,df:"medium"}]},
-{id:60,n:"Het Industriegebouw",la:51.923711,lo:4.492121,e:"🏭",c:"landmark",r:15,ch:[{t:"photo",ti:"Industrieel Shot",d:"Stoere industriële foto.",p:15,df:"easy"}]},
+{id:52,n:"Het Park",la:51.906157,lo:4.470373,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Picknick Zonder Picknick",d:"Team ligt in het gras alsof er een picknick is — alleen zonder eten of kleed. Jorik in het midden met denkbeeldige champagnefluit omhoog.",p:15,df:"easy"}]},
+{id:53,n:"Veerhaven",la:51.907406,lo:4.478667,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Verloofdenshoot",d:"Twee teamleden flankeren Jorik en kijken hem verliefd aan bij de zeilschepen. Hij staart wanhopig in de lens. Eén op de knie.",p:20,df:"easy"}]},
+{id:54,n:"Maastoren",la:51.908768,lo:4.493358,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber",d:"Heel team in perspectief: Maastoren lijkt klein in jullie hand. Jorik 'plet' de toren tussen vingers, team eromheen in panische pose. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:55,n:"Rijnhavenbrug",la:51.903332,lo:4.485836,e:"🌁",c:"bridge",r:15,ch:[{t:"photo",ti:"Katendrecht Crossing",d:"Team op de brug, Jorik centraal, allemaal wijzend naar Katendrecht alsof jullie een nieuw continent ontdekken. Minstens één in superman-pose.",p:20,df:"easy"}]},
+{id:56,n:"Foodhallen",la:51.906033,lo:4.487959,e:"🍽️",c:"food",r:20,ch:[{t:"video",ti:"Last Single Meal",d:"Jorik kiest 1 gerecht in de Foodhallen en vertelt op camera: dit is mijn vrijgezellen-souvenir. Waarom dit gerecht? Captain + minstens 2 teamleden in beeld naast hem als publiek. Iedereen erop.",p:25,df:"medium"}]},
+{id:57,n:"Floating Office",la:51.90408,lo:4.488447,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Out of Office",d:"Jorik houdt zijn telefoon omhoog voor het kantoor en roept: 'Out of office tot na 14 juni.' Team applaudisseert in beeld.",p:20,df:"easy"}]},
+{id:58,n:"Luchtpark Hofbogen",la:51.926834,lo:4.478982,e:"🌿",c:"park",r:15,ch:[{t:"photo",ti:"Rooftop Panorama",d:"Heel team breeduit op het dak van het Luchtpark Hofbogen, panorama als achtergrond. Jorik in het midden met armen wijd, team in V-formatie. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:59,n:"DakAkker",la:51.925465,lo:4.476699,e:"🌱",c:"landmark",r:15,ch:[{t:"photo",ti:"Dakboerderij",d:"Heel team poseert op de DakAkker, hoogste dakboerderij van Europa. Jorik in boerenpose met denkbeeldige hooivork, team eromheen als knechten. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:60,n:"Het Industriegebouw",la:51.923711,lo:4.492121,e:"🏭",c:"landmark",r:15,ch:[{t:"photo",ti:"Wederopbouw Mannen",d:"Team in werkmanshouding voor de gevel: armen over elkaar, kin omhoog. Jorik vooraan met een denkbeeldige hamer over de schouder.",p:15,df:"easy"}]},
 {id:61,n:"BlueCity",la:51.9198,lo:4.4981,e:"♻️",c:"landmark",r:15,ch:[{t:"quiz",ti:"BlueCity Quiz",d:"BlueCity zit in een voormalig zwembad. Hoe heette het?",a:"Tropicana",o:["Tropicana","Aquarena","De Dolfijn","Waterlinie"],p:25,df:"medium"}]},
-{id:62,n:"Het Slaakhuys",la:51.9255,lo:4.4988,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Art Deco Parel",d:"Foto van dit art deco monument.",p:20,df:"easy"}]},
-{id:63,n:"Gebouw Delftse Poort",la:51.9240,lo:4.4716,e:"🏙️",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber Selfie",d:"Selfie met het hoogste gebouw.",p:20,df:"easy"}]},
+{id:62,n:"Het Slaakhuys",la:51.9255,lo:4.4988,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Gatsby Groet",d:"Team in 1920s pose voor de gevel: Jorik tipt aan een denkbeeldige hoed, één teamlid blaast een kushand naar de camera.",p:20,df:"easy"}]},
+{id:63,n:"Gebouw Delftse Poort",la:51.9240,lo:4.4716,e:"🏙️",c:"architecture",r:20,ch:[{t:"photo",ti:"Hoogste Punt",d:"Heel team in beeld met Delftse Poort op de achtergrond. Jorik reikt met zijn hand omhoog: 'Mijn vrijgezellenstand piekt nog één keer voor de bruiloft.' Team eromheen, allemaal armen omhoog.",p:20,df:"easy"}]},
 {id:64,n:"Willemswerf",la:51.916963,lo:4.49011,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Schuine Gevel Quiz",d:"Welke architect ontwierp dit gebouw met de karakteristieke 45°-schuine gevel waar Jackie Chan in 1998 van naar beneden gleed in de film 'Who Am I?'?",a:"Wim Quist",o:["Wim Quist","Rem Koolhaas","Ben van Berkel","Piet Blom"],p:30,df:"hard"}]},
-{id:65,n:"Concertgebouw De Doelen",la:51.9234,lo:4.4740,e:"🎵",c:"culture",r:20,ch:[{t:"video",ti:"Luchtgitaar",d:"10 sec luchtgitaar voor De Doelen!",p:25,df:"medium"}]},
-{id:66,n:"Oude Luxor Theater",la:51.922997,lo:4.477027,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Broadway Moment",d:"Zing 10 sec musical voor de ingang.",p:30,df:"medium"}]},
-{id:67,n:"Geldersekade Panorama",la:51.9190,lo:4.4915,e:"🌅",c:"viewpoint",r:15,ch:[{t:"photo",ti:"Panorama Shot",d:"Panoramafoto Oude Haven + Witte Huis.",p:20,df:"easy"}]},
-{id:68,n:"Pauluskerk",la:51.919994,lo:4.472557,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Kerk Foto",d:"Foto bij de moderne Pauluskerk.",p:15,df:"easy"}]},
-{id:69,n:"Arminius Kerk",la:51.9155,lo:4.4727,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Kerk Contrast",d:"Foto: contrast oud en nieuw Rotterdam.",p:20,df:"easy"}]},
-{id:70,n:"Binnenwegplein",la:51.918234,lo:4.477439,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Kinetisch Kunstwerk",d:"Foto met het bewegende kunstwerk.",p:20,df:"easy"}]},
-{id:71,n:"THOMS",la:51.921926,lo:4.481385,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Speciaalbier-test",d:"Bestel een speciaalbier dat niemand in het team kent. Foto met het blind-geproefde gezicht van het slachtoffer.",p:30,df:"medium"}]},
-{id:72,n:"Bokaal",la:51.92245,lo:4.488359,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Jorik's Trouwtoast",d:"Jorik staat op (stoel of krukje, mits veilig) en houdt een 20-sec-toast op zichzelf in de derde persoon. Hij moet minstens drie keer 'die fantastische Jorik' zeggen. Team filmt en klinkt aan het eind.",p:25,df:"medium"}]},
-{id:73,n:"De Après Skihut",la:51.9223,lo:4.4767,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Skihut Sfeer",d:"Doe alsof jullie op wintersport zijn!",p:20,df:"easy"}]},
+{id:65,n:"Concertgebouw De Doelen",la:51.9234,lo:4.4740,e:"🎵",c:"culture",r:20,ch:[{t:"video",ti:"Luchtgitaar",d:"Heel team luchtgitaar voor De Doelen. Jorik vooraan als frontman, team als bandleden — drums, bas, headbangers. Allemaal in beeld, 10 sec.",p:25,df:"medium"}]},
+{id:66,n:"Oude Luxor Theater",la:51.922997,lo:4.477027,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Broadway Moment",d:"Heel team zingt 10 sec musical voor de ingang van de Oude Luxor. Jorik vooraan als hoofdrol-bruidegom, team als koor met choreografie. Allemaal in beeld.",p:30,df:"medium"}]},
+{id:67,n:"Geldersekade Panorama",la:51.9190,lo:4.4915,e:"🌅",c:"viewpoint",r:15,ch:[{t:"photo",ti:"Witte Huis Wijzen",d:"Panorama met Oude Haven en Witte Huis erop. Team wijst naar het Witte Huis, Jorik wijst naar zichzelf — 'oudste wolkenkrabber, oudste vrijgezel'.",p:20,df:"easy"}]},
+{id:68,n:"Pauluskerk",la:51.919994,lo:4.472557,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Generale Repetitie",d:"Jorik staat met de rug naar de kerk, team aan weerszijden. Iemand werpt rijst (of denkbeeldig). Repetitie voor 14 juni.",p:15,df:"easy"}]},
+{id:69,n:"Arminius Kerk",la:51.9155,lo:4.4727,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Bruidegom in Spe",d:"Jorik op de stoep voor de kerk, team in twee rijen achter hem. Hij houdt twee duimen op — laatste keer dat hij zo zorgeloos voor een kerk staat.",p:20,df:"easy"}]},
+{id:70,n:"Binnenwegplein",la:51.918234,lo:4.477439,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Synchroon Bewegen",d:"Team imiteert de beweging van het kunstwerk: allemaal in dezelfde houding, één arm zwaaiend. Jorik in het midden, op één been.",p:20,df:"easy"}]},
+{id:71,n:"THOMS",la:51.921926,lo:4.481385,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Speciaalbier-test",d:"Bestel een speciaalbier dat niemand kent. Het slachtoffer (mag Jorik zijn) proeft blind, heel team eromheen in beeld in afwachting van de reactie. Captain + minstens 2 teamleden zichtbaar bij het glas.",p:30,df:"medium"}]},
+{id:72,n:"Bokaal",la:51.92245,lo:4.488359,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Jorik's Trouwtoast",d:"Jorik staat op (stoel of krukje, mits veilig) en houdt een 20-sec-toast op zichzelf in de derde persoon. Minstens drie keer 'die fantastische Jorik' zeggen. Captain + minstens 2 teamleden in beeld die meeklinken aan het eind.",p:25,df:"medium"}]},
+{id:73,n:"De Après Skihut",la:51.9223,lo:4.4767,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Schnaps-Toost",d:"Jorik heft een glas (niet drinken, glas mag leeg zijn) en houdt een 1-zin trouwtoespraak in extreem Duits accent: \"Auf die Liebe und das Leben!\" Captain + minstens 2 teamleden in beeld die meeklinken en meebrullen. Mag overdreven.",p:25,df:"medium"}]},
 {id:74,n:"De Gele Kanarie",la:51.924182,lo:4.489447,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Cheers met vreemden",d:"Klink met twee onbekenden aan de bar. Foto met alle 4 gezichten zichtbaar.",p:30,df:"medium"}]},
-{id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Scheepje Ahoy",d:"Foto op het rode schip!",p:20,df:"easy"}]},
-{id:76,n:"BIRD Rotterdam",la:51.926726,lo:4.478851,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Band Foto",d:"Albumcover-waardige foto voor BIRD.",p:20,df:"easy"}]},
-{id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Vriendenbiecht",d:"Elk teamlid (min. 3) noemt vóór de camera één eigenschap van Jorik die zijn aanstaande waarschijnlijk nog niet kent. Jorik mag niet reageren, alleen kijken. Eén lange take.",p:30,df:"medium"}]},
+{id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Captain's Blessing",d:"Vraag een crew member / barman aan boord van Vessel 11 om Jorik's huwelijk te zegenen in nautische termen ('Goede wind en kalm water'). Captain + minstens 2 teamleden naast Jorik in beeld. Film het compleet moment.",p:30,df:"medium"}]},
+{id:76,n:"BIRD Rotterdam",la:51.926726,lo:4.478851,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Debuutalbum",d:"Bandfoto voor de gevel: Jorik vooraan met denkbeeldige microfoon, team achter hem als ritmesectie. Niemand mag glimlachen — albumcoverregel.",p:20,df:"easy"}]},
+{id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Vriendenbiecht",d:"Elk teamlid (min. 3) noemt voor de camera één eigenschap van Jorik die zijn aanstaande waarschijnlijk nog niet kent. Iedereen samen in beeld bij De Vrienden Live, Jorik kijkt zwijgend toe. Eén lange take.",p:30,df:"medium",wp:1}]},
 {id:78,n:"Hitz",la:51.9224,lo:4.4780,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Jorik's Bruiloftshit",d:"Kies samen één nummer dat de DJ (of speaker) draait. Binnen 30 sec verzinnen jullie nieuwe tekst op het refrein — moet gaan over Jorik's huwelijk. Hele team zingt mee, Jorik vooraan. Filmen.",p:30,df:"medium"}]},
-{id:79,n:"Sijf",la:51.917446,lo:4.474287,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Terras Genieten",d:"Beste terras-selfie van de dag!",p:15,df:"easy"}]},
-{id:80,n:"NRC",la:51.915542,lo:4.476326,e:"🍸",c:"bar",r:15,ch:[{t:"photo",ti:"Cocktail Shot",d:"Meest Instagrambare cocktail-foto.",p:20,df:"easy"}]},
+{id:79,n:"Sijf",la:51.917446,lo:4.474287,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Toost op Jorik",d:"Team aan tafel op het terras, glazen geheven richting Jorik. Hij houdt zijn glas het hoogst. Mag een biertje of cola zijn — gelijk welk.",p:15,df:"easy"}]},
+{id:80,n:"NRC",la:51.915542,lo:4.476326,e:"🍸",c:"bar",r:15,ch:[{t:"photo",ti:"Bachelor's Last Cocktail",d:"Jorik bestelt een cocktail aan de bar, team eromheen. Hij houdt het glas voor zijn gezicht — alleen ogen zichtbaar boven de rand.",p:20,df:"easy"}]},
 {id:81,n:"Biergarten",la:51.925686,lo:4.476209,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Duits accent Prosit",d:"Hele team roept 'PROSIT' met zo Duits mogelijk accent tegen de buurtafel. Film de reactie.",p:30,df:"medium"}]},
-{id:82,n:"Poppodium Annabel",la:51.9252,lo:4.4735,e:"🎸",c:"bar",r:20,ch:[{t:"photo",ti:"Rockster Pose",d:"Rockster-pose voor het poppodium!",p:20,df:"easy"}]},
+{id:82,n:"Poppodium Annabel",la:51.9252,lo:4.4735,e:"🎸",c:"bar",r:20,ch:[{t:"photo",ti:"Headliner Jorik",d:"Jorik vooraan met luchtgitaar, één been op een denkbeeldige monitor. Team eromheen met handen in de lucht — fans op de eerste rij.",p:20,df:"easy"}]},
 {id:83,n:"Happy Italy",la:51.923054,lo:4.485392,e:"🍕",c:"restaurant",r:15,ch:[
-  {t:"photo",ti:"Maffia Meeting",d:"'Maffia vergadering' foto. Godfather vibes.",p:25,df:"medium"},
-  {t:"creative",ti:"Pizza Bestelling",d:"Bestel in nep-Italiaans accent. Film de reactie!",p:35,df:"hard"}]},
-{id:84,n:"Sugo Pizza",la:51.9214,lo:4.4781,e:"🍕",c:"restaurant",r:15,ch:[{t:"photo",ti:"Sugo Selfie",d:"Beste 'Italian kiss' pose.",p:20,df:"easy"}]},
-{id:85,n:"O'Pazzo",la:51.922147,lo:4.490306,e:"🍝",c:"restaurant",r:15,ch:[{t:"creative",ti:"Pazzo Performance",d:"'O Pazzo' = 'de gek'. Doe iets geks!",p:30,df:"medium"}]},
+  {t:"photo",ti:"Maffia Meeting",d:"Heel team in 'maffia vergadering' bij Happy Italy. Jorik als Don aan het hoofd van de tafel, team als capi eromheen, Godfather vibes. Allemaal in beeld.",p:25,df:"medium"},
+  {t:"creative",ti:"Pizza Bestelling",d:"Eén teamlid bestelt bij Happy Italy in nep-Italiaans accent. Captain + minstens 2 teamleden in beeld naast hem aan tafel, Jorik bij. Film de reactie van de bediening.",p:35,df:"hard"}]},
+{id:84,n:"Sugo Pizza",la:51.9214,lo:4.4781,e:"🍕",c:"restaurant",r:15,ch:[{t:"photo",ti:"Sugo Selfie",d:"Heel team in 'Italian kiss' pose bij Sugo Pizza: vingertoppen tegen de mond, hand omhoog. Jorik vooraan, team eromheen synchroon. Allemaal in beeld.",p:20,df:"easy"}]},
+{id:85,n:"O'Pazzo",la:51.922147,lo:4.490306,e:"🍝",c:"restaurant",r:15,ch:[{t:"creative",ti:"Pazzo Performance",d:"'O Pazzo' = 'de gek'. Heel team doet iets geks voor de zaak: gekke gezichten, scheve houdingen, Jorik centraal als grootste pazzo. Allemaal in beeld.",p:30,df:"medium"}]},
 {id:86,n:"Vapiano",la:51.9208,lo:4.4863,e:"🍝",c:"restaurant",r:15,ch:[{t:"quiz",ti:"Vapiano Quiz",d:"Wat betekent 'Vapiano'?",a:"Langzaam",o:["Langzaam","Snel","Lekker","Vers"],p:20,df:"easy"}]},
-{id:87,n:"Old Scuola",la:51.923431,lo:4.49322,e:"🎓",c:"restaurant",r:15,ch:[{t:"photo",ti:"Old School Pose",d:"'Old school maffia' pose. Denkbeeldige sigaren!",p:20,df:"easy"}]},
+{id:87,n:"Old Scuola",la:51.923431,lo:4.49322,e:"🎓",c:"restaurant",r:15,ch:[{t:"photo",ti:"Old School Pose",d:"Heel team in 'old school maffia' pose voor Old Scuola: denkbeeldige sigaren, opgeslagen kragen. Jorik als capo vooraan, team als familie. Allemaal in beeld.",p:20,df:"easy"}]},
 {id:88,n:"Historisch Delfshaven",la:51.9068,lo:4.4496,e:"🏚️",c:"historic",r:15,ch:[
-  {t:"photo",ti:"Historisch Portret",d:"Foto bij de historische havenhuisjes.",p:25,df:"medium"},
+  {t:"photo",ti:"Historisch Portret",d:"Heel team in historische pose bij de havenhuisjes van Delfshaven. Jorik vooraan als zeevaarder-bruidegom, team als bemanning, hoeden in de hand. Allemaal in beeld.",p:25,df:"medium"},
   {t:"quiz",ti:"Pilgrim Fathers",d:"De Pilgrim Fathers vertrokken vanuit Delfshaven. Waarheen?",a:"Amerika",o:["Amerika","Indonesië","Suriname","Zuid-Afrika"],p:20,df:"easy"}]},
 {id:89,n:"Stadsbrouwerij De Pelgrim",la:51.908763,lo:4.448879,e:"🍺",c:"bar",r:15,ch:[
-  {t:"photo",ti:"Brouwerij Proost",d:"Proost met een lokaal biertje!",p:20,df:"easy"},
+  {t:"photo",ti:"Brouwerij Proost",d:"Heel team proost met een Pelgrim-biertje. Jorik centraal, glazen geheven, allemaal in beeld voor de brouwerij-gevel. Iedereen erop.",p:20,df:"easy"},
   {t:"quiz",ti:"Pelgrim Quiz",d:"Naar welke groep is deze brouwerij vernoemd?",a:"Pilgrim Fathers",o:["Pilgrim Fathers","Geuzen","Watergeuzen","VOC"],p:20,df:"medium"}]},
-{id:90,n:"Standbeeld Piet Hein",la:51.9073,lo:4.4491,e:"🗿",c:"art",r:15,ch:[{t:"photo",ti:"Zeeheld Pose",d:"Stoere zeeheld naast Piet Hein!",p:20,df:"easy"}]},
-{id:91,n:"Historische Tramhalte",la:51.9081,lo:4.4682,e:"🚃",c:"historic",r:15,ch:[{t:"photo",ti:"Tramhalte Pose",d:"Wacht op de tram (die niet komt).",p:15,df:"easy"}]},
-{id:92,n:"Cruise Terminal",la:51.905972,lo:4.486959,e:"🚢",c:"landmark",r:20,ch:[{t:"photo",ti:"Bon Voyage",d:"Afscheidsfoto: op cruise!",p:20,df:"easy"}]},
-{id:93,n:"Poortgebouw",la:51.910386,lo:4.495969,e:"🏚️",c:"landmark",r:15,ch:[{t:"photo",ti:"Kraakpand Pose",d:"Foto bij het bekendste kraakpand.",p:20,df:"easy"}]},
-{id:94,n:"Entrepotgebouw",la:51.910747,lo:4.499283,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Vijf Werelddelen",d:"Foto bij de gevel.",p:20,df:"easy"}]},
-{id:95,n:"WTC Rotterdam",la:51.921033,lo:4.480344,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Beursgebouw",d:"Power-pose voor het WTC.",p:15,df:"easy"}]},
-{id:96,n:"Haagsche Veer",la:51.9242,lo:4.4800,e:"🏛️",c:"historic",r:15,ch:[{t:"photo",ti:"Gevangenispoort",d:"Foto bij de voormalige gevangenispoort.",p:20,df:"easy"}]},
-{id:97,n:"Villa Thalia",la:51.923002,lo:4.476314,e:"🎭",c:"culture",r:15,ch:[{t:"photo",ti:"Theater Pose",d:"Dramatische pose voor Villa Thalia!",p:20,df:"easy"}]},
-{id:98,n:"Chabot Museum",la:51.914735,lo:4.472336,e:"🎨",c:"culture",r:15,ch:[{t:"photo",ti:"Expressionisme",d:"Expressionistische foto à la Chabot.",p:25,df:"medium"}]},
+{id:90,n:"Standbeeld Piet Hein",la:51.9073,lo:4.4491,e:"🗿",c:"art",r:15,ch:[{t:"photo",ti:"Zilvervloot Veroverd",d:"Jorik naast Piet Hein, beiden met dezelfde pose. Team knielt aan zijn voeten met denkbeeldige zilveren staven — buit voor de bruiloft.",p:20,df:"easy"}]},
+{id:91,n:"Historische Tramhalte",la:51.9081,lo:4.4682,e:"🚃",c:"historic",r:15,ch:[{t:"video",ti:"Time-Travel Tram",d:"Jorik vertelt de tramhalte hoe hij over zijn huwelijk denkt over 25 jaar. Captain + minstens 2 teamleden in beeld als toekomstige getuigen. Min. 20 sec, één take, ernstig (of probeer).",p:30,df:"medium"}]},
+{id:92,n:"Cruise Terminal",la:51.905972,lo:4.486959,e:"🚢",c:"landmark",r:20,ch:[{t:"photo",ti:"Vrijgezellen Vaarwel",d:"Jorik staat op de kade, team zwaait theatraal vanaf afstand. Eén traantje wegvegen verplicht. Hij vertrekt richting 14 juni — geen retour.",p:20,df:"easy"}]},
+{id:93,n:"Poortgebouw",la:51.910386,lo:4.495969,e:"🏚️",c:"landmark",r:15,ch:[{t:"photo",ti:"Anti-Bruidegom",d:"Team poseert voor het pand met gefronste blik en gebalde vuist. Jorik vooraan met kapotte stropdas (denkbeeldig of echt) — punk-protest tegen z'n eigen huwelijk.",p:20,df:"easy"}]},
+{id:94,n:"Entrepotgebouw",la:51.910747,lo:4.499283,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Vijf Werelddelen",d:"Vijf teamleden voor de gevel, elk in een andere wereld-pose: Eiffeltoren, sumo, sambadanser, geisha-buiging, cowboy. Jorik kiest zelf welk werelddeel.",p:20,df:"easy"}]},
+{id:95,n:"WTC Rotterdam",la:51.921033,lo:4.480344,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wall Street Bachelor",d:"Team in CEO-pose voor het WTC: handen in zakken, blik vooruit, één met telefoon aan oor. Jorik centraal — 'vandaag verkoop ik mijn vrijgezellen-aandelen'.",p:15,df:"easy"}]},
+{id:96,n:"Haagsche Veer",la:51.9242,lo:4.4800,e:"🏛️",c:"historic",r:15,ch:[{t:"photo",ti:"Levenslang",d:"Jorik onder de poort, polsen tegen elkaar alsof geboeid. Twee teamleden flankeren als bewakers. 'Veroordeeld tot 14 juni — levenslang.'",p:20,df:"easy"}]},
+{id:97,n:"Villa Thalia",la:51.923002,lo:4.476314,e:"🎭",c:"culture",r:15,ch:[{t:"photo",ti:"Tragedie & Komedie",d:"Halve team trekt huilgezicht (tragedie), andere helft schaterlach (komedie). Jorik in het midden — één helft van zijn gezicht verdrietig, andere blij.",p:20,df:"easy"}]},
+{id:98,n:"Chabot Museum",la:51.914735,lo:4.472336,e:"🎨",c:"culture",r:15,ch:[{t:"photo",ti:"Expressionisme",d:"Heel team in expressionistische pose à la Chabot voor het museum: vervormde gezichten, dramatische gebaren, hoekige houdingen. Jorik centraal. Allemaal in beeld.",p:25,df:"medium"}]},
 {id:99,n:"Natuurhistorisch Museum",la:51.91077,lo:4.472479,e:"🦕",c:"culture",r:15,ch:[{t:"photo",ti:"Uitgestorven soort",d:"Team doet alsof het een uitstervende mannensoort is. Dramatische fossiel-pose. Eén dood op de trap.",p:25,df:"medium"}]},
-{id:100,n:"KINO Rotterdam",la:51.917129,lo:4.469393,e:"🎬",c:"culture",r:15,ch:[{t:"photo",ti:"Filmster Pose",d:"Red carpet pose bij de bioscoop!",p:20,df:"easy"}]},
-{id:101,n:"Belasting & Douane Museum",la:51.907617,lo:4.476414,e:"💰",c:"culture",r:15,ch:[{t:"photo",ti:"Smokkelaar Pose",d:"Doe alsof je smokkelt langs de douane.",p:25,df:"medium"}]},
-{id:102,n:"Historische Tuin Schoonoord",la:51.908937,lo:4.473386,e:"🌷",c:"park",r:15,ch:[{t:"photo",ti:"Tuinfoto",d:"Mooiste foto in de historische tuin.",p:20,df:"easy"}]},
+{id:100,n:"KINO Rotterdam",la:51.917129,lo:4.469393,e:"🎬",c:"culture",r:15,ch:[{t:"video",ti:"Bruiloft Trailer",d:"Film een 30sec \"movie trailer\" voor Jorik's trouwerij bij KINO. Heel team speelt mee in de trailer-scenes — bruiloftsgasten, schurken, dansers. Jorik in de hoofdrol. Cinematische voice-over, tagline aan het eind. Iedereen in beeld.",p:40,df:"hard"}]},
+{id:101,n:"Belasting & Douane Museum",la:51.907617,lo:4.476414,e:"💰",c:"culture",r:15,ch:[{t:"photo",ti:"Smokkelaar Pose",d:"Heel team doet alsof het smokkelt langs de douane bij het Belasting & Douane Museum: jassen vol denkbeeldige spullen, schichtige blikken. Jorik met grootste 'last'. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:102,n:"Historische Tuin Schoonoord",la:51.908937,lo:4.473386,e:"🌷",c:"park",r:15,ch:[{t:"photo",ti:"Bruidsboeket",d:"Jorik plukt (denkbeeldig — niets echt afbreken!) een boeket en overhandigt het plechtig aan een teamlid dat geknield ja-knikt. Min. 4 mensen in beeld.",p:20,df:"easy"}]},
 ];
 
 // ═══════════════════════════════════════════
@@ -1220,6 +1261,10 @@ function App(){
   const[showWedding,setShowWedding]=useState(false);
   // V19+: Jorik-missions done-set; hydrated from session so refresh doesn't wipe progress.
   const[jorikMissionsDone,setJorikMissionsDone]=useState(()=>new Set(Array.isArray(hydrated?.jorikMissionsDone)?hydrated.jorikMissionsDone:[]));
+  // V22: per-running-mission progress counter (e.g., trade mission's 4 trades). Plain object
+  // so it survives JSON serialization. {[missionId]: count}. Mission moves into the done-set
+  // only when count reaches `tradeTarget`.
+  const[jorikRunningCounts,setJorikRunningCounts]=useState(()=>(typeof hydrated?.jorikRunningCounts==='object'&&hydrated.jorikRunningCounts!==null?{...hydrated.jorikRunningCounts}:{}));
   const[showJorikMissions,setShowJorikMissions]=useState(false);
   const[activityFeed,setActivityFeed]=useState([]);
   // V10: admin unlock via ?admin=vriendvanjorik (hardened token).
@@ -2048,15 +2093,43 @@ function App(){
   };
 
   // V19+ Jorik-specific missions (only team holding Jorik can do these)
-  const completeJorikMission=(id,pts,photoData=null)=>{
+  // V22: (a) read pts from the mission array — defensive against callers passing wrong value;
+  //      (b) apply FINALE_MULTIPLIER during phase 4 (parity with completeChallenge so Jorik
+  //          missions don't get penalised against regular L_DATA challenges in the final 20 min);
+  //      (c) running-mission support — for missions with `running:true` + `tradeTarget:N`,
+  //          each upload increments a counter; the mission only goes into the done-set when
+  //          the counter reaches the target. Per-step points = m.pts / tradeTarget (rounded).
+  const completeJorikMission=(id,_unusedPts,photoData=null)=>{
     if(jorikMissionsDone.has(id))return;
     const m=JORIK_MISSIONS.find(x=>x.id===id);
     if(!m)return;
+    const phaseMult=phase===4?FINALE_MULTIPLIER:1;
+    const finaleSuffix=phaseMult>1?` (×${FINALE_MULTIPLIER} finale)`:'';
+
+    // V22: running-mission branch
+    if(m.running&&m.tradeTarget>0){
+      const prevCount=jorikRunningCounts[id]||0;
+      const newCount=Math.min(prevCount+1,m.tradeTarget);
+      const stepPts=Math.round((m.pts/m.tradeTarget)*phaseMult);
+      setJorikRunningCounts(prev=>({...prev,[id]:newCount}));
+      setScorePopup(`+${stepPts}`);
+      addActivity(`${m.emoji} Jorik ruil ${newCount}/${m.tradeTarget} · ${m.title} · +${stepPts} pts${finaleSuffix}`,stepPts,photoData);
+      applyScoreDelta(myTeam?.id,stepPts);
+      // Final step: also lock the mission as fully done.
+      if(newCount>=m.tradeTarget){
+        setJorikMissionsDone(prev=>new Set([...prev,id]));
+        addActivity(`🏁 Jorik voltooide de hele dag-mission: ${m.title}!`,0,null);
+      }
+      return;
+    }
+
+    // Normal one-shot path
+    const awardedPts=Math.round(m.pts*phaseMult);
     setJorikMissionsDone(prev=>new Set([...prev,id]));
-    setScorePopup(`+${pts}`);
-    addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${pts} pts`,pts,photoData);
+    setScorePopup(`+${awardedPts}`);
+    addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${awardedPts} pts${finaleSuffix}`,awardedPts,photoData);
     // V20: atomic delta — replaces manual setScores + sb.from('teams').update
-    applyScoreDelta(myTeam?.id,pts);
+    applyScoreDelta(myTeam?.id,awardedPts);
   };
 
   const completeChallenge=(locId,chIdx,pts,photoData=null)=>{
@@ -2826,8 +2899,8 @@ function App(){
   // V30: storySeen persistence removed with the chapter-modal system.
   // V19+: persist Jorik-mission completion state
   useEffect(()=>{
-    if(myTeam)saveSession({jorikMissionsDone:[...jorikMissionsDone]});
-  },[jorikMissionsDone,myTeam]);
+    if(myTeam)saveSession({jorikMissionsDone:[...jorikMissionsDone],jorikRunningCounts});
+  },[jorikMissionsDone,jorikRunningCounts,myTeam]);
 
   // V12: leaving a team (tap the HUD avatar)
   const leaveTeam=useCallback(async()=>{
@@ -2956,13 +3029,16 @@ function App(){
     return(
       <div className="screen-hero">
         {isAdmin&&<div className="chip chip-gold animate-in" style={{position:'absolute',top:'var(--sp-6)'}}>👑 Game Master</div>}
+        {/* V23: TESTMODUS chip — only visible while TEST_MODE is on. Once we
+            flip the constant back to false for the live build, it disappears. */}
+        {TEST_MODE&&<div className="chip animate-in" style={{position:'absolute',top:isAdmin?'calc(var(--sp-6) + 36px)':'var(--sp-6)',background:'rgba(110,163,255,0.18)',border:'1px solid rgba(110,163,255,0.45)',color:'var(--foto-2)'}}>🧪 TESTMODUS · gates uit</div>}
         <div style={{fontSize:96,animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
         <div style={{height:'var(--sp-6)'}}/>
         <h1 className="t-hero animate-in animate-in-1 text-center" style={{background:'linear-gradient(135deg,#ffffff 0%,var(--accent-2) 50%,var(--foto-2) 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Stadsspel</h1>
         <div className="t-label animate-in animate-in-2" style={{marginTop:'var(--sp-2)',letterSpacing:'0.5em'}}>Rotterdam</div>
         <div style={{height:'var(--sp-5)'}}/>
-        <div className="t-caption animate-in animate-in-3 text-center">Jorik's Bachelor Party · 6 juni 2026</div>
-        <div className="t-body animate-in animate-in-4 text-center" style={{marginTop:'var(--sp-2)',color:'var(--quiz-2)',fontStyle:'italic'}}>"Acht dagen voor de bruiloft — de ring is zoek."</div>
+        <div className="t-caption animate-in animate-in-3 text-center">Jorik's Bachelor Party · 6 juni 2026 · 14:00 — 19:30</div>
+        <div className="t-body animate-in animate-in-4 text-center" style={{marginTop:'var(--sp-2)',color:'var(--quiz-2)',fontStyle:'italic'}}>"Laten we samen memorabele herinneringen maken — met een vleugje Italië en heel veel Jorik."</div>
         <div style={{height:'var(--sp-8)'}}/>
         <button className="btn btn-gold btn-lg animate-in animate-in-5" onClick={()=>{
           const now=Date.now();if(now-tapGuardRef.current<250)return;tapGuardRef.current=now;
@@ -2971,9 +3047,14 @@ function App(){
           {isAdmin?'Start als Game Master':'Speel mee'} <span>→</span>
         </button>
         <div style={{height:'var(--sp-7)'}}/>
-        <div className="t-caption animate-in animate-in-6 text-center" style={{maxWidth:320,lineHeight:'var(--lh-relaxed)'}}>
-          {teams.length>0?<><span className="t-accent-2" style={{fontWeight:'var(--fw-bold)'}}>{teams.length} team{teams.length===1?'':'s'}</span> in de lobby · </>:''}≈4 uur buiten<br/>Neem een power bank mee
-        </div>
+        {/* V23: dropped "≈4 uur buiten / Neem een power bank mee" tail per Mike's
+            request. Live team-count survives so the splash still signals lobby
+            activity at a glance. Caption hidden entirely when there are no teams. */}
+        {teams.length>0&&(
+          <div className="t-caption animate-in animate-in-6 text-center" style={{maxWidth:320,lineHeight:'var(--lh-relaxed)'}}>
+            <span className="t-accent-2" style={{fontWeight:'var(--fw-bold)'}}>{teams.length} team{teams.length===1?'':'s'}</span> in de lobby
+          </div>
+        )}
       </div>
     );
   }
@@ -3042,7 +3123,12 @@ function App(){
         )}
         <div style={{height:'var(--sp-7)'}}/>
 
-        {isAdmin?(
+        {/* V23: when LOBBY_OPEN_TO_ALL (TEST_MODE), every phone gets the start
+            button — no waiting on the Game Master. Admin still sees the
+            "Game Master" framing; non-admin sees the "testmodus" framing so
+            it's obvious this is the loosened build. Live behavior restored
+            when TEST_MODE flips to false (LOBBY_OPEN_TO_ALL becomes false). */}
+        {(LOBBY_OPEN_TO_ALL||isAdmin)?(
           <div className="stack-3">
             {/* V28: stripped the teamCount<2 confirmAsync gate. Admin = Mike; no
                 friction, no dialog that could get obscured by stacked overlays
@@ -3050,8 +3136,8 @@ function App(){
                 now fires startGame() synchronously on click — if Mike really
                 wants to start with 0 or 1 teams, that's his call. Teams can
                 still register mid-lobby via realtime after phase flips. */}
-            <button className="btn btn-gold btn-lg" onClick={()=>startGame()} style={{width:'100%'}}>🎮 Start het spel{teamCount>0?` (${teamCount})`:''}</button>
-            <div className="t-caption text-center">Jij bent de Game Master — druk zodra iedereen er is</div>
+            <button className="btn btn-gold btn-lg" onClick={()=>startGame()} style={{width:'100%'}}>{isAdmin?'🎮 Start het spel':'🎮 Start spel (testmodus)'}{teamCount>0?` (${teamCount})`:''}</button>
+            <div className="t-caption text-center">{isAdmin?'Jij bent de Game Master — druk zodra iedereen er is':'🧪 Testmodus — iedereen kan het spel starten · GPS-checks staan uit'}</div>
           </div>
         ):(
           <div className="panel text-center" style={{background:'linear-gradient(155deg,rgba(110,163,255,0.08),rgba(110,163,255,0.02))',borderColor:'rgba(110,163,255,0.25)'}}>
@@ -3228,7 +3314,7 @@ function App(){
 
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} onRenameTeam={renameTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync} jorikVisitedTeamIds={jorikVisitedTeamIds} teamMemberCounts={teamMemberCounts}/>}
@@ -3305,7 +3391,10 @@ function App(){
       {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync}/>}
 
       {/* V19+: Jorik-specific missions — mirror of wedding, visible only when Jorik IS in team */}
-      {showJorikMissions&&<JorikMissions onClose={()=>setShowJorikMissions(false)} onComplete={completeJorikMission} done={jorikMissionsDone} jorikInTeam={jorikInTeam}/>}
+      {/* V21: pos + barBreakActive passed so the panel can curate by context (loc-tagged + bar-only missions).
+          Note: barBreakActive (truthy ONLY during the live overlay window) is used here,
+          NOT the sticky barBreak state. Bar set-pieces should only light up while the break is actually running. */}
+      {showJorikMissions&&<JorikMissions onClose={()=>setShowJorikMissions(false)} onComplete={completeJorikMission} done={jorikMissionsDone} runningCounts={jorikRunningCounts} jorikInTeam={jorikInTeam} pos={pos} barBreak={barBreakActive}/>}
 
       {/* Tab bar */}
       <div className="tab-bar">
@@ -3364,6 +3453,15 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
   const usedEmojis=teams.map(t=>t.emoji);
   const usedNames=teams.map(t=>t.name.toLowerCase());
 
+  // V23: hard 4-team cap. Counts non-spectator teams only — the GM "👑 Observeren"
+  // path inserts a synthetic id=-1 spectator that should never count against the
+  // playable cap. Mirrored server-side by the `enforce_team_cap` trigger in
+  // SUPABASE-V23-RESET.sql so a second tab racing past the client check still gets
+  // rejected by Postgres (23514 check_violation).
+  const activeTeamCount=teams.filter(t=>!t.spectator&&t.id!==-1).length;
+  const teamSlotsFull=activeTeamCount>=MAX_TEAMS;
+  const capMsg=`Het spel zit vol — er zijn al ${MAX_TEAMS} teams. Wacht tot er een team plek maakt.`;
+
   // V12: fresh name check against live Supabase right before insert — belt-and-braces vs stale local state
   const nameConflict=async(finalName)=>{
     if(!finalName)return false;
@@ -3388,6 +3486,10 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
 
   const createFromPack=async(pack)=>{
     if(busy)return;
+    // V23: hard 4-team cap. Server-side trigger is the source of truth, but
+    // surfacing the friendly Dutch message client-side avoids a confusing
+    // generic "Team aanmaken mislukt" toast when the limit is reached.
+    if(teamSlotsFull){setErr(capMsg);return;}
     const finalName=(packNameOverride[pack.name]||pack.name).trim();
     if(!finalName){setErr('Geef je team een naam');return;}
     if(usedEmojis.includes(pack.emoji)){setErr(`${pack.emoji} is al gekozen door een ander team`);return;}
@@ -3423,6 +3525,8 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
 
   const createCustom=async()=>{
     if(busy)return;
+    // V23: same hard cap branch as createFromPack — see SUPABASE-V23-RESET.sql.
+    if(teamSlotsFull){setErr(capMsg);return;}
     if(!name||!emoji||!color){setErr('Kies naam, icoon én kleur');return;}
     const finalName=name.trim();
     if(usedEmojis.includes(emoji)){setErr(`${emoji} is al gekozen door een ander team`);return;}
@@ -3485,9 +3589,25 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
       <div className="text-center">
         <div style={{fontSize:64,filter:'drop-shadow(0 6px 16px rgba(228,178,92,0.35))'}}>💍</div>
         <h1 className="t-title animate-in" style={{marginTop:'var(--sp-3)'}}>Kies je team</h1>
-        <p className="t-body animate-in animate-in-1" style={{marginTop:'var(--sp-2)'}}>Tik op een starter pack of maak je eigen</p>
+        <p className="t-body animate-in animate-in-1" style={{marginTop:'var(--sp-2)'}}>Tik op een starter pack of maak je eigen · {activeTeamCount}/{MAX_TEAMS} teams</p>
       </div>
       <div style={{height:'var(--sp-6)'}}/>
+
+      {/* V23: hard 4-team cap banner. Renders above the picker once 4 active
+          teams exist. Mirrors the server-side enforce_team_cap() trigger from
+          SUPABASE-V23-RESET.sql so the UI matches what the DB will actually
+          allow. Pool is 8 starter packs but only 4 may ever be active. */}
+      {teamSlotsFull&&(
+        <div role="alert" style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(255,107,107,0.12)',border:'1px solid rgba(255,107,107,0.4)',color:'#fff',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
+          <div style={{fontSize:20,flexShrink:0}}>🔒</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div className="t-body-emph" style={{marginBottom:2}}>{MAX_TEAMS}/{MAX_TEAMS} teams gevuld</div>
+            <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
+              Het spel zit vol. Wacht tot een team plek maakt, of vraag de Game Master om een team te verwijderen.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mode toggle — segment */}
       <div style={{display:'flex',gap:'var(--sp-1)',padding:'var(--sp-1)',background:'rgba(255,255,255,0.04)',borderRadius:'var(--r-pill)',border:'1px solid var(--border)'}}>
@@ -3546,13 +3666,18 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
               // falls back to name if the pack was renamed post-create.
               const takenTeam=taken?teams.find(t=>t.emoji===p.emoji||(t.name||'').toLowerCase()===p.name.toLowerCase()):null;
               const headcount=takenTeam?(teamMemberCounts[takenTeam.id]||0):0;
-              const handleKey=(e)=>{if(!taken&&!busy&&(e.key==='Enter'||e.key===' ')){e.preventDefault();createFromPack(p);}};
+              // V23: lock unselectable packs once the 4-team cap is reached.
+              // Visually distinct from "taken" — taken means another team grabbed
+              // it; locked means there are no slots left at all.
+              const locked=teamSlotsFull&&!taken;
+              const blocked=taken||locked;
+              const handleKey=(e)=>{if(!blocked&&!busy&&(e.key==='Enter'||e.key===' '||e.key===' ')){e.preventDefault();createFromPack(p);}};
               return(
-                <div key={i} role="button" tabIndex={taken||busy?-1:0} aria-label={`${shownName} · kies dit team`} aria-disabled={taken||busy}
-                  className={`starter-card animate-in animate-in-${(i%4)+1} ${taken?'taken':''}`}
-                  onClick={()=>!taken&&!busy&&createFromPack(p)} onKeyDown={handleKey}
-                  style={{borderColor:taken?'var(--border)':p.color,boxShadow:taken?'none':`0 8px 24px ${p.color}28,${p.color}12 0px 0px 0px 1px inset,var(--sh-ring)`}}>
-                  {!taken&&(
+                <div key={i} role="button" tabIndex={blocked||busy?-1:0} aria-label={`${shownName} · kies dit team`} aria-disabled={blocked||busy}
+                  className={`starter-card animate-in animate-in-${(i%4)+1} ${blocked?'taken':''}`}
+                  onClick={()=>!blocked&&!busy&&createFromPack(p)} onKeyDown={handleKey}
+                  style={{borderColor:blocked?'var(--border)':p.color,boxShadow:blocked?'none':`0 8px 24px ${p.color}28,${p.color}12 0px 0px 0px 1px inset,var(--sh-ring)`,opacity:locked?0.5:undefined}}>
+                  {!blocked&&(
                     <button type="button" className="starter-edit-btn" onClick={(e)=>renamePack(p,e)}
                       aria-label={`Naam aanpassen voor ${shownName}`} title="Naam aanpassen">✏️</button>
                   )}
@@ -3561,6 +3686,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
                   {renamed&&<div className="t-caption" style={{marginTop:2,color:p.color,fontSize:'var(--fs-10)'}}>({p.name})</div>}
                   <div className="starter-color" style={{background:p.color}}/>
                   {taken&&<div className="t-label-sm" style={{marginTop:'var(--sp-2)'}}>Bezet{headcount>0?` · 📱 ${headcount}`:''}</div>}
+                  {locked&&<div className="t-label-sm" style={{marginTop:'var(--sp-2)',color:'var(--video-2)'}}>🔒 Vol</div>}
                 </div>
               );
             })}
@@ -3596,9 +3722,9 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
               ))}
             </div>
           </div>
-          <button className="btn btn-cyan btn-lg" onClick={createCustom} disabled={!name||!emoji||!color||busy}
+          <button className="btn btn-cyan btn-lg" onClick={createCustom} disabled={!name||!emoji||!color||busy||teamSlotsFull}
             style={{width:'100%'}}>
-            {busy?'⏳ Aanmaken…':'Team aanmaken & joinen'}
+            {busy?'⏳ Aanmaken…':teamSlotsFull?`🔒 ${MAX_TEAMS}/${MAX_TEAMS} teams gevuld`:'Team aanmaken & joinen'}
           </button>
           {err&&<div className="panel-sm t-body-emph t-danger text-center" style={{background:'rgba(255,107,107,0.12)',borderColor:'rgba(255,107,107,0.35)'}}>⚠ {err}</div>}
         </div>
@@ -3661,25 +3787,66 @@ function TwoRingIndicator({dist,pos,loc}){
 // Sort: by band (unlock → preview → far → unknown), distance within band,
 // completed pushed to a trailing "Al gedaan" group. Filters out bars (separate mechanic).
 function TaskList({pos,onSelect,completed,visitedLocs}){
-  // Build rows once; treat each L_DATA POI as a row.
-  const rows=L_DATA
-    .filter(l=>l.c!=='bar')
-    .map(loc=>{
-      const{band,dist}=locBand(pos,loc);
-      const locCompleted=completed&&completed[loc.id]?Object.keys(completed[loc.id]).length:0;
-      const total=(loc.ch&&loc.ch.length)||0;
-      const allDone=total>0&&locCompleted>=total;
-      return{loc,band,dist,locCompleted,total,allDone};
-    });
-  // Partition by group
+  // V23: when TASKLIST_NEARBY_ONLY (default true), the list under the map is
+  // capped to TASKLIST_NEARBY_N nearest non-completed missions. The map itself
+  // still shows all 102 markers — this only affects the scrollable mission
+  // list. Reuses getNearby() (smart ROI ranking within NEARBY_RADIUS=500m,
+  // graceful distance fallback). When pos is null, falls back to the first N
+  // POIs of L_DATA so the list isn't empty.
+  // Set TASKLIST_NEARBY_ONLY=false (constants block) to restore the original
+  // 4-group inventory view.
+  const completedMap=completed||{};
+  const buildRow=(loc)=>{
+    const{band,dist}=locBand(pos,loc);
+    const locCompleted=completedMap[loc.id]?Object.keys(completedMap[loc.id]).length:0;
+    const total=(loc.ch&&loc.ch.length)||0;
+    const allDone=total>0&&locCompleted>=total;
+    return{loc,band,dist,locCompleted,total,allDone};
+  };
+
+  if(TASKLIST_NEARBY_ONLY){
+    let rows=[];
+    if(pos){
+      // getNearby already filters out completed locations and sorts smartly.
+      rows=getNearby(pos,completedMap,TASKLIST_NEARBY_N).map(buildRow);
+    }else{
+      // No GPS yet — show first N non-bar, non-completed POIs as a placeholder
+      // so the panel isn't empty.
+      rows=L_DATA.filter(l=>l.c!=='bar'&&!completedMap[l.id]).slice(0,TASKLIST_NEARBY_N).map(buildRow);
+    }
+    return(
+      <section style={{marginTop:'var(--sp-5)'}}>
+        <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Dichtstbij je nu ({rows.length})</h3>
+        {!pos&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS — zet locatie aan om de echte dichtstbijzijnde missies te zien.</div>}
+        {rows.length===0&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Geen openstaande missies in de buurt — alles in deze radius is al gedaan.</div>}
+        {rows.map(r=>(
+          <button key={r.loc.id} className={`task-row ${r.allDone?'completed':r.band||'far'}`} onClick={()=>onSelect(r.loc.id)} style={{marginBottom:'var(--sp-2)'}}>
+            <div className="task-row-emoji">{r.loc.e||'📍'}</div>
+            <div className="task-row-body">
+              <div className="task-row-name">{r.loc.n}</div>
+              <div className="task-row-meta">
+                {r.total>0?`${r.total} challenge${r.total===1?'':'s'} · ${r.locCompleted}/${r.total} klaar`:'Geen challenges'}
+                {r.dist!=null&&<span style={{opacity:0.7,marginLeft:6}}>· {fmtDist(r.dist)}</span>}
+              </div>
+            </div>
+            <div className="task-row-chevron">›</div>
+          </button>
+        ))}
+        <div className="t-caption" style={{marginTop:'var(--sp-3)',opacity:0.65,textAlign:'center'}}>🗺️ Andere locaties zie je op de kaart hierboven.</div>
+      </section>
+    );
+  }
+
+  // Legacy full-inventory view (TASKLIST_NEARBY_ONLY=false). Kept intact so
+  // flipping the constant restores V22 behavior without code surgery.
+  const rows=L_DATA.filter(l=>l.c!=='bar').map(buildRow);
   const groups={unlock:[],preview:[],far:[],done:[]};
   rows.forEach(r=>{
     if(r.allDone)groups.done.push(r);
     else if(r.band==='unlock')groups.unlock.push(r);
     else if(r.band==='preview')groups.preview.push(r);
-    else groups.far.push(r); // far + unknown
+    else groups.far.push(r);
   });
-  // Within each group, sort by distance (null last)
   const sortByDist=(a,b)=>{
     if(a.dist==null&&b.dist==null)return 0;
     if(a.dist==null)return 1;
@@ -3726,7 +3893,7 @@ function TaskList({pos,onSelect,completed,visitedLocs}){
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,pendingMine,completed,visitedLocs,jorikMissionsDone,onShowJorikMissions}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,pendingMine,completed,completedPts,visitedLocs,jorikMissionsDone,onShowJorikMissions}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
   const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
@@ -3785,6 +3952,57 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
           <div className="t-card-title" style={{marginTop:'var(--sp-1)'}}>{barBreak.name}</div>
         </div>
       )}
+
+      {/* V21: PRIZE TEASER — mid-game motivation. MIKE: vervang de tweede regel
+          zodra je de echte prijs weet (bv. "Eerste toast bij dinner + fles grappa"). */}
+      <div className="panel-sm" style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',background:'linear-gradient(145deg,rgba(228,178,92,0.16),rgba(255,107,107,0.05))',borderColor:'rgba(228,178,92,0.35)',textAlign:'center'}}>
+        <div className="t-card-label t-accent">🏆 Prijs voor het winnende team</div>
+        <div className="t-caption" style={{marginTop:'var(--sp-1)',opacity:0.85}}>Nog een geheim — Mike onthult bij dinner</div>
+      </div>
+
+      {/* V21: WEDDING-VIDEO PIPELINE — 4 hand-picked landmarks deliver the surprise edit.
+          Computes from L_DATA wp:1 + completed[locId][chIdx]. Hidden when Jorik is IN the team. */}
+      {!jorikInTeam&&(()=>{
+        const wpChallenges=[];
+        L_DATA.forEach(loc=>{(loc.ch||[]).forEach((ch,idx)=>{if(ch.wp)wpChallenges.push({loc,ch,idx});});});
+        // V22: cross-check completedPts > 0 so a rejected (0-pt) submission doesn't falsely
+        // increment the wedding-pipeline counter. Without this check, an admin rejecting a
+        // wp:1 photo deducts the points but the chip still shows the shot as "done".
+        const wpDone=wpChallenges.filter(({loc,idx})=>{
+          const isCompleted=!!(completed&&completed[loc.id]&&completed[loc.id][idx]);
+          if(!isCompleted)return false;
+          const pts=completedPts&&completedPts[loc.id]?completedPts[loc.id][idx]:undefined;
+          // Treat undefined as "yes, count it" (legacy completions before completedPts was wired).
+          // Treat 0 as "no, the photo was rejected" — exclude.
+          return pts===undefined||pts>0;
+        }).length;
+        const wpTotal=wpChallenges.length;
+        if(wpTotal===0)return null;
+        const allWpDone=wpDone>=wpTotal;
+        const showRemaining=()=>{
+          // V22: same rejected-photo guard as the wpDone counter — a 0-pt entry counts as
+          // "still to do" so the team knows to retake.
+          const remaining=wpChallenges.filter(({loc,idx})=>{
+            const isCompleted=!!(completed&&completed[loc.id]&&completed[loc.id][idx]);
+            if(!isCompleted)return true;
+            const pts=completedPts&&completedPts[loc.id]?completedPts[loc.id][idx]:undefined;
+            return pts!==undefined&&pts<=0;
+          });
+          if(remaining.length===0){alert('🎬 Alle 4 wedding-video shots gefilmd! Op naar de bruiloft.');return;}
+          alert('🎬 Wedding-video missie — nog te doen:\n\n'+remaining.map(({loc,ch})=>`• ${loc.e} ${loc.n} · ${ch.ti}`).join('\n'));
+        };
+        return(
+          <button type="button" onClick={showRemaining}
+            className="panel-sm" style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',background:allWpDone?'rgba(95,216,165,0.12)':'linear-gradient(145deg,rgba(255,107,107,0.16),rgba(228,178,92,0.05))',borderColor:allWpDone?'rgba(95,216,165,0.35)':'rgba(255,107,107,0.4)',cursor:'pointer',width:'100%',color:'#fff',textAlign:'left',display:'flex',alignItems:'center',gap:'var(--sp-3)'}}>
+            <span style={{fontSize:22}}>📹</span>
+            <span style={{flex:1}}>
+              <div className="t-card-label" style={{color:allWpDone?'var(--success)':'#ff8a8a'}}>{allWpDone?'Bruiloftsvideo compleet':'Geheime bruiloftsvideo · '+wpDone+'/'+wpTotal+' shots'}</div>
+              <div className="t-caption" style={{marginTop:'var(--sp-1)',opacity:0.85}}>{allWpDone?'Alle 4 shots gefilmd — chapeau':'Tik om te zien wat nog ontbreekt'}</div>
+            </span>
+            <span className="t-caption">ⓘ</span>
+          </button>
+        );
+      })()}
 
       {/* Wedding video mission */}
       {!jorikInTeam&&!weddingDone&&(
@@ -4502,6 +4720,55 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
         </div>
       )}
 
+      {/* V22: Admin pace-guide panel — soft suggestion only, helps Mike not forget to
+           trigger bar breaks / phase transitions on time. Computes "where in the day are we"
+           from the wall clock + the hardcoded gameday window (14:00 – 19:30). */}
+      {(()=>{
+        const SCHEDULE=[
+          {min:0,    label:'14:00 — Start spel',                 hint:'Druk op 🎮 START in lobby.',                                  step:'start'},
+          {min:60,   label:'15:00 — Bar 1 (~30 min)',            hint:'🍺 Trigger bar break. Jorik krijgt bar-set-piece.',           step:'bar1'},
+          {min:90,   label:'15:30 — Einde bar 1 / Fase 2 erna',  hint:'Bar overlay sluit automatisch. Geen actie.',                   step:'phase2'},
+          {min:180,  label:'17:00 — Bar 2 (~30 min)',            hint:'🍺 Trigger bar break #2.',                                    step:'bar2'},
+          {min:240,  label:'18:00 — Fase 3 transition',          hint:'Soft moment, geen actie nodig (admin kan phase forward).',     step:'phase3'},
+          {min:270,  label:'18:30 — Bar 3 (~30 min)',            hint:'🍺 Laatste bar break.',                                       step:'bar3'},
+          {min:300,  label:'19:00 — Markthal moment',            hint:'Jorik solo Hand-in-Hand Kameraden in Markthal — als hij daar kan zijn.',step:'markthal'},
+          {min:315,  label:'19:15 — FINALE (×1.5)',              hint:'🏆 Trigger Finale. Punten ×1.5 in laatste 15 min.',           step:'finale'},
+          {min:330,  label:'19:30 — Dinner / einde',             hint:'🥂 Start Finale-uitslag. Onthul prijs.',                      step:'end'},
+        ];
+        // Compute minutes-from-start using the same DINER_DATE clock as the rest of the app.
+        // For dev (DINER_DATE > 7 days away) we fall back to "minutes since dev clock started".
+        const dinner=dinerTs(); // 19:30 game-day OR now+4h dev
+        const startMs=dinner-(5.5*3600*1000); // 14:00 game-day = dinner - 5.5h
+        const elapsedMin=Math.floor((Date.now()-startMs)/60000);
+        // "Now" = the latest scheduled item where min <= elapsedMin
+        let nowIdx=0;
+        for(let i=0;i<SCHEDULE.length;i++){if(SCHEDULE[i].min<=elapsedMin)nowIdx=i;}
+        const nextIdx=Math.min(nowIdx+1,SCHEDULE.length-1);
+        const minToNext=SCHEDULE[nextIdx].min-elapsedMin;
+        return(
+          <div className="panel stack-3" style={{marginBottom:'var(--sp-4)',borderColor:'rgba(95,216,165,0.30)',background:'linear-gradient(155deg,rgba(95,216,165,0.08),rgba(255,255,255,0.015))'}}>
+            <div className="t-label t-success">⏱ Pace-guide (advies)</div>
+            <div className="row-3" style={{alignItems:'flex-start'}}>
+              <div style={{fontSize:24,flexShrink:0}}>📍</div>
+              <div className="flex-1">
+                <div className="t-card-label">Nu: {SCHEDULE[nowIdx].label}</div>
+                <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{SCHEDULE[nowIdx].hint}</div>
+              </div>
+            </div>
+            {nextIdx>nowIdx&&(
+              <div className="row-3" style={{alignItems:'flex-start',opacity:0.85}}>
+                <div style={{fontSize:24,flexShrink:0}}>⏭</div>
+                <div className="flex-1">
+                  <div className="t-card-label-sm">Volgende ({minToNext>=0?`over ${minToNext} min`:'inhalen'}): {SCHEDULE[nextIdx].label}</div>
+                  <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{SCHEDULE[nextIdx].hint}</div>
+                </div>
+              </div>
+            )}
+            <div className="t-caption t-muted" style={{fontStyle:'italic'}}>Schema is suggestie. Niets vuurt automatisch — admin triggert handmatig.</div>
+          </div>
+        );
+      })()}
+
       {/* Game-master controls */}
       <div className="panel stack-4" style={{marginBottom:'var(--sp-5)',borderColor:'rgba(228,178,92,0.28)',background:'linear-gradient(155deg,rgba(228,178,92,0.05),rgba(255,255,255,0.015))'}}>
         <div className="t-label t-accent">🎛 Game Master controls</div>
@@ -4938,7 +5205,10 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   const isSpectator=myTeam?.spectator||myTeam?.id===-1;
   const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
   const gateRadius=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE;
-  const tooFar=isMedia&&!isAdmin&&dist!=null&&dist>gateRadius;
+  // V23: GPS_GATE_BYPASS (TEST_MODE) lets every team upload from anywhere —
+  // critical for sofa testing the photo flow without walking to Rotterdam.
+  // Live behavior restored when TEST_MODE flips to false.
+  const tooFar=isMedia&&!isAdmin&&!GPS_GATE_BYPASS&&dist!=null&&dist>gateRadius;
 
   // V16: spectator guard — disable challenge completion since the score wouldn't persist
   if(isSpectator){
@@ -4964,7 +5234,11 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
       if(!isVideoData(raw)){
         // V20: adaptive tiered compression (falls back to null only if 3 tiers still fail)
         shareable=await compressPhotoAdaptive(raw);
-      }else if(raw.length>700000){
+      }else if(raw.length>5*1024*1024){
+        // V22: bumped 700kB → 5MB (was silently dropping 95% of phone clips from the feed).
+        // The wedding-edit pipeline relies on these clips, so we want them in the activity feed.
+        // 5MB is the practical cap before Supabase realtime broadcast starts truncating payloads.
+        // Larger clips: shareable=null + UI placeholder ("Video opgenomen, te groot voor preview").
         shareable=null;
       }
       setPreview(raw);
@@ -5195,11 +5469,61 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam,confirmAsync}){
 // Only visible to the team currently holding Jorik (inverse of WeddingMission).
 // Each mission is one-shot; previous done-list is preserved when Jorik rotates away.
 // ═══════════════════════════════════════════
-function JorikMissions({onClose,onComplete,done,jorikInTeam}){
+function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,barBreak}){
   const fileRefs=useRef({});
   const totalPts=JORIK_MISSIONS.reduce((s,m)=>s+m.pts,0);
   const doneSet=done instanceof Set?done:new Set(done||[]);
-  const earnedPts=JORIK_MISSIONS.filter(m=>doneSet.has(m.id)).reduce((s,m)=>s+m.pts,0);
+  const runMap=runningCounts&&typeof runningCounts==='object'?runningCounts:{};
+  // Earned pts: full pts for fully-done missions + proportional for running-in-progress.
+  const earnedPts=JORIK_MISSIONS.reduce((s,m)=>{
+    if(doneSet.has(m.id))return s+m.pts;
+    if(m.running&&m.tradeTarget>0){
+      const c=runMap[m.id]||0;
+      return s+Math.round((m.pts/m.tradeTarget)*c);
+    }
+    return s;
+  },0);
+
+  // V21: context match — does this mission render in the "Nu beschikbaar" lane right now?
+  // 'any'  → always available
+  // 'bar'  → only during an active bar break
+  // 'loc:N'→ only when team GPS is in preview band (300m) of POI N
+  // V22: defensive shape check (was inBar=!!(barBreak&&barBreak.name) — too loose, an empty
+  // object would have evaluated true). Now requires a non-empty string `name`.
+  const inBar=!!(barBreak&&typeof barBreak.name==='string'&&barBreak.name.length>0);
+  // V22: GPS hysteresis on loc-tagged missions — the matched-state was thrashing as GPS
+  // jittered around the 300m PREVIEW_RADIUS boundary (Markthal mission flickering on/off).
+  // Use a useRef-backed Map keyed on `loc:N` → last matched bool. Unlock at 280m, re-lock at 320m.
+  const ctxMatchedRef=React.useRef(new Map());
+  const ctxMatches=(m)=>{
+    const c=m.context||'any';
+    if(c==='any')return true;
+    if(c==='bar')return inBar;
+    if(c.startsWith('loc:')){
+      const id=parseInt(c.slice(4),10);
+      const loc=L_DATA.find(l=>l.id===id);
+      if(!loc||!pos)return false;
+      const d=haversine(pos.lat,pos.lng,loc.la,loc.lo);
+      const wasMatched=ctxMatchedRef.current.get(c)===true;
+      // Hysteresis: 280m to enter matched state, 320m to leave it. Sticky in between.
+      const matched=wasMatched?d<=320:d<=280;
+      ctxMatchedRef.current.set(c,matched);
+      return matched;
+    }
+    // V22: default-deny for unrecognised context formats (was `return true` — silent permissive).
+    return false;
+  };
+  const prio=(m)=>m.priority==='high'?0:m.priority==='low'?2:1;
+  // V22: memoize sort to prevent stale-closure capture on every render. Re-derives only when
+  // the inputs actually change. JORIK_MISSIONS is module-scope so it's a stable reference.
+  const sortedMissions=React.useMemo(()=>{
+    return [...JORIK_MISSIONS].sort((a,b)=>{
+      const ca=ctxMatches(a)?0:1, cb=ctxMatches(b)?0:1;
+      if(ca!==cb)return ca-cb;
+      return prio(a)-prio(b);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[inBar,pos&&pos.lat,pos&&pos.lng]);
 
   // V21 a11y: escape closes + role dialog
   React.useEffect(()=>{
@@ -5209,14 +5533,20 @@ function JorikMissions({onClose,onComplete,done,jorikInTeam}){
   },[onClose]);
 
   const handleFile=(m,file)=>{
-    if(!file||doneSet.has(m.id))return;
-    // Compress photos; drop large video blobs before shipping to feed
+    if(!file)return;
+    // V22: running missions can be uploaded to until count reaches target. Block here as a
+    // safety net so re-clicks during the FileReader window can't double-fire.
+    if(doneSet.has(m.id))return;
+    if(m.running&&m.tradeTarget>0&&(runMap[m.id]||0)>=m.tradeTarget)return;
+    // V22: bumped video cap 700kB → 5MB so most phone clips reach the activity feed
+    // (and therefore the wedding-edit dataset). See parallel comment at the photo-review
+    // path for the same change. Larger clips: shareable=null fallback + placeholder UI.
     const r=new FileReader();
     r.onload=async(ev)=>{
       const raw=ev.target.result;
       let shareable=raw;
       if(m.media==='video'){
-        if(raw.length>700000)shareable=null;
+        if(raw.length>5*1024*1024)shareable=null;
       }else{
         // V20: adaptive tiered compression
         shareable=await compressPhotoAdaptive(raw);
@@ -5251,11 +5581,34 @@ function JorikMissions({onClose,onComplete,done,jorikInTeam}){
         )}
 
         <div className="stack-3" style={{marginBottom:'var(--sp-4)'}}>
-          {JORIK_MISSIONS.map(m=>{
+          {sortedMissions.map(m=>{
             const isDone=doneSet.has(m.id);
-            const locked=!jorikInTeam||isDone;
+            const matches=ctxMatches(m);
+            // V22: running missions stay actionable (re-uploadable) until count==target.
+            const runCount=m.running?(runMap[m.id]||0):0;
+            const runTarget=m.tradeTarget||0;
+            const runComplete=m.running&&runTarget>0&&runCount>=runTarget;
+            const locked=!jorikInTeam||isDone||runComplete||!matches;
+            // V21: per-mission context label so Jorik's team knows when each mission is intended
+            let ctxLabel=null,ctxColor='rgba(255,255,255,0.05)';
+            if(m.context==='bar'){
+              ctxLabel=matches?'🍻 Bar break — nu actief':'🍻 Pas tijdens een bar break';
+              ctxColor=matches?'rgba(228,178,92,0.18)':'rgba(255,255,255,0.04)';
+            }else if((m.context||'').startsWith('loc:')){
+              const id=parseInt(m.context.slice(4),10);
+              const loc=L_DATA.find(l=>l.id===id);
+              ctxLabel=matches?`📍 Bij ${loc?.n||'locatie'} — nu`:`📍 Alleen bij ${loc?.n||'locatie'}`;
+              ctxColor=matches?'rgba(95,216,165,0.16)':'rgba(255,255,255,0.04)';
+            }else if(m.priority==='high'){
+              ctxLabel='✨ Hoogste prioriteit';
+              ctxColor='rgba(228,178,92,0.14)';
+            }else if(m.priority==='low'){
+              ctxLabel='💎 Bonus / zeldzaam';
+              ctxColor='rgba(255,255,255,0.04)';
+            }
+            const isRunning=!!m.running;
             return(
-              <div key={m.id} className="panel" style={{borderColor:isDone?'rgba(95,216,165,0.35)':'rgba(228,178,92,0.25)',background:isDone?'rgba(95,216,165,0.08)':'rgba(228,178,92,0.05)'}}>
+              <div key={m.id} className="panel" style={{borderColor:isDone?'rgba(95,216,165,0.35)':matches?'rgba(228,178,92,0.35)':'rgba(255,255,255,0.08)',background:isDone?'rgba(95,216,165,0.08)':matches?'rgba(228,178,92,0.07)':'rgba(255,255,255,0.02)',opacity:matches||isDone?1:0.6}}>
                 <div style={{display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
                   <div style={{fontSize:28,flexShrink:0}}>{m.emoji}</div>
                   <div style={{flex:1,minWidth:0}}>
@@ -5263,21 +5616,36 @@ function JorikMissions({onClose,onComplete,done,jorikInTeam}){
                       <span>{m.title}</span>
                       <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',background:'rgba(255,255,255,0.05)'}}>{m.cat}</span>
                       <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'var(--accent-2)',borderColor:'var(--accent)'}}>+{m.pts} pts</span>
+                      {m.weddingPipeline&&<span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'#ff6b6b',borderColor:'rgba(255,107,107,0.4)',background:'rgba(255,107,107,0.08)'}}>📹 bruiloft</span>}
+                      {isRunning&&runTarget>0&&<span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'#5fd8a5',borderColor:'rgba(95,216,165,0.4)',background:'rgba(95,216,165,0.08)'}}>🔁 {runCount}/{runTarget} ruils</span>}
                     </div>
+                    {ctxLabel&&<div className="t-caption" style={{marginTop:'var(--sp-1)',display:'inline-block',padding:'2px 8px',borderRadius:'12px',background:ctxColor,fontSize:'var(--fs-10)',letterSpacing:'0.3px'}}>{ctxLabel}</div>}
                     <div className="t-body" style={{marginTop:'var(--sp-1)',opacity:0.9}}>{m.desc}</div>
                     <div style={{marginTop:'var(--sp-2)'}}>
-                      {isDone?(
+                      {isDone||runComplete?(
                         <div className="panel-sm text-center t-success t-body-emph" style={{background:'rgba(95,216,165,0.1)',borderColor:'rgba(95,216,165,0.3)'}}>
-                          ✅ Voltooid · +{m.pts} pts
+                          ✅ Voltooid · +{m.pts} pts{isRunning?` (${runCount}/${runTarget})`:''}
                         </div>
                       ):(
                         <>
                           <input ref={el=>{fileRefs.current[m.id]=el}} type="file" accept={m.media==='video'?'video/*':'image/*'} style={{display:'none'}}
                             onChange={e=>{if(e.target.files[0])handleFile(m,e.target.files[0])}}/>
                           <button className={`btn btn-sm ${m.media==='video'?'btn-cyan':'btn-gold'}`}
-                            onClick={()=>!locked&&fileRefs.current[m.id]?.click()}
+                            onClick={()=>{
+                              if(locked)return;
+                              // V22: bar-set-piece consent gate. Bar-set-piece missions (bar-proposal,
+                              // bar-rating, bar-toast) involve recording bar staff or strangers at
+                              // their table. Prompt for explicit consent confirmation before opening
+                              // the camera. Two-second pause; protects the wedding edit from
+                              // featuring a non-consenting subject.
+                              if(m.context==='bar'){
+                                const ok=window.confirm("Even checken: heb je het personeel/de tafel gebriefd en gaf iedereen die in beeld komt akkoord voor opname?\\n\\nJa = camera opent.\\nNee = brief eerst, en probeer dan opnieuw.");
+                                if(!ok)return;
+                              }
+                              fileRefs.current[m.id]?.click();
+                            }}
                             disabled={locked} style={{width:'100%'}}>
-                            {!jorikInTeam?'🚫 Wacht tot Jorik terug is':(m.media==='video'?`🎬 Video opnemen of kiezen`:`📸 Foto maken of kiezen`)}
+                            {!jorikInTeam?'🚫 Wacht tot Jorik terug is':(!matches?(m.context==='bar'?'🍻 Pas tijdens een bar break':'📍 Loop dichter naar de locatie'):(isRunning&&runCount>0?`📸 Volgende ruil (${runCount}/${runTarget})`:(m.media==='video'?`🎬 Video opnemen of kiezen`:`📸 Foto maken of kiezen`)))}
                           </button>
                         </>
                       )}
@@ -5323,7 +5691,8 @@ function BarBreakOverlay({info,onClose,onComplete}){
       let shareable=raw;
       // V20: adaptive tiered compression for photos
       if(!isVideoData(raw))shareable=await compressPhotoAdaptive(raw);
-      else if(raw.length>700000)shareable=null;
+      // V22: video cap bumped 700kB → 5MB (parity with JorikMissions handleFile + photo-review path)
+      else if(raw.length>5*1024*1024)shareable=null;
       setDone(prev=>new Set([...prev,i]));
       onComplete&&onComplete(m,m.pts,shareable);
     };
