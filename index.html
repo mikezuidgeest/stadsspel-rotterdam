@@ -157,6 +157,15 @@
     @keyframes chipPulse{0%{box-shadow:0 0 0 0 rgba(95,216,165,0.55)}70%{box-shadow:0 0 0 8px rgba(95,216,165,0)}100%{box-shadow:0 0 0 0 rgba(95,216,165,0)}}
     .chip-role{background:linear-gradient(135deg,rgba(155,123,234,0.18),rgba(110,163,255,0.08));border:1px solid rgba(155,123,234,0.4);color:#cdb6ff;font-weight:700}
     .chip-count{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text-primary);font-variant-numeric:tabular-nums;font-weight:800;padding:5px 10px}
+    /* V30 — accessibility: respect prefers-reduced-motion. Keeps state correctness;
+       only kills decorative motion (pulses, confetti, shimmer) so users with
+       motion-sickness settings aren't punished. WCAG 2.1 SC 2.3.3. */
+    @media (prefers-reduced-motion: reduce){
+      .chip-status::before{animation:none}
+      .confetti-piece{animation:none;opacity:0}
+      .skeleton-row{animation:none;background:rgba(255,255,255,0.04)}
+      *{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}
+    }
 
     /* V13: Animations — spring-heavy */
     @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
@@ -769,7 +778,7 @@ const L_DATA=[
   {t:"video",ti:"Brug Catwalk",d:"Team vormt een erehaag-rij over de Erasmusbrug, loopt samen plechtig richting camera alsof ze een onzichtbare bruidegom-stoet escorteren. Captain leidt de stoet, laatste teamlid roept aan het eind 'Voor Jorik!' luid in de camera. Min. 10 sec, gefilmd vanaf de andere kant.",p:35,df:"hard",wp:1},
   {t:"quiz",ti:"Brug Kennis",d:"Wat is de bijnaam van de Erasmusbrug?",a:"De Zwaan",o:["De Zwaan","De Harp","De Naald","Het Zeil"],p:15,df:"easy"}]},
 {id:2,n:"Markthal",la:51.920109,lo:4.486957,e:"🏗️",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Plafond Cirkel",d:"Heel team staat in een cirkel op de Markthalvloer, allemaal kijken samen omhoog naar het beschilderde plafond met open mond. Captain in het midden. Foto vanaf ooghoogte van de groep — plafond zichtbaar boven hun hoofden.",p:20,df:"easy"},
+  {t:"photo",ti:"Plafond Cirkel",d:"Heel team staat in een cirkel op de Markthalvloer, allemaal kijken samen omhoog naar het 'Horn of Plenty'-plafond (11.000 m², Arno Coenen) met open mond. Captain in het midden. Vraag een voorbijganger om de foto te maken vanaf ooghoogte — plafond zichtbaar boven jullie hoofden.",p:25,df:"medium"},
   {t:"creative",ti:"Proeverij Challenge",d:"Koop het raarste ding in de Markthal. Captain geblinddoekt, team eromheen, allemaal in beeld terwijl de captain blind proeft. Reacties van het team meefilmen.",p:35,df:"hard"},
   {t:"quiz",ti:"Markthal Trivia",d:"Hoeveel m² is het kunstwerk op het plafond?",a:"11.000 m²",o:["11.000 m²","5.000 m²","8.500 m²","15.000 m²"],p:25,df:"medium"}]},
 {id:3,n:"Kubuswoningen",la:51.920394,lo:4.490127,e:"🎲",c:"architecture",r:15,ch:[
@@ -824,7 +833,7 @@ const L_DATA=[
   {t:"photo",ti:"Kerstman Pose",d:"Heel team creatief met het Paul McCarthy-kunstwerk: captain op zijn knieën in aanbidding, team eromheen kerstman-pose. Allemaal in beeld.",p:25,df:"medium"},
   {t:"quiz",ti:"Buttplug Quiz",d:"Hoe heet dit kunstwerk officieel?",a:"Santa Claus",o:["Santa Claus","Gnome","Kabouter","Christmas Tree"],p:20,df:"easy"}]},
 {id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"video",ti:"Fikkie's Vrijgezellenbiecht",d:"Captain knielt naast Fikkie en biecht één huwelijksangst op (mag verzonnen zijn). Heel team eromheen in beeld als jury. Een teamlid spreekt Fikkie's oordeel uit: schuldig of onschuldig. Iedereen erop.",p:30,df:"medium"}]},
-{id:25,n:"L'Homme qui Marche",la:51.917633,lo:4.472299,e:"🚶",c:"art",r:15,ch:[{t:"video",ti:"Volgende Stap",d:"Captain loopt naast Giacometti's L'Homme qui Marche aan de Westersingel in dezelfde pose, voice-over: \"mijn volgende stap is het altaar\". Heel team loopt synchroon mee in dezelfde houding. Allemaal in beeld, min. 10 sec.",p:25,df:"medium"}]},
+{id:25,n:"L'Homme qui Marche",la:51.917633,lo:4.472299,e:"🚶",c:"art",r:15,ch:[{t:"video",ti:"Volgende Stap",d:"Captain loopt naast Rodin's L'Homme qui Marche aan de Westersingel in dezelfde pose, voice-over: \"mijn volgende stap is het altaar\". Heel team loopt synchroon mee in dezelfde houding. Allemaal in beeld, min. 10 sec.",p:25,df:"medium"}]},
 {id:26,n:"Sylvette (Picasso)",la:51.9149,lo:4.4735,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Picasso Pose",d:"Heel team in kubistische pose voor Sylvette: hoeken, gekantelde hoofden, scherpe houdingen. Captain centraal in de scherpste hoek. Allemaal in beeld.",p:25,df:"medium"}]},
 {id:27,n:"Cascade (Van Lieshout)",la:51.9178,lo:4.4800,e:"🎪",c:"art",r:20,ch:[{t:"photo",ti:"Cascade Climb",d:"Heel team beklimt (waar veilig) of poseert rond Cascade. Captain bovenop als koning, team gedrapeerd eronder als veroverd volk. Allemaal in beeld.",p:25,df:"medium"}]},
 {id:28,n:"Make It Happen Mural",la:51.9149,lo:4.4789,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Make It Happen",d:"Captain staat onder de tekst en wijst ernaar. Team eromheen, duimen omhoog: dit is het teammotto richting 14 juni.",p:20,df:"easy"}]},
@@ -839,12 +848,12 @@ const L_DATA=[
 {id:33,n:"Wereldmuseum",la:51.9079,lo:4.4804,e:"🌍",c:"culture",r:15,ch:[{t:"video",ti:"Drie Talen Advies",d:"Bij het Wereldmuseum aan de Veerhaven — wereldhavenstad-mix par excellence — vraag drie vreemden (verschillende nationaliteiten zo mogelijk) om huwelijksadvies in hun moedertaal. Captain + minstens 2 teamleden in beeld bij elke clip. Film alle drie.",p:35,df:"hard"}]},
 {id:34,n:"Nieuwe Instituut",la:51.914708,lo:4.471158,e:"📐",c:"culture",r:15,ch:[{t:"photo",ti:"Architectuur Shot",d:"Heel team in artistieke pose voor het Nieuwe Instituut. Captain tegen de gevel, team in geometrische formatie eromheen. Iedereen in beeld, architectuur als achtergrond.",p:25,df:"medium"}]},
 {id:35,n:"Huis Sonneveld",la:51.915611,lo:4.472337,e:"🏠",c:"culture",r:10,ch:[{t:"photo",ti:"Bauhaus Bachelor",d:"Team in strakke lijn voor Huis Sonneveld — Rotterdams pronkstuk van Het Nieuwe Bouwen — armen langs het lichaam, gezichten neutraal. Captain centraal — alsof jullie de meubels zijn.",p:20,df:"easy"}]},
-{id:36,n:"Mariniersmuseum",la:51.918716,lo:4.491564,e:"🎖️",c:"culture",r:15,ch:[{t:"video",ti:"Mariniersbiecht",d:"Bij het Mariniersmuseum aan de Oude Haven — Rotterdam is sinds 1665 mariniersstad — biecht één teamlid in marinierhouding het 'gevaarlijkste' op wat de captain ooit deed (echt of verzonnen, mag absurd). Rest van het team in beeld als publiek. Iedereen erop, min. 15 sec.",p:30,df:"medium"}]},
+{id:36,n:"Mariniersmuseum",la:51.918716,lo:4.491564,e:"🎖️",c:"culture",r:15,ch:[{t:"video",ti:"Mariniersbiecht",d:"Bij het Mariniersmuseum aan de Wijnhaven — Korps Mariniers werd in 1665 in Rotterdam opgericht — biecht één teamlid in marinierhouding het 'gevaarlijkste' op wat de captain ooit deed (echt of verzonnen, mag absurd). Rest van het team in beeld als publiek. Iedereen erop, min. 15 sec.",p:30,df:"medium"}]},
 {id:37,n:"Witte de Withstraat",la:51.915524,lo:4.476784,e:"🎨",c:"street",r:20,ch:[
   {t:"creative",ti:"Terras Interview",d:"Team interviewt een terrasbezoeker op de Witte de Withstraat — Rotterdams meest opinionerige terrasstraat: 'Advies voor een bruidegom?' Captain + minstens 2 teamleden in beeld naast de bezoeker. Film de reactie.",p:40,df:"hard"},
   {t:"photo",ti:"Street Art Hunt",d:"Vind street art op de Witte de Withstraat. Heel team poseert ervoor zo dat ze het kunstwerk visueel 'aanvullen' — ledematen of poses die de tekening uitbreiden. Allemaal in beeld.",p:25,df:"medium"}]},
 {id:38,n:"Skatepark Westblaak",la:51.916824,lo:4.476183,e:"🛹",c:"landmark",r:20,ch:[{t:"video",ti:"Skatepark Move",d:"Eén teamlid probeert een skate-trick of pose op Westblaak. Rest van het team in beeld als entourage of jury, duimen omhoog/omlaag. Iedereen erop. Humor > vaardigheid.",p:30,df:"medium"}]},
-{id:39,n:"Walk of Fame",la:51.9158,lo:4.4820,e:"⭐",c:"landmark",r:10,ch:[{t:"video",ti:"Bachelor Handprint",d:"Op de Walk of Fame Europe naast Schouwburgplein drukt de captain de handen naast een ster en spreekt namens Jorik: \"Vrijgezel sinds [jaar]. Trouwt 14 juni. Laatste handafdruk als vrij man.\" Heel team eromheen geknield als fans, allemaal in beeld. Film.",p:25,df:"medium"}]},
+{id:39,n:"Walk of Fame",la:51.9158,lo:4.4820,e:"⭐",c:"landmark",r:10,ch:[{t:"video",ti:"Bachelor Handprint",d:"Op de oude locatie van de Walk of Fame Europe aan de Schiedamsedijk drukt de captain de handen op de stoep en spreekt namens Jorik: \"Vrijgezel sinds [jaar]. Trouwt 14 juni. Laatste handafdruk als vrij man.\" Heel team eromheen geknield als fans, allemaal in beeld. Film.",p:25,df:"medium"}]},
 {id:40,n:"Chinatown Poort",la:51.9215,lo:4.4694,e:"🏮",c:"landmark",r:15,ch:[{t:"photo",ti:"Geheim genootschap",d:"Heel team staat als een maffia-plaatje onder de Chinatown-poort. Captain vooraan als capo, serieuze gezichten, één met sigaret (mag fake zijn). Allemaal in beeld.",p:25,df:"medium"}]},
 {id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Havenkraan Bruidegom",d:"De vier rode lichtmasten van Adriaan Geuze (1996) zijn een eerbetoon aan de havenkranen. Film de captain die een havenkraan nadoet: stijve benen, arm omhoog, 'tilt' een denkbeeldige bruid symbolisch op. Captain + minstens 2 teamleden in beeld als havenpersoneel met commentaar. Min. 15 sec.",p:35,df:"hard"}]},
 {id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"creative",ti:"Singel Biecht",d:"Twee teamleden op een bankje aan de Westersingel — Rotterdams openluchtbeeldenroute. Eén bekent on-camera het meest gênante moment uit zijn/haar eigen leven, met de eenden als getuigen. Min. 20 sec. Niet stoppen voor er gelachen wordt.",p:40,df:"hard"}]},
@@ -866,10 +875,10 @@ const L_DATA=[
 {id:56,n:"Foodhallen",la:51.906033,lo:4.487959,e:"🍽️",c:"food",r:20,ch:[{t:"video",ti:"Last Single Meal",d:"Captain kiest 1 gerecht in de Foodhallen en vertelt op camera: dit is mijn vrijgezellen-souvenir. Waarom dit gerecht? Captain + minstens 2 teamleden in beeld als publiek. Iedereen erop.",p:25,df:"medium"}]},
 {id:57,n:"Floating Office",la:51.90408,lo:4.488447,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Out of Office",d:"Captain houdt de telefoon omhoog voor het Floating Office in de Rijnhaven — 's werelds grootste drijvende kantoor — en roept: 'Out of office tot na 14 juni.' Team applaudisseert in beeld, water op de achtergrond.",p:20,df:"easy"}]},
 {id:58,n:"Luchtpark Hofbogen",la:51.926834,lo:4.478982,e:"🌿",c:"park",r:15,ch:[{t:"photo",ti:"Rooftop Panorama",d:"Heel team breeduit op het dak van het Luchtpark Hofbogen, panorama als achtergrond. Captain in het midden met armen wijd, team in V-formatie. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:59,n:"DakAkker",la:51.925465,lo:4.476699,e:"🌱",c:"landmark",r:15,ch:[{t:"photo",ti:"Dakboerderij",d:"Heel team poseert op de DakAkker, hoogste dakboerderij van Europa. Captain in boerenpose met denkbeeldige hooivork, team eromheen als knechten. Allemaal in beeld.",p:25,df:"medium"}]},
+{id:59,n:"DakAkker",la:51.925465,lo:4.476699,e:"🌱",c:"landmark",r:15,ch:[{t:"photo",ti:"Dakboerderij",d:"Heel team poseert op de DakAkker, grootste open-lucht dakboerderij van Nederland op het Schieblock. Captain in boerenpose met denkbeeldige hooivork, team eromheen als knechten. Allemaal in beeld.",p:25,df:"medium"}]},
 {id:60,n:"Het Industriegebouw",la:51.923711,lo:4.492121,e:"🏭",c:"landmark",r:15,ch:[{t:"photo",ti:"Wederopbouw Mannen",d:"Team in werkmanshouding voor het Industriegebouw — symbool van Rotterdams wederopbouw na 1945: armen over elkaar, kin omhoog. Captain vooraan met een denkbeeldige hamer over de schouder.",p:15,df:"easy"}]},
 {id:61,n:"BlueCity",la:51.9198,lo:4.4981,e:"♻️",c:"landmark",r:15,ch:[{t:"quiz",ti:"BlueCity Quiz",d:"BlueCity zit in een voormalig zwembad. Hoe heette het?",a:"Tropicana",o:["Tropicana","Aquarena","De Dolfijn","Waterlinie"],p:25,df:"medium"}]},
-{id:62,n:"Het Slaakhuys",la:51.9255,lo:4.4988,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Gatsby Groet",d:"Team in 1920s pose voor de art-deco gevel van Het Slaakhuys — vooroorlogs Rotterdams pareltje aan de Oostzeedijk: captain tipt aan een denkbeeldige hoed, één teamlid blaast een kushand naar de camera.",p:20,df:"easy"}]},
+{id:62,n:"Het Slaakhuys",la:51.9255,lo:4.4988,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Gatsby Groet",d:"Team in 1920s pose voor Het Slaakhuys aan de Slaak — voormalig hoofdkantoor van krant Het Vrije Volk, nu boutique hotel: captain tipt aan een denkbeeldige hoed, één teamlid blaast een kushand naar de camera.",p:20,df:"easy"}]},
 {id:63,n:"Gebouw Delftse Poort",la:51.9240,lo:4.4716,e:"🏙️",c:"architecture",r:20,ch:[{t:"photo",ti:"Hoogste Punt",d:"Heel team in beeld met Delftse Poort op de achtergrond. Captain reikt een hand omhoog: 'Onze stand piekt nog één keer voor de bruiloft.' Team eromheen, allemaal armen omhoog.",p:20,df:"easy"}]},
 {id:64,n:"Willemswerf",la:51.916963,lo:4.49011,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Schuine Gevel Quiz",d:"Welke architect ontwierp dit gebouw met de karakteristieke 45°-schuine gevel waar Jackie Chan in 1998 van naar beneden gleed in de film 'Who Am I?'?",a:"Wim Quist",o:["Wim Quist","Rem Koolhaas","Ben van Berkel","Piet Blom"],p:30,df:"hard"}]},
 {id:65,n:"Concertgebouw De Doelen",la:51.9234,lo:4.4740,e:"🎵",c:"culture",r:20,ch:[{t:"video",ti:"Luchtgitaar",d:"Heel team luchtgitaar voor De Doelen. Captain vooraan als frontman, team als bandleden — drums, bas, headbangers. Allemaal in beeld, 10 sec.",p:25,df:"medium"}]},
@@ -877,11 +886,11 @@ const L_DATA=[
 {id:67,n:"Geldersekade Panorama",la:51.9190,lo:4.4915,e:"🌅",c:"viewpoint",r:15,ch:[{t:"photo",ti:"Witte Huis Wijzen",d:"Panorama met Oude Haven en Witte Huis erop. Team wijst naar het Witte Huis, captain wijst naar zichzelf — 'oudste wolkenkrabber, oudste vrijgezel van het team'.",p:20,df:"easy"}]},
 {id:68,n:"Pauluskerk",la:51.919994,lo:4.472557,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Generale Repetitie",d:"Captain staat met de rug naar de Pauluskerk — Rotterdams bekendste daklozen-toevlucht én moderne kerk-icoon — team aan weerszijden. Iemand werpt rijst (of denkbeeldig). Repetitie voor 14 juni.",p:15,df:"easy"}]},
 {id:69,n:"Arminius Kerk",la:51.9155,lo:4.4727,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Bruidegom in Spe",d:"Captain op de stoep voor de Arminiuskerk aan de Westersingel — Rotterdams remonstrants debat-podium — team in twee rijen erachter. Captain houdt twee duimen op — laatste keer zo zorgeloos voor een kerk.",p:20,df:"easy"}]},
-{id:70,n:"Binnenwegplein",la:51.918234,lo:4.477439,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Synchroon Bewegen",d:"Team imiteert op het Binnenwegplein de beweging van Pierre van Soest's 'Cascade'-fontein: allemaal in dezelfde houding, één arm zwaaiend. Captain in het midden, op één been, midden in Rotterdams winkelhart.",p:20,df:"easy"}]},
+{id:70,n:"Binnenwegplein",la:51.918234,lo:4.477439,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Synchroon Bewegen",d:"Team imiteert op het Binnenwegplein de beweging van George Rickey's 'Two Turning Vertical Rectangles' (1971): allemaal in dezelfde houding, één arm zwaaiend. Captain in het midden, op één been, midden in Rotterdams winkelhart.",p:20,df:"easy"}]},
 {id:71,n:"THOMS",la:51.921926,lo:4.481385,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Speciaalbier-test",d:"Bestel bij THOMS in de Karel Doormanstraat een speciaalbier dat niemand kent. Het slachtoffer (één teamlid) proeft blind, heel team eromheen in beeld in afwachting van de reactie. Captain + minstens 2 teamleden zichtbaar bij het glas.",p:30,df:"medium"}]},
 {id:72,n:"Bokaal",la:51.92245,lo:4.488359,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Captain's Trouwtoast",d:"In Bokaal aan de Nieuwemarkt — Rotterdams huiskamer-bruine kroeg — staat de captain op (stoel of krukje, mits veilig) en houdt een 20-sec-toast op zichzelf in de derde persoon. Minstens drie keer 'die fantastische captain' zeggen. Captain + minstens 2 teamleden in beeld die meeklinken aan het eind.",p:25,df:"medium"}]},
-{id:73,n:"De Après Skihut",la:51.9223,lo:4.4767,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Schnaps-Toost",d:"In De Après Skihut bij Schouwburgplein — Rotterdams enige jaar-rond Tirol-bar — heft de captain een glas (niet drinken, glas mag leeg zijn) en houdt een 1-zin trouwtoespraak in extreem Duits accent: \"Auf die Liebe und das Leben!\" Captain + minstens 2 teamleden in beeld die meeklinken en meebrullen. Mag overdreven.",p:25,df:"medium"}]},
-{id:74,n:"De Gele Kanarie",la:51.924182,lo:4.489447,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Cheers met vreemden",d:"Klink in De Gele Kanarie — Rotterdams legendarische volkscafé in het Oude Noorden — met twee onbekenden aan de bar. Foto met alle 4 gezichten zichtbaar.",p:30,df:"medium"}]},
+{id:73,n:"De Après Skihut",la:51.9223,lo:4.4767,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Schnaps-Toost",d:"In De Après Skihut aan het Stadhuisplein — Rotterdams jaar-rond Tirol-bar sinds 1997 — heft de captain een glas (niet drinken, glas mag leeg zijn) en houdt een 1-zin trouwtoespraak in extreem Duits accent: \"Auf die Liebe und das Leben!\" Captain + minstens 2 teamleden in beeld die meeklinken en meebrullen. Mag overdreven.",p:25,df:"medium"}]},
+{id:74,n:"De Gele Kanarie",la:51.924182,lo:4.489447,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Cheers met vreemden",d:"Klink in De Gele Kanarie — Rotterdams bierbrouwers-café aan de Goudsesingel met eigen brouwerij in de kelder — met twee onbekenden aan de bar. Foto met alle 4 gezichten zichtbaar.",p:30,df:"medium"}]},
 {id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Captain's Blessing",d:"Vraag een crew member / barman aan boord van Vessel 11 om een goed huwelijk in het algemeen te zegenen in nautische termen ('Goede wind en kalm water'). Captain + minstens 2 teamleden naast de gezegende in beeld. Film het complete moment.",p:30,df:"medium"}]},
 {id:76,n:"BIRD Rotterdam",la:51.926726,lo:4.478851,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Debuutalbum",d:"Bandfoto voor BIRD in ZOHO — Rotterdams ruwste jazz/hiphop-podium: captain vooraan met denkbeeldige microfoon, team erachter als ritmesectie. Niemand mag glimlachen — albumcoverregel.",p:20,df:"easy"}]},
 {id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Vriendenbiecht",d:"Heel team voor de camera bij De Vrienden Live (min. 3 leden). Elk teamlid noemt één eigenschap van Jorik die zijn aanstaande waarschijnlijk nog niet kent. Geen Jorik in beeld nodig — dit is voor de bruiloftsedit. Eén lange take.",p:30,df:"medium",wp:1}]},
@@ -906,13 +915,13 @@ const L_DATA=[
 {id:90,n:"Standbeeld Piet Hein",la:51.9073,lo:4.4491,e:"🗿",c:"art",r:15,ch:[{t:"photo",ti:"Zilvervloot Veroverd",d:"Captain naast Piet Hein, beiden met dezelfde pose. Team knielt aan de voeten met denkbeeldige zilveren staven — buit voor de bruiloft.",p:20,df:"easy"}]},
 {id:91,n:"Historische Tramhalte",la:51.9081,lo:4.4682,e:"🚃",c:"historic",r:15,ch:[{t:"video",ti:"Time-Travel Tram",d:"Bij de historische tramhalte aan de Maashaven — Rotterdam reed al sinds 1879 met paardentram — vertelt de captain de halte hoe het team over de bruiloft van Jorik denkt over 25 jaar. Captain + minstens 2 teamleden in beeld als toekomstige getuigen. Min. 20 sec, één take, ernstig (of probeer).",p:30,df:"medium"}]},
 {id:92,n:"Cruise Terminal",la:51.905972,lo:4.486959,e:"🚢",c:"landmark",r:20,ch:[{t:"photo",ti:"Vrijgezellen Vaarwel",d:"Captain staat op de kade van de Cruise Terminal aan de Wilhelminapier — waar de Holland-Amerika Lijn vroeger vertrok — team zwaait theatraal vanaf afstand. Eén traantje wegvegen verplicht. Vertrek richting 14 juni — geen retour.",p:20,df:"easy"}]},
-{id:93,n:"Poortgebouw",la:51.910386,lo:4.495969,e:"🏚️",c:"landmark",r:15,ch:[{t:"photo",ti:"Anti-Bruidegom",d:"Team poseert voor het Poortgebouw op het Stieltjesplein — Rotterdams beroemdste kraakpand sinds 1980 en nog steeds woon-collectief — met gefronste blik en gebalde vuist. Captain vooraan met kapotte stropdas (denkbeeldig of echt), punk-protest tegen het huwelijk in het algemeen.",p:20,df:"easy"}]},
+{id:93,n:"Poortgebouw",la:51.910386,lo:4.495969,e:"🏚️",c:"landmark",r:15,ch:[{t:"photo",ti:"Anti-Bruidegom",d:"Team poseert voor het Poortgebouw aan de Stieltjesstraat — Rotterdams beroemdste kraakpand sinds 1980 en nog steeds woon-collectief — met gefronste blik en gebalde vuist. Captain vooraan met kapotte stropdas (denkbeeldig of echt), punk-protest tegen het huwelijk in het algemeen.",p:20,df:"easy"}]},
 {id:94,n:"Entrepotgebouw",la:51.910747,lo:4.499283,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Vijf Werelddelen",d:"Vijf teamleden voor de gevel van het Entrepotgebouw aan de Stieltjesstraat — vroeger douane-pakhuis met goederen uit alle werelddelen — elk in een andere wereld-pose: Eiffeltoren, sumo, sambadanser, geisha-buiging, cowboy. Captain kiest welk werelddeel.",p:20,df:"easy"}]},
 {id:95,n:"WTC Rotterdam",la:51.921033,lo:4.480344,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wall Street Bachelor",d:"Team in CEO-pose voor het WTC: handen in zakken, blik vooruit, één met telefoon aan oor. Captain centraal — 'vandaag verkoop ik mijn vrijgezellen-aandelen'.",p:15,df:"easy"}]},
 {id:96,n:"Haagsche Veer",la:51.9242,lo:4.4800,e:"🏛️",c:"historic",r:15,ch:[{t:"photo",ti:"Levenslang",d:"Captain onder de poort van het Haagsche Veer — Rotterdams oude politiebureau & cellencomplex achter het Stadhuis — polsen tegen elkaar alsof geboeid. Twee teamleden flankeren als bewakers. 'Veroordeeld tot 14 juni — levenslang.'",p:20,df:"easy"}]},
 {id:97,n:"Villa Thalia",la:51.923002,lo:4.476314,e:"🎭",c:"culture",r:15,ch:[{t:"photo",ti:"Tragedie & Komedie",d:"Voor Villa Thalia aan de Kruiskade — Rotterdams oudste nog actieve theaterpand — trekt halve team huilgezicht (tragedie), andere helft schaterlach (komedie). Captain in het midden — één helft van het gezicht verdrietig, andere blij.",p:20,df:"easy"}]},
 {id:98,n:"Chabot Museum",la:51.914735,lo:4.472336,e:"🎨",c:"culture",r:15,ch:[{t:"photo",ti:"Expressionisme",d:"Heel team in expressionistische pose à la Chabot voor het museum: vervormde gezichten, dramatische gebaren, hoekige houdingen. Captain centraal. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:99,n:"Natuurhistorisch Museum",la:51.91077,lo:4.472479,e:"🦕",c:"culture",r:15,ch:[{t:"photo",ti:"Uitgestorven soort",d:"Op de trap van Villa Dijkzigt — Het Natuurhistorisch Museum in Het Park — doet het team alsof het een uitstervende mannensoort is. Dramatische fossiel-pose. Eén dood op de trap.",p:25,df:"medium"}]},
+{id:99,n:"Natuurhistorisch Museum",la:51.91077,lo:4.472479,e:"🦕",c:"culture",r:15,ch:[{t:"photo",ti:"Uitgestorven soort",d:"Op de trap van Villa Dijkzigt — Het Natuurhistorisch Museum in het Museumpark — doet het team alsof het een uitstervende mannensoort is. Dramatische fossiel-pose. Eén dood op de trap.",p:25,df:"medium"}]},
 {id:100,n:"KINO Rotterdam",la:51.917129,lo:4.469393,e:"🎬",c:"culture",r:15,ch:[{t:"video",ti:"Bruiloft Trailer",d:"Film een 30sec \"movie trailer\" voor Jorik's trouwerij bij KINO. Heel team speelt mee in de trailer-scenes — bruiloftsgasten, schurken, dansers. Captain in de hoofdrol als bruidegom-stand-in. Cinematische voice-over, tagline aan het eind. Iedereen in beeld.",p:40,df:"hard"}]},
 {id:101,n:"Belasting & Douane Museum",la:51.907617,lo:4.476414,e:"💰",c:"culture",r:15,ch:[{t:"photo",ti:"Smokkelaar Pose",d:"Heel team doet alsof het smokkelt langs de douane bij het Belasting & Douane Museum: jassen vol denkbeeldige spullen, schichtige blikken. Captain met grootste 'last'. Allemaal in beeld.",p:25,df:"medium"}]},
 {id:102,n:"Historische Tuin Schoonoord",la:51.908937,lo:4.473386,e:"🌷",c:"park",r:15,ch:[{t:"photo",ti:"Bruidsboeket",d:"In de Historische Tuin Schoonoord — Rotterdams verborgen 19e-eeuwse stadstuin — plukt de captain (denkbeeldig — niets echt afbreken!) een boeket en overhandigt het plechtig aan een teamlid dat geknield ja-knikt. Min. 4 mensen in beeld.",p:20,df:"easy"}]},
@@ -1261,18 +1270,26 @@ function App(){
   const[broadcastBanner,setBroadcastBanner]=useState(null);
   const broadcastTimerRef=useRef(null);
   // V28 — confetti seed: incremented by triggerConfetti() to re-mount ConfettiBurst.
-  // Threshold 30+ pts triggers a celebratory burst. Auto-resets to 0 after 1.8s so
-  // the DOM unmounts cleanly + future low-point completions don't accidentally
-  // re-fire the animation.
+  // V30 — tiered intensity: every score event >0 fires a burst, but the SIZE scales
+  // with the score earned. Threshold 30+ no longer drops easy POIs onto the floor.
+  // Easy 15-20 pts → small burst (12 pieces, smaller spread).
+  // Medium 25-35 pts → medium burst (22 pieces, normal spread).
+  // Hard 40+ pts → large burst (38 pieces, wide spread + audio + haptic).
+  // Audio + haptic still gated to "milestone" score (≥30) so easy POIs feel different
+  // from medium/hard ones — important for player perception of difficulty.
   const[confettiSeed,setConfettiSeed]=useState(0);
+  const[confettiIntensity,setConfettiIntensity]=useState('small');
   const confettiTimerRef=useRef(null);
   const triggerConfetti=useCallback((pts)=>{
-    if(!pts||pts<30)return;
+    if(!pts||pts<=0)return;
+    const intensity=pts>=40?'large':pts>=25?'medium':'small';
+    setConfettiIntensity(intensity);
     setConfettiSeed(s=>s+1);
     if(confettiTimerRef.current)clearTimeout(confettiTimerRef.current);
     confettiTimerRef.current=setTimeout(()=>setConfettiSeed(0),1800);
-    // V29: score milestones get audio + haptic alongside the visual confetti
-    if(pts>=30){playCueRef.current&&playCueRef.current('score');tapRef.current&&tapRef.current([10,30,10]);}
+    // V29 (refined V30): audio + haptic only on medium/large — small bursts stay
+    // visual-only so a quick streak of easy POIs doesn't become noise.
+    if(pts>=25){playCueRef.current&&playCueRef.current('score');tapRef.current&&tapRef.current(pts>=40?[15,40,15,40,80]:[10,30,10]);}
   },[]);
   // V29 forward refs so triggerConfetti (declared before playCue/tap) can call them.
   const playCueRef=useRef(null);
@@ -1284,16 +1301,35 @@ function App(){
   // a tap so this works in practice). All cue + haptic calls are best-effort try/catch
   // so they never break the game flow if blocked.
   const[muted,setMuted]=useState(()=>{try{return localStorage.getItem('ssr_muted')==='1'}catch(e){return false}});
+  // V30 — Web Audio capability state. We can detect AudioContext existence at mount
+  // (works in all modern browsers), but actually CREATING + RESUMING the context
+  // requires a user gesture. We surface 3 states for the splash mute toggle:
+  //   - 'capable'    AudioContext class exists; first user tap will lazy-init
+  //   - 'unavailable' no AudioContext at all (very old browser); the toggle still works
+  //                   for haptic-only mute but cues silently fall back to vibrate-only
+  //   - 'blocked'    AudioContext exists but resume() rejected (autoplay policy etc.)
+  // Used to color the mute toggle: green when sound is on AND audio is capable,
+  // amber when sound on but audio likely won't play, red when muted.
+  const[audioCapability,setAudioCapability]=useState('capable');
+  useEffect(()=>{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx)setAudioCapability('unavailable');
+  },[]);
   const audioCtxRef=useRef(null);
   const playCue=useCallback((kind)=>{
     if(muted)return;
     try{
       if(!audioCtxRef.current){
         const Ctx=window.AudioContext||window.webkitAudioContext;
-        if(!Ctx)return;
+        if(!Ctx){setAudioCapability('unavailable');return;}
         audioCtxRef.current=new Ctx();
       }
       const ctx=audioCtxRef.current;
+      // V30: try to resume if suspended (autoplay policy on iOS Safari + some Chrome).
+      // resume() returns a Promise; we don't await — best-effort.
+      if(ctx.state==='suspended'){
+        ctx.resume().then(()=>setAudioCapability('capable'),()=>setAudioCapability('blocked'));
+      }
       const t=ctx.currentTime;
       const tones=kind==='score'?[660,990]:kind==='correct'?[523,784]:kind==='wrong'?[330,165]:kind==='broadcast'?[440]:kind==='upload'?[392]:[660];
       tones.forEach((freq,i)=>{
@@ -1310,7 +1346,7 @@ function App(){
         osc.start(start);
         osc.stop(start+0.2);
       });
-    }catch(e){}
+    }catch(e){setAudioCapability('blocked');}
   },[muted]);
   const tap=useCallback((pattern)=>{
     try{if(navigator.vibrate)navigator.vibrate(pattern);}catch(e){}
@@ -3238,11 +3274,16 @@ function App(){
         {TEST_MODE&&<div className="chip animate-in" style={{position:'absolute',top:isAdmin?'calc(var(--sp-6) + 36px)':'var(--sp-6)',background:'rgba(110,163,255,0.18)',border:'1px solid rgba(110,163,255,0.45)',color:'var(--foto-2)'}}>🧪 TESTMODUS · gates uit</div>}
         {/* V29 — mute toggle. Persists in localStorage; defaults to UNMUTED so first-load
             users hear the cues. Top-right placement keeps it discoverable but out of
-            the splash hero's attention path. */}
+            the splash hero's attention path.
+            V30: copy was "🔊 sound / 🔇 muted" — verb/state ambiguous. Tap on "sound"
+            felt like "turn sound on" but actually toggled it OFF. Now describes the
+            CURRENT STATE in Dutch ("Geluid aan" / "Geluid uit") so the user knows
+            what they have, not what the button does. aria-label still describes
+            the action for screen readers. */}
         <button onClick={toggleMuted} aria-label={muted?'Geluid aanzetten':'Geluid uitzetten'}
           className="chip animate-in" type="button"
           style={{position:'absolute',top:'var(--sp-6)',right:'var(--sp-6)',cursor:'pointer',background:muted?'rgba(255,107,107,0.12)':'rgba(95,216,165,0.12)',border:`1px solid ${muted?'rgba(255,107,107,0.4)':'rgba(95,216,165,0.4)'}`,color:muted?'var(--video-2)':'var(--success)'}}>
-          {muted?'🔇 muted':'🔊 sound'}
+          {muted?'🔇 Geluid uit':'🔊 Geluid aan'}
         </button>
         <div style={{fontSize:96,animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
         <div style={{height:'var(--sp-6)'}}/>
@@ -3396,7 +3437,7 @@ function App(){
       )}
       {scorePopup&&<div className="score-popup">{scorePopup}</div>}
       {/* V28 — confetti burst on score milestones (>= 30 pts in one drop) */}
-      <ConfettiBurst seed={confettiSeed}/>
+      <ConfettiBurst seed={confettiSeed} intensity={confettiIntensity}/>
       {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal */}
       {(gpsStatus==='denied'||gpsStatus==='unavailable')&&(
         <div className="sheet-overlay" style={{zIndex:10000}}>
@@ -3554,7 +3595,7 @@ function App(){
         {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter}/>}
-        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} onRenameTeam={renameTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync} jorikVisitedTeamIds={jorikVisitedTeamIds} teamMemberCounts={teamMemberCounts}/>}
+        {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} onRenameTeam={renameTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync} jorikVisitedTeamIds={jorikVisitedTeamIds} teamMemberCounts={teamMemberCounts} nowTs={nowTs}/>}
       </div>
 
       {/* V30: NARRATIVE story modal render removed with the chapter-modal system. */}
@@ -3623,7 +3664,8 @@ function App(){
       {phase===5&&<FinaleScreen teams={teams} scores={scores} myTeam={myTeam} elapsed={elapsed} activityFeed={activityFeed} jorikTeamId={jorikTeamId}/>}
 
       {/* Bottom sheet for challenges */}
-      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam}/>}
+      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam}/>
+        /* V30: jorikInTeam already passed to ChallengeSheet — the new wp:1 secrecy lock reads it. No call-site change needed beyond the existing prop. */}
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
       {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync}/>}
@@ -4028,13 +4070,18 @@ function TwoRingIndicator({dist,pos,loc}){
 // Mounted via a numeric `seed` from App; React re-mounts on seed change so each trigger
 // plays the animation fresh. Pure CSS animation, no library. Auto-cleans (component
 // unmounts itself after the animation duration via App-level setTimeout — see triggerConfetti).
-function ConfettiBurst({seed}){
+function ConfettiBurst({seed,intensity}){
   if(!seed)return null;
   const colors=['#e4b25c','#5b8dee','#e05c5c','#4bbe8a','#9b7bea','#ec4899'];
+  // V30 — tiered: piece count + spread scale with intensity.
+  // small (easy POI 15-20pt) → still feels celebratory but doesn't over-cover the screen
+  // medium (25-35pt) → standard burst
+  // large (40+pt + Jorik missions) → loud, wide, multi-color
+  const cfg=intensity==='large'?{n:38,cxRange:240,dxRange:340}:intensity==='medium'?{n:22,cxRange:180,dxRange:280}:{n:12,cxRange:120,dxRange:200};
   const pieces=[];
-  for(let i=0;i<30;i++){
-    const cx=(Math.random()-0.5)*180;
-    const dx=(Math.random()-0.5)*280;
+  for(let i=0;i<cfg.n;i++){
+    const cx=(Math.random()-0.5)*cfg.cxRange;
+    const dx=(Math.random()-0.5)*cfg.dxRange;
     const color=colors[i%colors.length];
     const delay=Math.random()*0.15;
     const w=8+Math.random()*6;
@@ -4061,7 +4108,7 @@ function SkeletonRow(){
   );
 }
 
-function TaskList({pos,onSelect,completed,visitedLocs}){
+function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus}){
   // V23: when TASKLIST_NEARBY_ONLY (default true), the list under the map is
   // capped to TASKLIST_NEARBY_N nearest non-completed missions. The map itself
   // still shows all 102 markers — this only affects the scrollable mission
@@ -4084,15 +4131,22 @@ function TaskList({pos,onSelect,completed,visitedLocs}){
     // cold-start fallback (first 3 POIs of L_DATA) was a UX lie. Replace with
     // SkeletonRow shimmer so the panel reads as "loading…" instead of "here
     // are your 3 nearest" (which they aren't yet).
-    const loadingGps=!pos;
+    // V30: distinguish pos-null INTO three states for honest copy:
+    //   - GPS denied/unavailable → static placeholder + actionable instruction (no shimmer — nothing is loading)
+    //   - GPS weak/searching → shimmer skeleton (active loading)
+    //   - first-fix-not-yet → shimmer skeleton (active loading)
+    const denied=gpsStatus==='denied'||gpsStatus==='unavailable';
+    const loadingGps=!pos&&!denied;
     let rows=[];
     if(pos){
       rows=getNearby(pos,completedMap,TASKLIST_NEARBY_N).map(buildRow);
     }
+    const headerSuffix=denied?'GPS uit':loadingGps?'…':rows.length;
     return(
       <section style={{marginTop:'var(--sp-5)'}}>
-        <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Dichtstbij je nu ({loadingGps?'…':rows.length})</h3>
-        {loadingGps&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS — zet locatie aan om de echte dichtstbijzijnde missies te zien.</div>}
+        <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Dichtstbij je nu ({headerSuffix})</h3>
+        {denied&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,107,107,0.4)',borderRadius:'var(--r-md)',fontSize:13,color:'var(--video-2)',marginBottom:'var(--sp-3)'}}>📍🚫 Locatie geweigerd — schakel GPS in via je telefooninstellingen om de dichtstbijzijnde missies te zien.</div>}
+        {loadingGps&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS-fix — zoekt nu je locatie. Een paar seconden geduld.</div>}
         {loadingGps&&[0,1,2].map(i=><SkeletonRow key={i}/>)}
         {!loadingGps&&rows.length===0&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Geen openstaande missies in de buurt — alles in deze radius is al gedaan.</div>}
         {!loadingGps&&rows.map(r=>(
@@ -4595,7 +4649,7 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
             </div>
           );
         })()}
-        <TaskList pos={pos} onSelect={onSelect} completed={completed} visitedLocs={visitedLocs}/>
+        <TaskList pos={pos} onSelect={onSelect} completed={completed} visitedLocs={visitedLocs} gpsStatus={gpsStatus}/>
       </div>
     </div>
   );
@@ -4942,7 +4996,7 @@ function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClos
 // ═══════════════════════════════════════════
 // V6: ADMIN REVIEW QUEUE
 // ═══════════════════════════════════════════
-function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinalePhase,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,onRenameTeam,reviewUndo,onUndoReview,onBroadcast,onResetGame,confirmAsync,jorikVisitedTeamIds,teamMemberCounts={}}){
+function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,jorikMovedAt=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinalePhase,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,onRenameTeam,reviewUndo,onUndoReview,onBroadcast,onResetGame,confirmAsync,jorikVisitedTeamIds,teamMemberCounts={},nowTs=Date.now()}){
   // V20 UX P1: fallback to native confirm if prop missing (for isolated testing)
   const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
   const[barChoice,setBarChoice]=React.useState('');
@@ -5121,6 +5175,42 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 
         {/* V16: broadcast message to players */}
         <div>
+          {/* V30 — Setup Checklist (issue #25): surfaces Mike's open inputs that have
+              been carried in PROJECT-MEMORY since V21 but were never reflected in the
+              live UI. Shows red items that need Mike's attention before gameday + green
+              items already complete. Detected by grepping the live L_DATA + game_state
+              for placeholder strings. Doesn't block — it's a soft reminder. */}
+          <div style={{padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(255,107,107,0.05)',border:'1px solid rgba(255,107,107,0.25)',marginBottom:'var(--sp-3)'}}>
+            <div className="t-label t-accent" style={{marginBottom:'var(--sp-2)'}}>📋 Setup checklist</div>
+            <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
+              <div>❌ <b>3 bar names + GPS-coördinaten</b> — vul in via L_DATA category 'bar' of de bar-break dropdown</div>
+              <div>❌ <b>Winnaarsprijs</b> — bewerk de tekst "Mike onthult bij dinner" in LeaderboardView</div>
+              <div>❌ <b>Wedding-video framing</b> — Mike's tekst voor de bruiloftsedit (intro/outro)</div>
+              <div>❌ <b>Trade-starter object</b> — Mike's voorwerp voor de Jorik-ruil-mission</div>
+              <div style={{marginTop:'var(--sp-2)',color:'var(--text-tertiary)'}}>Checklist verschijnt alleen voor de Game Master, niet voor spelers. Geen blocker — gameday werkt zonder, maar deze items maken het premium.</div>
+            </div>
+          </div>
+
+          {/* V30 — Jorik resilience status (issue #16): if a Jorik holder exists,
+              show the time since last rotation + countdown to the V27 25-min auto-rotate
+              fallback. Reassures the admin that resilience is armed. Disappears when
+              jorik_team_id is null. */}
+          {jorikTeamId!=null&&jorikMovedAt!=null&&(()=>{
+            const elapsedMs=nowTs-jorikMovedAt;
+            const remainingMs=Math.max(0,(25*60*1000)-elapsedMs);
+            const remainingMin=Math.ceil(remainingMs/60000);
+            const holder=teams.find(t=>t.id===jorikTeamId);
+            const willFire=remainingMs<=0&&!barBreakActive;
+            return(
+              <div style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:willFire?'rgba(228,178,92,0.12)':'rgba(110,163,255,0.06)',border:`1px solid ${willFire?'rgba(228,178,92,0.4)':'rgba(110,163,255,0.25)'}`,marginBottom:'var(--sp-3)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
+                <div style={{fontSize:18}}>⏰</div>
+                <div className="t-caption" style={{flex:1,lineHeight:'var(--lh-relaxed)'}}>
+                  <b>Jorik-resilience</b>: bij {holder?.emoji} {holder?.name||'?'} sinds {Math.floor(elapsedMs/60000)} min · {willFire?<span style={{color:'var(--accent-2)'}}>auto-rotate triggert nu (geen actieve bar break)</span>:<span>auto-rotate over {remainingMin} min als geen bar break</span>}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="t-label-sm" style={{marginBottom:'var(--sp-2)'}}>Bericht naar alle teams</div>
           <div className="row-2">
             <input value={broadcastMsg} onChange={e=>setBroadcastMsg(e.target.value)}
@@ -5336,7 +5426,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 // ═══════════════════════════════════════════
 // CHALLENGE BOTTOM SHEET — V5: dynamic quiz rotation + photo feed
 // ═══════════════════════════════════════════
-function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam}){
+function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam,jorikInTeam}){
   // V29 (§4): Escape-to-close wasn't wired. Backdrop click was, but the ✕
   // button was a dim 26px text glyph on no background — Mike couldn't find
   // it in his screenshots. Below we (a) listen for Escape globally while this
@@ -5403,6 +5493,14 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
           const done=completed[idx];
           const isQuiz=ch.t==='quiz';
           const locked=isQuiz&&hasAnyPhoto&&!hasPhotoCompleted;
+          // V30 — wp:1 secret-mission gate. The wedding-pipeline shots are explicitly
+          // for the surprise wedding video that Jorik must NOT see during the game.
+          // The LeaderboardView wp:1 progress chip already hides when jorikInTeam,
+          // but the L_DATA challenge cards themselves were still tappable on the
+          // map / TaskList by the holding team — defeating the secrecy. Now if the
+          // holding team opens a wp:1 challenge, the card shows a secrecy lock
+          // explaining why and offering no upload action. Non-holders see normal.
+          const isSecretWp=ch.wp===1&&jorikInTeam;
           // V10: distinguish wrong-gegokt (pts=0) from correct completion
           const ptsEarned=completedPts[idx];
           const wasWrong=done && ptsEarned===0;
@@ -5413,6 +5511,25 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
           const lockMsg=farFromPoi
             ?`🔒 Loop naar ${loc.n} · foto maken · dan opent de quiz`
             :'🔒 Eerst een foto-opdracht — dan opent de quiz';
+          // V30 — secrecy lock takes precedence over the quiz-locked overlay.
+          if(isSecretWp&&!done){
+            return(
+              <div key={idx} className="ch-card" style={{position:'relative',borderColor:'rgba(228,178,92,0.35)',background:'linear-gradient(155deg,rgba(228,178,92,0.08),rgba(255,107,107,0.04))'}}>
+                <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-2)'}}>
+                  <div className="flex-1">
+                    <span className="ch-type" style={{background:'rgba(228,178,92,0.18)',color:'var(--accent-2)'}}>geheim</span>
+                    <h3 className="t-card-label" style={{marginTop:'var(--sp-2)'}}>{ch.ti}</h3>
+                  </div>
+                  <div className="points-badge">+{ch.p}</div>
+                </div>
+                <div style={{padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(0,0,0,0.25)',border:'1px dashed rgba(228,178,92,0.45)'}}>
+                  <div style={{fontSize:24,marginBottom:'var(--sp-1)'}}>🤫💍</div>
+                  <div className="t-card-label t-accent" style={{marginBottom:'var(--sp-1)'}}>Geheime bruiloftsmissie</div>
+                  <div className="t-caption" style={{lineHeight:'var(--lh-relaxed)',color:'var(--text-secondary)'}}>Deze missie is voor de surprise bruiloftsvideo van Jorik op 14 juni. Jullie team heeft Jorik nu — laat een ander team dit doen. De missie wordt weer beschikbaar zodra Jorik bij de volgende bar break naar een ander team gaat.</div>
+                </div>
+              </div>
+            );
+          }
           return(
             <div key={idx} className={`ch-card ${done&&!wasWrong?'completed':''} ${wasWrong?'wrong-done':''} ${locked?'locked':''}`} style={{position:'relative'}}>
               {locked&&<div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',zIndex:1,padding:'var(--sp-3)',textAlign:'center'}} className="t-card-label t-accent" title="Unlock volgorde: locatie bereiken → foto maken → quiz wordt open">{lockMsg}</div>}
