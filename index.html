@@ -150,6 +150,13 @@
     .chip:hover{background:var(--surface-hover)}
     .chip-gold{background:var(--accent-glow);border-color:rgba(228,178,92,0.3);color:var(--accent)}
     .chip-blue{background:rgba(110,163,255,0.12);border-color:rgba(110,163,255,0.3);color:var(--foto)}
+    /* V29 — richer chip variants for premium gamification feel */
+    .chip-achievement{background:linear-gradient(135deg,rgba(228,178,92,0.2),rgba(255,107,107,0.1));border:1px solid rgba(228,178,92,0.55);color:#ffe1a8;box-shadow:0 0 12px rgba(228,178,92,0.25),inset 0 0 0 1px rgba(255,225,168,0.15);font-weight:800}
+    .chip-status{background:rgba(95,216,165,0.15);border:1px solid rgba(95,216,165,0.45);color:var(--success);position:relative;padding-left:18px}
+    .chip-status::before{content:'';position:absolute;left:8px;top:50%;transform:translateY(-50%);width:6px;height:6px;border-radius:50%;background:var(--success);box-shadow:0 0 0 0 rgba(95,216,165,0.6);animation:chipPulse 1.6s ease-out infinite}
+    @keyframes chipPulse{0%{box-shadow:0 0 0 0 rgba(95,216,165,0.55)}70%{box-shadow:0 0 0 8px rgba(95,216,165,0)}100%{box-shadow:0 0 0 0 rgba(95,216,165,0)}}
+    .chip-role{background:linear-gradient(135deg,rgba(155,123,234,0.18),rgba(110,163,255,0.08));border:1px solid rgba(155,123,234,0.4);color:#cdb6ff;font-weight:700}
+    .chip-count{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text-primary);font-variant-numeric:tabular-nums;font-weight:800;padding:5px 10px}
 
     /* V13: Animations — spring-heavy */
     @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
@@ -164,6 +171,16 @@
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     /* V24 — admin broadcast banner entry animation */
     @keyframes broadcastIn{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+    /* V28 — premium ui polish: confetti burst + skeleton-loading rows */
+    @keyframes confettiFall{0%{transform:translate(var(--cx,0),0) rotate(0);opacity:1}100%{transform:translate(calc(var(--cx,0) + var(--dx,40px)),100vh) rotate(720deg);opacity:0}}
+    .confetti-burst{position:fixed;inset:0;pointer-events:none;z-index:10005;overflow:hidden}
+    .confetti-piece{position:absolute;top:38%;left:50%;width:10px;height:14px;border-radius:2px;animation:confettiFall 1.6s cubic-bezier(.42,0,.58,1) forwards}
+    .skeleton-row{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3);border-radius:var(--r-md);border:1px solid var(--border);background:linear-gradient(90deg,rgba(255,255,255,0.04) 0%,rgba(255,255,255,0.08) 50%,rgba(255,255,255,0.04) 100%);background-size:200% 100%;animation:shimmer 1.6s linear infinite;margin-bottom:var(--sp-2)}
+    .skeleton-emoji{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.06);flex-shrink:0}
+    .skeleton-body{flex:1;display:flex;flex-direction:column}
+    .skeleton-line{height:10px;border-radius:5px;background:rgba(255,255,255,0.06)}
+    .skeleton-line.long{width:62%}
+    .skeleton-line.short{width:38%;margin-top:6px}
     @keyframes breathing{0%,100%{opacity:0.6}50%{opacity:1}}
     /* V14: celebration animations */
     @keyframes confettiFall{0%{transform:translateY(-20vh) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
@@ -1243,6 +1260,75 @@ function App(){
   // multi-line ("Iedereen naar Markthal binnen 15 min!").
   const[broadcastBanner,setBroadcastBanner]=useState(null);
   const broadcastTimerRef=useRef(null);
+  // V28 — confetti seed: incremented by triggerConfetti() to re-mount ConfettiBurst.
+  // Threshold 30+ pts triggers a celebratory burst. Auto-resets to 0 after 1.8s so
+  // the DOM unmounts cleanly + future low-point completions don't accidentally
+  // re-fire the animation.
+  const[confettiSeed,setConfettiSeed]=useState(0);
+  const confettiTimerRef=useRef(null);
+  const triggerConfetti=useCallback((pts)=>{
+    if(!pts||pts<30)return;
+    setConfettiSeed(s=>s+1);
+    if(confettiTimerRef.current)clearTimeout(confettiTimerRef.current);
+    confettiTimerRef.current=setTimeout(()=>setConfettiSeed(0),1800);
+    // V29: score milestones get audio + haptic alongside the visual confetti
+    if(pts>=30){playCueRef.current&&playCueRef.current('score');tapRef.current&&tapRef.current([10,30,10]);}
+  },[]);
+  // V29 forward refs so triggerConfetti (declared before playCue/tap) can call them.
+  const playCueRef=useRef(null);
+  const tapRef=useRef(null);
+  // V29 — premium polish: muted toggle (persisted) + Web Audio cue helper + haptic helper.
+  // Mute is opt-out: defaults to UNMUTED so first-time players hear the cues. Persists in
+  // localStorage so a tap survives reload. Audio context lazily created on first cue
+  // (browsers block AudioContext outside a user gesture; the FIRST cue often comes from
+  // a tap so this works in practice). All cue + haptic calls are best-effort try/catch
+  // so they never break the game flow if blocked.
+  const[muted,setMuted]=useState(()=>{try{return localStorage.getItem('ssr_muted')==='1'}catch(e){return false}});
+  const audioCtxRef=useRef(null);
+  const playCue=useCallback((kind)=>{
+    if(muted)return;
+    try{
+      if(!audioCtxRef.current){
+        const Ctx=window.AudioContext||window.webkitAudioContext;
+        if(!Ctx)return;
+        audioCtxRef.current=new Ctx();
+      }
+      const ctx=audioCtxRef.current;
+      const t=ctx.currentTime;
+      const tones=kind==='score'?[660,990]:kind==='correct'?[523,784]:kind==='wrong'?[330,165]:kind==='broadcast'?[440]:kind==='upload'?[392]:[660];
+      tones.forEach((freq,i)=>{
+        const osc=ctx.createOscillator();
+        const gain=ctx.createGain();
+        osc.type=kind==='wrong'?'sawtooth':'sine';
+        osc.frequency.value=freq;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        const start=t+i*0.08;
+        gain.gain.setValueAtTime(0,start);
+        gain.gain.linearRampToValueAtTime(0.08,start+0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001,start+0.18);
+        osc.start(start);
+        osc.stop(start+0.2);
+      });
+    }catch(e){}
+  },[muted]);
+  const tap=useCallback((pattern)=>{
+    try{if(navigator.vibrate)navigator.vibrate(pattern);}catch(e){}
+  },[]);
+  const toggleMuted=useCallback(()=>{
+    setMuted(prev=>{
+      const next=!prev;
+      try{localStorage.setItem('ssr_muted',next?'1':'0');}catch(e){}
+      return next;
+    });
+  },[]);
+  useEffect(()=>{
+    playCueRef.current=playCue;
+    tapRef.current=tap;
+    // V29: also hang on window so deep child components (ChallengeAction handleQuiz)
+    // can fire cues without prop-drilling. Always best-effort try/catch on the consumer side.
+    try{window.__ssrPlayCue=playCue;}catch(e){}
+  },[playCue,tap]);
   const showBroadcast=useCallback((message,createdAt)=>{
     if(!message)return;
     const id=createdAt||Date.now();
@@ -1251,7 +1337,10 @@ function App(){
     broadcastTimerRef.current=setTimeout(()=>{
       setBroadcastBanner(b=>(b&&b.id===id)?null:b);
     },BROADCAST_BANNER_MS);
-  },[]);
+    // V29: subtle audio cue + haptic when a broadcast lands
+    playCue('broadcast');
+    tap([20,40,20]);
+  },[playCue,tap]);
   const[scorePopup,setScorePopup]=useState(null);
   // V20 UX P1: promise-based dialog replacing native window.confirm / window.prompt.
   // Native dialogs block the event loop, look out-of-place on mobile, and on some
@@ -2188,6 +2277,7 @@ function App(){
       const stepPts=Math.round((m.pts/m.tradeTarget)*phaseMult);
       setJorikRunningCounts(prev=>({...prev,[id]:newCount}));
       setScorePopup(`+${stepPts}`);
+      triggerConfetti(stepPts);
       addActivity(`${m.emoji} Jorik ruil ${newCount}/${m.tradeTarget} · ${m.title} · +${stepPts} pts${finaleSuffix}`,stepPts,photoData);
       applyScoreDelta(myTeam?.id,stepPts);
       // Final step: also lock the mission as fully done.
@@ -2202,6 +2292,7 @@ function App(){
     const awardedPts=Math.round(m.pts*phaseMult);
     setJorikMissionsDone(prev=>new Set([...prev,id]));
     setScorePopup(`+${awardedPts}`);
+    triggerConfetti(awardedPts);
     addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${awardedPts} pts${finaleSuffix}`,awardedPts,photoData);
     // V20: atomic delta — replaces manual setScores + sb.from('teams').update
     applyScoreDelta(myTeam?.id,awardedPts);
@@ -2240,6 +2331,7 @@ function App(){
       // V20: atomic delta — no more lost updates when two teammates race
       applyScoreDelta(myTeam?.id,totalPts);
       setScorePopup(`+${totalPts}`);
+      triggerConfetti(totalPts);
     }
     if(loc){
       if(isWrongZero){
@@ -3144,6 +3236,14 @@ function App(){
         {/* V23: TESTMODUS chip — only visible while TEST_MODE is on. Once we
             flip the constant back to false for the live build, it disappears. */}
         {TEST_MODE&&<div className="chip animate-in" style={{position:'absolute',top:isAdmin?'calc(var(--sp-6) + 36px)':'var(--sp-6)',background:'rgba(110,163,255,0.18)',border:'1px solid rgba(110,163,255,0.45)',color:'var(--foto-2)'}}>🧪 TESTMODUS · gates uit</div>}
+        {/* V29 — mute toggle. Persists in localStorage; defaults to UNMUTED so first-load
+            users hear the cues. Top-right placement keeps it discoverable but out of
+            the splash hero's attention path. */}
+        <button onClick={toggleMuted} aria-label={muted?'Geluid aanzetten':'Geluid uitzetten'}
+          className="chip animate-in" type="button"
+          style={{position:'absolute',top:'var(--sp-6)',right:'var(--sp-6)',cursor:'pointer',background:muted?'rgba(255,107,107,0.12)':'rgba(95,216,165,0.12)',border:`1px solid ${muted?'rgba(255,107,107,0.4)':'rgba(95,216,165,0.4)'}`,color:muted?'var(--video-2)':'var(--success)'}}>
+          {muted?'🔇 muted':'🔊 sound'}
+        </button>
         <div style={{fontSize:96,animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
         <div style={{height:'var(--sp-6)'}}/>
         <h1 className="t-hero animate-in animate-in-1 text-center" style={{background:'linear-gradient(135deg,#ffffff 0%,var(--accent-2) 50%,var(--foto-2) 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Stadsspel</h1>
@@ -3295,6 +3395,8 @@ function App(){
         </div>
       )}
       {scorePopup&&<div className="score-popup">{scorePopup}</div>}
+      {/* V28 — confetti burst on score milestones (>= 30 pts in one drop) */}
+      <ConfettiBurst seed={confettiSeed}/>
       {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal */}
       {(gpsStatus==='denied'||gpsStatus==='unavailable')&&(
         <div className="sheet-overlay" style={{zIndex:10000}}>
@@ -3474,6 +3576,7 @@ function App(){
           if(awarded)return;awarded=true;
           applyScoreDelta(myTeam?.id,pts);
           setScorePopup(`+${pts}`);
+          triggerConfetti(pts);
           addActivity(`haalde "${mini.title}" bij ${barBreakActive.name} · +${pts} pts`,pts,photo);
         };
         if(!OFFLINE&&sb&&myTeam?.id){
@@ -3921,6 +4024,43 @@ function TwoRingIndicator({dist,pos,loc}){
 // V25 (#71): TaskList — grouped, always-visible list of every main-deck task.
 // Sort: by band (unlock → preview → far → unknown), distance within band,
 // completed pushed to a trailing "Al gedaan" group. Filters out bars (separate mechanic).
+// V28 — ConfettiBurst: short particle effect for score milestones (>=30 pts in one drop).
+// Mounted via a numeric `seed` from App; React re-mounts on seed change so each trigger
+// plays the animation fresh. Pure CSS animation, no library. Auto-cleans (component
+// unmounts itself after the animation duration via App-level setTimeout — see triggerConfetti).
+function ConfettiBurst({seed}){
+  if(!seed)return null;
+  const colors=['#e4b25c','#5b8dee','#e05c5c','#4bbe8a','#9b7bea','#ec4899'];
+  const pieces=[];
+  for(let i=0;i<30;i++){
+    const cx=(Math.random()-0.5)*180;
+    const dx=(Math.random()-0.5)*280;
+    const color=colors[i%colors.length];
+    const delay=Math.random()*0.15;
+    const w=8+Math.random()*6;
+    pieces.push(React.createElement('div',{
+      key:i,className:'confetti-piece',
+      style:{background:color,'--cx':cx+'px','--dx':dx+'px',animationDelay:delay+'s',width:w+'px',height:(w*1.4)+'px'}
+    }));
+  }
+  return <div key={seed} className="confetti-burst" aria-hidden="true">{pieces}</div>;
+}
+
+// V28 — SkeletonRow: shimmer placeholder for "loading…" rows. Used in TaskList when
+// pos === null (waiting for first GPS fix) so the panel doesn't render an empty void
+// or the cold-start fallback POIs that may not match the user's actual location.
+function SkeletonRow(){
+  return(
+    <div className="skeleton-row" aria-hidden="true">
+      <div className="skeleton-emoji"/>
+      <div className="skeleton-body">
+        <div className="skeleton-line long"/>
+        <div className="skeleton-line short"/>
+      </div>
+    </div>
+  );
+}
+
 function TaskList({pos,onSelect,completed,visitedLocs}){
   // V23: when TASKLIST_NEARBY_ONLY (default true), the list under the map is
   // capped to TASKLIST_NEARBY_N nearest non-completed missions. The map itself
@@ -3940,21 +4080,22 @@ function TaskList({pos,onSelect,completed,visitedLocs}){
   };
 
   if(TASKLIST_NEARBY_ONLY){
+    // V28: while pos is null we don't actually know what's nearby — the V25
+    // cold-start fallback (first 3 POIs of L_DATA) was a UX lie. Replace with
+    // SkeletonRow shimmer so the panel reads as "loading…" instead of "here
+    // are your 3 nearest" (which they aren't yet).
+    const loadingGps=!pos;
     let rows=[];
     if(pos){
-      // getNearby already filters out completed locations and sorts smartly.
       rows=getNearby(pos,completedMap,TASKLIST_NEARBY_N).map(buildRow);
-    }else{
-      // No GPS yet — show first N non-bar, non-completed POIs as a placeholder
-      // so the panel isn't empty.
-      rows=L_DATA.filter(l=>l.c!=='bar'&&!completedMap[l.id]).slice(0,TASKLIST_NEARBY_N).map(buildRow);
     }
     return(
       <section style={{marginTop:'var(--sp-5)'}}>
-        <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Dichtstbij je nu ({rows.length})</h3>
-        {!pos&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS — zet locatie aan om de echte dichtstbijzijnde missies te zien.</div>}
-        {rows.length===0&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Geen openstaande missies in de buurt — alles in deze radius is al gedaan.</div>}
-        {rows.map(r=>(
+        <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Dichtstbij je nu ({loadingGps?'…':rows.length})</h3>
+        {loadingGps&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS — zet locatie aan om de echte dichtstbijzijnde missies te zien.</div>}
+        {loadingGps&&[0,1,2].map(i=><SkeletonRow key={i}/>)}
+        {!loadingGps&&rows.length===0&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Geen openstaande missies in de buurt — alles in deze radius is al gedaan.</div>}
+        {!loadingGps&&rows.map(r=>(
           <button key={r.loc.id} className={`task-row ${r.allDone?'completed':r.band||'far'}`} onClick={()=>onSelect(r.loc.id)} style={{marginBottom:'var(--sp-2)'}}>
             <div className="task-row-emoji">{r.loc.e||'📍'}</div>
             <div className="task-row-body">
@@ -5362,6 +5503,9 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
     const f=e.target.files[0];
     if(!f)return;
     setProcessing(true);
+    // V29 — confirm photo capture started with a soft haptic + audio cue.
+    try{const c=window.__ssrPlayCue;if(c)c('upload');}catch(e2){}
+    try{if(navigator.vibrate)navigator.vibrate(10);}catch(e2){}
     const r=new FileReader();
     r.onload=async(ev)=>{
       const raw=ev.target.result;
@@ -5420,9 +5564,15 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
     setQuizAnswer(opt);
     if(opt===ch.a){
       setQuizFeedback('correct');
+      // V29 audio + haptic cue. Correct answer = bright two-tone bell + short tap.
+      try{const c=window.__ssrPlayCue;if(c)c('correct');}catch(e){}
+      try{if(navigator.vibrate)navigator.vibrate([15,40,15]);}catch(e){}
       setTimeout(()=>onComplete(locId,chIdx,ch.p,null),700);
     }else{
       setQuizFeedback('wrong');
+      // V29 audio + haptic cue. Wrong = downward sawtooth + longer "buzzer" tap.
+      try{const c=window.__ssrPlayCue;if(c)c('wrong');}catch(e){}
+      try{if(navigator.vibrate)navigator.vibrate([180]);}catch(e){}
       // Reveal the correct answer during feedback, then mark done with 0 pts
       setTimeout(()=>onComplete(locId,chIdx,0,null),QUIZ_WRONG_FEEDBACK_MS);
     }
