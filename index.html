@@ -180,6 +180,8 @@
     @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
     /* V24 — admin broadcast banner entry animation */
     @keyframes broadcastIn{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+    /* V33 — admin menu drawer slide-in from the right */
+    @keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
     /* V28 — premium ui polish: confetti burst + skeleton-loading rows */
     @keyframes confettiFall{0%{transform:translate(var(--cx,0),0) rotate(0);opacity:1}100%{transform:translate(calc(var(--cx,0) + var(--dx,40px)),100vh) rotate(720deg);opacity:0}}
     .confetti-burst{position:fixed;inset:0;pointer-events:none;z-index:10005;overflow:hidden}
@@ -1316,6 +1318,13 @@ function App(){
     if(!Ctx)setAudioCapability('unavailable');
   },[]);
   const audioCtxRef=useRef(null);
+  // V33: one-shot latch for the V32 WIPED-GAME guard. Without this, every teams
+  // refresh (which the realtime effect triggers when myTeam/isAdmin/barBreakActive
+  // changes) re-evaluates the guard and kicks the GM back to splash whenever
+  // they enter the lobby with 0 teams in the DB. The guard only needs to cover
+  // the cold-start "stale cache vs wiped DB" case — once we're past first-mount,
+  // local screen transitions are intentional and trustworthy.
+  const wipeGuardLatchedRef=useRef(false);
   const playCue=useCallback((kind)=>{
     if(muted)return;
     try{
@@ -1445,6 +1454,10 @@ function App(){
   // only when count reaches `tradeTarget`.
   const[jorikRunningCounts,setJorikRunningCounts]=useState(()=>(typeof hydrated?.jorikRunningCounts==='object'&&hydrated.jorikRunningCounts!==null?{...hydrated.jorikRunningCounts}:{}));
   const[showJorikMissions,setShowJorikMissions]=useState(false);
+  // V33: admin menu drawer — open from a floating ⚙ button visible on lobby/game screens.
+  // Bundles every game-state action (pause, reset, wipe, finale) in one place so the
+  // admin doesn't have to hunt through the Beoordelen tab to find them.
+  const[adminMenuOpen,setAdminMenuOpen]=useState(false);
   const[activityFeed,setActivityFeed]=useState([]);
   // V10: admin unlock via ?admin=vriendvanjorik (hardened token).
   // V22 audit fix: dropped the ?admin=true legacy fallback — the app URL is shared in
@@ -1737,7 +1750,7 @@ function App(){
           return next;
         });
 
-        // V32: phantom-team guard. If localStorage's myTeam.id no longer exists
+        // V20: phantom-team guard. If localStorage's myTeam.id no longer exists
         // in the authoritative teams list (admin hard-reset, admin deleted a
         // team while this tab was closed, DB wipe) the app was rendering the
         // stale team name indefinitely — all realtime channels would keep working
@@ -1753,6 +1766,34 @@ function App(){
           // absent from the authoritative list) is clearly NOT "admin deleted"
           // (which gets the 🗑 prefix below) and NOT "session expired" (⏱).
           setToast('👻 Team niet meer gevonden — kies opnieuw');
+        }
+
+        // V32: WIPED-GAME guard (Mike's gameday-rehearsal blocker). The original
+        // V20 phantom-team guard above explicitly excluded spectators (id=-1) +
+        // didn't catch the case where the SERVER says "no game running" but the
+        // CLIENT has a stale 'game'/'lobby' screen restored from localStorage.
+        // Symptom: admin opens admin URL → tap-through stores spectator session →
+        // game runs → DB gets wiped → next visit lands the user inside the
+        // post-game leaderboard view with phase=0 + 0 scores + Game Master chrome,
+        // skipping splash entirely. Real-user-visible. The V31 audit missed it
+        // because every persona played via REST harness, not browser.
+        // Detection: if 0 active teams remain in DB AND we have a cached non-splash
+        // screen (lobby/game), the game has been reset — clear local state and
+        // route to splash regardless of spectator/team distinction.
+        // V33 latch: only fire once per page-load. After first-mount the guard
+        // would otherwise misfire on intentional in-session transitions (e.g.
+        // GM picks "Observeren als GM" with 0 teams in DB → flips to lobby →
+        // teams effect re-runs → guard kicks them straight back to splash).
+        if(!wipeGuardLatchedRef.current){
+          wipeGuardLatchedRef.current=true;
+          const activeTeamCount=res.data.filter(t=>!t.spectator&&t.id>0).length;
+          const cachedNonSplash=screen==='lobby'||screen==='game';
+          if(activeTeamCount===0&&cachedNonSplash){
+            clearSession();
+            setMyTeam(null);
+            setScreen('splash');
+            setToast('🔄 Spel is gereset — kies opnieuw');
+          }
         }
       }
     },()=>{});
@@ -2993,6 +3034,51 @@ function App(){
     setToast('↺ Spel teruggezet naar de lobby');
   },[isAdmin]);
 
+  // V33: full wipe + restart. Deletes every team, score, completion and feed entry,
+  // then resets game_state to phase 0. The V32 WIPED-GAME guard on every connected
+  // client picks up the empty teams + phase=0 and snaps each phone back to the
+  // splash screen. Local admin device is also pushed back to splash and the local
+  // session cache is cleared so the admin can run a fresh test from scratch.
+  const wipeAndRestart=useCallback(async()=>{
+    if(!isAdmin)return;
+    if(!OFFLINE&&sb){
+      // Order matters: child rows first to keep FK constraints happy on schemas
+      // that don't cascade. Each delete is independent — a failure of one
+      // (e.g. a missing optional table on an older DB) doesn't block the others.
+      const tables=['photo_reviews','completed_challenges','feed_reactions','activity_feed','team_members','teams'];
+      for(const t of tables){
+        try{await sb.from(t).delete().not('id','is',null);}catch(e){/* tolerate missing tables */}
+      }
+      try{
+        await sb.from('game_state').update({
+          phase:0,started_at:null,game_ended:false,
+          bar_break_active:null,bar_break_started_at:null,
+          jorik_team_id:null,jorik_moved_at:null,
+        }).eq('id',1);
+      }catch(e){/* swallow — local reset still happens */}
+    }
+    // Local reset: drop everything cached so the splash render is identical to
+    // a never-cached visit (matches the V32 wiped-game guard's clean state).
+    clearSession();
+    setMyTeam(null);
+    setTeams([]);
+    setScores({});
+    setCompleted({});
+    setCompletedPts({});
+    setActivityFeed([]);
+    setReviewQueue([]);
+    setPhase(0);
+    setGameStart(null);
+    setJorikTeamId(null);
+    setJorikMovedAt(null);
+    setBarBreak(null);
+    setBarBreakActive(null);
+    setBarBreakHidden(false);
+    setScreen('splash');
+    setAdminMenuOpen(false);
+    setToast('🏠 Spel volledig gewist — terug naar startscherm');
+  },[isAdmin]);
+
   // V12: admin score override
   // V20 NOTE: this is kept as an absolute-set (not atomic delta) because it's
   // admin-only, low-frequency, and used for judgment calls where "I want team X
@@ -3331,6 +3417,19 @@ function App(){
     const teamCount=teams.length;
     return(
       <div className="screen">
+        {/* V33: floating ⚙ admin button — Mike-only; opens AdminMenu drawer */}
+        {isAdmin&&(
+          <button onClick={()=>setAdminMenuOpen(true)} aria-label="Open admin menu"
+            style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-pill)',background:'linear-gradient(135deg,rgba(228,178,92,0.95),rgba(212,160,84,0.95))',color:'#0a0b10',border:'1px solid rgba(255,255,255,0.4)',boxShadow:'0 4px 14px rgba(228,178,92,0.45)',cursor:'pointer',fontSize:'var(--fs-13)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
+            <span style={{fontSize:16}}>⚙</span><span>Admin</span>
+          </button>
+        )}
+        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync}/>}
+        {/* V33: lobby needs the confirm-dialog mount point too — without this,
+            confirmAsync() sets `dialog` state but no DialogSheet renders to show
+            it, so admin menu confirmations silently no-op from the lobby. */}
+        {dialog&&<DialogSheet {...dialog} onClose={closeDialog}/>}
+        {toast&&<div className="toast" role="status" aria-live="polite" aria-atomic="true"><div className="toast-inner">{toast}</div></div>}
         <div className="text-center">
           <div className="chip chip-blue animate-in" style={{margin:'0 auto'}}>Lobby</div>
           <h1 className="t-title animate-in animate-in-1" style={{marginTop:'var(--sp-4)'}}>{isAdmin?'Klaar om te starten?':'Verzamelen in Rotterdam'}</h1>
@@ -3447,6 +3546,17 @@ function App(){
       {scorePopup&&<div className="score-popup">{scorePopup}</div>}
       {/* V28 — confetti burst on score milestones (>= 30 pts in one drop) */}
       <ConfettiBurst seed={confettiSeed} intensity={confettiIntensity}/>
+      {/* V33: floating ⚙ admin button — only Mike sees it (token-gated isAdmin).
+          Position is fixed top-right just under the safe-area inset so it never
+          clashes with the HUD avatar block. Tap opens the AdminMenu drawer. */}
+      {isAdmin&&(
+        <button onClick={()=>setAdminMenuOpen(true)} aria-label="Open admin menu"
+          style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-pill)',background:'linear-gradient(135deg,rgba(228,178,92,0.95),rgba(212,160,84,0.95))',color:'#0a0b10',border:'1px solid rgba(255,255,255,0.4)',boxShadow:'0 4px 14px rgba(228,178,92,0.45)',cursor:'pointer',fontSize:'var(--fs-13)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
+          <span style={{fontSize:16}}>⚙</span><span>Admin</span>
+          {reviewQueue.length>0&&<span style={{background:'#ff4444',color:'#fff',fontSize:10,fontWeight:800,padding:'2px 6px',borderRadius:9}}>{reviewQueue.length}</span>}
+        </button>
+      )}
+      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync}/>}
       {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal */}
       {(gpsStatus==='denied'||gpsStatus==='unavailable')&&(
         <div className="sheet-overlay" style={{zIndex:10000}}>
@@ -4996,9 +5106,13 @@ function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClos
   };
   return(
     <>
-      <div className="sheet-overlay" onClick={onCancel} role="presentation"/>
+      {/* V33: bumped z-index to 12000 / 12050 so confirms originating from
+          inside the AdminMenu drawer (z=11500) and broadcast banner (z=11000)
+          render above the drawer instead of behind it. Previously 10000/10050
+          which was fine until AdminMenu introduced a higher overlay. */}
+      <div className="sheet-overlay" onClick={onCancel} role="presentation" style={{zIndex:12000}}/>
       <div role="alertdialog" aria-modal="true" aria-labelledby="dialog-msg"
-        style={{position:'fixed',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:10050,maxWidth:420,width:'92%',padding:'var(--sp-6) var(--sp-6) var(--sp-5)',borderRadius:'var(--r-lg)',background:'var(--bg-elevated,#17181f)',border:'1px solid var(--border)',boxShadow:'0 20px 60px rgba(0,0,0,0.6)',color:'#fff'}}
+        style={{position:'fixed',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:12050,maxWidth:420,width:'92%',padding:'var(--sp-6) var(--sp-6) var(--sp-5)',borderRadius:'var(--r-lg)',background:'var(--bg-elevated,#17181f)',border:'1px solid var(--border)',boxShadow:'0 20px 60px rgba(0,0,0,0.6)',color:'#fff'}}
         onKeyDown={onKey}>
         <div id="dialog-msg" className="t-body" style={{marginBottom:'var(--sp-5)',lineHeight:'var(--lh-relaxed)',whiteSpace:'pre-wrap'}}>{msg}</div>
         {type==='prompt'&&(
@@ -5015,6 +5129,123 @@ function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClos
         </div>
       </div>
     </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// V33: ADMIN MENU — discoverable drawer with every game-state action grouped
+// in one place. Opened by the floating ⚙ button in the top-right corner of the
+// lobby + game screens. Each destructive action confirms before firing. Pause
+// and Resume are broadcast-only (signal to teams, no scoring halt). Reset goes
+// to the lobby (DB intact). Hernieuw spel runs the full wipe + splash flow.
+// ═══════════════════════════════════════════
+function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync}){
+  const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
+  if(!open)return null;
+  const phaseLabel=phase===0?'Lobby (wachten)':phase===1?'Fase 1 — Zoektocht':phase===2?'Fase 2 — Geruchten':phase===3?'Fase 3 — Cirkel':phase===4?'Fase 4 — Finale (×1.5)':phase>=5?'Eindceremonie / klaar':'';
+  const jorikHolder=jorikTeamId!=null?teams.find(t=>t.id===jorikTeamId):null;
+  const Section=({title,children})=>(
+    <div style={{marginBottom:'var(--sp-5)'}}>
+      <div className="t-label" style={{marginBottom:'var(--sp-3)',color:'var(--text-secondary)',letterSpacing:'var(--ls-wider)'}}>{title}</div>
+      <div className="stack-2">{children}</div>
+    </div>
+  );
+  return(
+    <div className="sheet-overlay" style={{zIndex:11500}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{position:'fixed',top:0,right:0,bottom:0,width:'min(420px,92vw)',background:'linear-gradient(180deg,#161821 0%,var(--bg) 100%)',borderLeft:'1px solid rgba(228,178,92,0.35)',boxShadow:'-12px 0 40px rgba(0,0,0,0.5)',overflowY:'auto',animation:'slideInRight 0.28s var(--ease-out)'}}>
+        <div style={{padding:'var(--sp-5)',paddingTop:'calc(env(safe-area-inset-top, 0px) + var(--sp-5))'}}>
+          <div className="row-between" style={{marginBottom:'var(--sp-4)'}}>
+            <div>
+              <div className="t-label t-accent">👑 Game Master</div>
+              <div className="t-section" style={{marginTop:'var(--sp-1)'}}>Admin menu</div>
+            </div>
+            <button onClick={onClose} aria-label="Sluit menu"
+              style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',fontSize:18}}>×</button>
+          </div>
+
+          {/* Status snapshot */}
+          <div className="panel stack-2" style={{marginBottom:'var(--sp-5)',background:'rgba(110,163,255,0.06)',borderColor:'rgba(110,163,255,0.25)'}}>
+            <div className="t-label-sm" style={{color:'var(--foto-2)'}}>Status</div>
+            <div className="t-body-emph">{phaseLabel}</div>
+            <div className="t-caption t-muted">
+              👥 {teamCount} team{teamCount===1?'':'s'} · 🤵 {jorikHolder?`${jorikHolder.emoji} ${jorikHolder.name}`:'Jorik loopt alleen'} · ✅ {queueCount} in wachtrij
+              {barBreakActive&&<><br/>🍻 Bar break actief: {barBreakActive.name}</>}
+            </div>
+          </div>
+
+          <Section title="Spel besturen">
+            <button onClick={async()=>{if(await ask('Pauze-bericht naar alle teams sturen? Scoring loopt door — dit is alleen een signaal naar de spelers.',{confirmLabel:'Stuur pauze-bericht'}))onPause&&onPause()}}
+              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
+              <span style={{fontSize:20}}>⏸</span>
+              <div style={{textAlign:'left',flex:1}}>
+                <div className="t-body-emph">Pauzeer spel</div>
+                <div className="t-caption t-muted">Stuur "PAUZE" naar alle teams</div>
+              </div>
+            </button>
+            <button onClick={async()=>{if(await ask('Hervat-bericht naar alle teams sturen?',{confirmLabel:'Stuur GO'}))onResume&&onResume()}}
+              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
+              <span style={{fontSize:20}}>▶</span>
+              <div style={{textAlign:'left',flex:1}}>
+                <div className="t-body-emph">Hervat spel</div>
+                <div className="t-caption t-muted">Stuur "GO — verder spelen"</div>
+              </div>
+            </button>
+            <button onClick={async()=>{if(await ask('Spel resetten naar de lobby? Phase gaat naar 0, alle phones keren terug naar het wachtscherm. Teams, scores en voltooide opdrachten blijven bewaard.',{danger:true,confirmLabel:'Reset naar lobby'}))onResetToLobby&&onResetToLobby()}}
+              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',borderColor:'rgba(255,107,107,0.25)',background:'rgba(255,107,107,0.04)'}}>
+              <span style={{fontSize:20}}>↺</span>
+              <div style={{textAlign:'left',flex:1}}>
+                <div className="t-body-emph">Reset naar lobby</div>
+                <div className="t-caption t-muted">Phase → 0 · teams + scores blijven</div>
+              </div>
+            </button>
+            <button onClick={async()=>{if(await ask('LET OP — alles wissen? Dit verwijdert élk team, élke score, élke voltooide opdracht en de hele activity feed uit de database. Iedereen wordt teruggestuurd naar het startscherm. Dit kan NIET ongedaan worden gemaakt.',{danger:true,confirmLabel:'Ja, wis alles'}))onWipeAndRestart&&onWipeAndRestart()}}
+              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',borderColor:'rgba(255,107,107,0.45)',background:'rgba(255,107,107,0.10)',color:'#fff'}}>
+              <span style={{fontSize:20}}>🏠</span>
+              <div style={{textAlign:'left',flex:1}}>
+                <div className="t-body-emph" style={{color:'var(--danger)'}}>Hernieuw spel</div>
+                <div className="t-caption t-muted">Wis alles · iedereen terug naar startscherm</div>
+              </div>
+            </button>
+          </Section>
+
+          <Section title="Finale">
+            <button onClick={async()=>{if(phase>=4){return;}if(await ask('Start de finale-fase? Alle scoring krijgt ×1.5 voor de laatste 20 minuten.',{confirmLabel:'Start finale-fase'}))onStartFinalePhase&&onStartFinalePhase()}}
+              disabled={phase>=4}
+              className="btn btn-cyan" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',opacity:phase>=4?0.4:1}}>
+              <span style={{fontSize:20}}>🏁</span>
+              <div style={{textAlign:'left',flex:1}}>
+                <div className="t-body-emph">{phase===4?'Finale-fase loopt · ×1.5':'Start finale-fase (×1.5)'}</div>
+                <div className="t-caption" style={{opacity:0.85}}>Punten ×1.5 in de laatste 20 min</div>
+              </div>
+            </button>
+            <button onClick={async()=>{if(phase>=5){return;}if(await ask('Spel beëindigen en naar de eindceremonie? Dit kan niet ongedaan worden gemaakt.',{danger:true,confirmLabel:'Start eindceremonie'}))onStartFinale&&onStartFinale()}}
+              disabled={phase>=5}
+              className="btn btn-gold" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',opacity:phase>=5?0.4:1}}>
+              <span style={{fontSize:20}}>🏆</span>
+              <div style={{textAlign:'left',flex:1}}>
+                <div className="t-body-emph">{phase>=5?'Finale loopt':'Start eindceremonie'}</div>
+                <div className="t-caption" style={{opacity:0.85}}>Onthul winnaar · Mike's prijs</div>
+              </div>
+            </button>
+          </Section>
+
+          <Section title="Direct beheer">
+            <button onClick={()=>{onClose();onGoReview&&onGoReview();}}
+              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
+              <span style={{fontSize:20}}>✅</span>
+              <div style={{textAlign:'left',flex:1}}>
+                <div className="t-body-emph">Open Beoordelen-tab</div>
+                <div className="t-caption t-muted">Wachtrij, Jorik-rotatie, bar break, team beheer</div>
+              </div>
+            </button>
+          </Section>
+
+          <div className="t-caption t-muted" style={{textAlign:'center',padding:'var(--sp-3)',lineHeight:'var(--lh-relaxed)'}}>
+            Voor een schema-wipe (incl. tabellen die de UI niet kent): draai <code>SUPABASE-V23-RESET.sql</code> in de Supabase SQL editor.
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
