@@ -1250,7 +1250,11 @@ function App(){
   const[completedPts,setCompletedPts]=useState({}); // V10: {locationId: {challengeIdx: ptsAwarded}} — lets UI distinguish wrong (0) from correct
   const[visitedLocs,setVisitedLocs]=useState(new Set());
   const[pos,setPos]=useState(null);
-  const[tab,setTab]=useState('leaderboard');
+  // V35 P1 fix (Sandra/Erik personas): first-game default was Ranking — gives
+  // status, not next action. Map shows "what's near me" which is the actual
+  // next-step a player needs. Hydrated from session if present so Mike's
+  // own preference (Beoordelen tab during a real day) survives reloads.
+  const[tab,setTab]=useState(()=>(typeof hydrated?.tab==='string'&&['leaderboard','map','activity','review'].includes(hydrated.tab))?hydrated.tab:'map');
   // V23 (#50): ref-mirror of `tab` so long-lived realtime subscribe handlers
   // (set up once with [myTeam,isAdmin] deps) can always see the latest tab.
   const tabRef=React.useRef(tab);useEffect(()=>{tabRef.current=tab;},[tab]);
@@ -1670,6 +1674,10 @@ function App(){
 
   // Toast auto-dismiss
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),4000);return()=>clearTimeout(t)}},[toast]);
+  // V35: expose setToast on window so PaceGuide (a leaf component nested in
+  // AdminReviewView) can fire toasts on threshold-cross without prop-drilling.
+  // Cleared on App unmount so a hot-reload doesn't leak a stale closure.
+  useEffect(()=>{window.__ssrSetToast=setToast;return()=>{if(window.__ssrSetToast===setToast)delete window.__ssrSetToast;};},[]);
   useEffect(()=>{if(scorePopup){const t=setTimeout(()=>setScorePopup(null),1200);return()=>clearTimeout(t)}},[scorePopup]);
 
   // V14: 1-second tick for countdown clocks (HUD + bar break)
@@ -2511,6 +2519,14 @@ function App(){
           applyScoreDelta(myTeam.id,firstBonusPts);
           setToast(`🏆 Eerste bij ${loc.n}! +${firstBonusPts} pts bonus`);
           addActivity(`was als eerste bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · +${firstBonusPts} pts bonus`,firstBonusPts,null,locId);
+          // V35 P1 fix (Tom persona): the eerste-team bonus used to land as a
+          // muted toast + score-popup — same visual weight as a regular finish.
+          // The bonus is the PRIDE moment of the day. Now we fire a dedicated
+          // gold celebrate-burst so the team feels the win, plus haptic so phones
+          // in pockets register it through the trousers.
+          try{celebrate({emoji:'🥇',title:'Eerste team!',sub:`+${firstBonusPts} pts bonus`,breakdown:[`+${firstBonusPts} eerste-team`,`bij ${loc.n}`],big:true,levelUp:false});}catch(e){}
+          try{if(navigator.vibrate)navigator.vibrate([100,50,100,50,200]);}catch(e){}
+          try{const c=window.__ssrPlayCue;if(c)c('first');}catch(e){}
         };
         const isConflict=(err)=>err&&(err.code==='23505'||String(err.message||'').toLowerCase().includes('duplicate')||String(err.code||'').startsWith('23'));
         const isMissing=(err)=>{
@@ -3244,10 +3260,30 @@ function App(){
     }
   },[teams,myTeam]);
 
-  // V12: persist key session fields so a refresh doesn't kick players out
+  // V12: persist key session fields so a refresh doesn't kick players out.
+  // V35: also persist `tab` so Mike's Beoordelen tab + Sandra's Map default both
+  // survive a reload — no more "I lost my place".
   useEffect(()=>{
-    if(myTeam)saveSession({screen,myTeam,phase,gameStart});
-  },[screen,myTeam,phase,gameStart]);
+    if(myTeam)saveSession({screen,myTeam,phase,gameStart,tab});
+  },[screen,myTeam,phase,gameStart,tab]);
+
+  // V35 P1 fix (Erik/Sandra personas): silent phase transitions confused everyone
+  // who was tabbed away or new to the day. Now fire a toast on every advance so
+  // late-joiners + players in the middle of an upload see the world change. Skip
+  // the very first render (ref starts undefined) so a mid-game cold-mount doesn't
+  // toast a fake "transition just happened" on the value the page hydrated with.
+  const prevPhaseRef=React.useRef(undefined);
+  useEffect(()=>{
+    const prev=prevPhaseRef.current;
+    prevPhaseRef.current=phase;
+    if(prev===undefined||phase===prev)return;
+    const labels={1:'Fase 1 — Zoektocht',2:'Fase 2 — Geruchten',3:'Fase 3 — Cirkel',4:'🏁 Finale-fase · ×1.5 punten',5:'🏆 Eindceremonie',6:'🥂 Spel afgelopen'};
+    const lbl=labels[phase];
+    if(lbl){
+      setToast(lbl);
+      try{if(navigator.vibrate)navigator.vibrate([60,40,60]);}catch(e){}
+    }
+  },[phase]);
 
   // V30: storySeen persistence removed with the chapter-modal system.
   // V19+: persist Jorik-mission completion state
@@ -3384,7 +3420,7 @@ function App(){
         {isAdmin&&<div className="chip chip-gold animate-in" style={{position:'absolute',top:'var(--sp-6)'}}>👑 Game Master</div>}
         {/* V23: TESTMODUS chip — only visible while TEST_MODE is on. Once we
             flip the constant back to false for the live build, it disappears. */}
-        {TEST_MODE&&<div className="chip animate-in" style={{position:'absolute',top:isAdmin?'calc(var(--sp-6) + 36px)':'var(--sp-6)',background:'rgba(110,163,255,0.18)',border:'1px solid rgba(110,163,255,0.45)',color:'var(--foto-2)'}}>🧪 TESTMODUS · gates uit</div>}
+        {TEST_MODE&&<div className="chip animate-in" style={{position:'absolute',top:isAdmin?'calc(var(--sp-6) + 36px)':'var(--sp-6)',background:'rgba(110,163,255,0.18)',border:'1px solid rgba(110,163,255,0.45)',color:'var(--foto-2)'}}>🧪 Generale repetitie · alle drempels uit</div>}
         {/* V29 — mute toggle. Persists in localStorage; defaults to UNMUTED so first-load
             users hear the cues. Top-right placement keeps it discoverable but out of
             the splash hero's attention path.
@@ -3396,7 +3432,7 @@ function App(){
         <button onClick={toggleMuted} aria-label={muted?'Geluid aanzetten':'Geluid uitzetten'}
           className="chip animate-in" type="button"
           style={{position:'absolute',top:'var(--sp-6)',right:'var(--sp-6)',cursor:'pointer',background:muted?'rgba(255,107,107,0.12)':'rgba(95,216,165,0.12)',border:`1px solid ${muted?'rgba(255,107,107,0.4)':'rgba(95,216,165,0.4)'}`,color:muted?'var(--video-2)':'var(--success)'}}>
-          {muted?'🔇 Geluid uit':'🔊 Geluid aan'}
+          {muted?'🔇 Geluid: uit (tik om aan te zetten)':'🔊 Geluid: aan (tik om uit te zetten)'}
         </button>
         <div style={{fontSize:96,animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
         <div style={{height:'var(--sp-6)'}}/>
@@ -3537,7 +3573,7 @@ function App(){
           <div className="panel text-center" style={{background:'linear-gradient(155deg,rgba(110,163,255,0.08),rgba(110,163,255,0.02))',borderColor:'rgba(110,163,255,0.25)'}}>
             <div style={{fontSize:36}}>⏳</div>
             <div className="t-card-label" style={{color:'var(--foto-2)',marginTop:'var(--sp-2)'}}>Wachten op de Game Master</div>
-            <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Pak vast een drankje bij het Maritiem Museum.<br/>Het spel start automatisch.</div>
+            <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Verzamel bij het terras op de Leuvehaven-kade.<br/>Mike start zodra iedereen er is.</div>
           </div>
         )}
         {OFFLINE&&<div className="text-center" style={{marginTop:'var(--sp-4)'}}><button className="btn btn-ghost btn-sm" onClick={startGame}>Demo: start zelf</button></div>}
@@ -3699,7 +3735,12 @@ function App(){
 
       {/* V30: hot-target countdown removed with the timed-target system. */}
 
-      {/* V15: HUD — consistent padding + type */}
+      {/* V15: HUD — consistent padding + type.
+          V35 P1 fix (Lisa persona): spectators were rendered with a fully-empty
+          player HUD (score 0, level L1, "0 ch · 0 POI") which silently signalled
+          "you're not playing" and gave no real information. Spectator branch now
+          shows: time-of-day, current Jorik holder, total photos in the feed +
+          team count. Active players keep their score/level/POI HUD unchanged. */}
       <div style={{padding:`var(--sp-4) var(--sp-5)`,paddingTop:OFFLINE?'var(--sp-7)':phase>=1&&phase<5?'var(--sp-9)':'var(--sp-4)',background:'linear-gradient(180deg,rgba(10,11,16,0.92) 0%,rgba(10,11,16,0.85) 100%)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'var(--sp-3)',zIndex:100,backdropFilter:'blur(20px) saturate(1.4)',WebkitBackdropFilter:'blur(20px) saturate(1.4)',position:'relative'}}>
         <div
           onMouseDown={avatarLP.start} onMouseUp={avatarLP.cancel} onMouseLeave={avatarLP.cancel}
@@ -3709,21 +3750,38 @@ function App(){
           <div style={{minWidth:0}}>
             <div className="t-card-label truncate">{myTeam?.name}</div>
             <div className="row-2" style={{marginTop:2,flexWrap:'wrap'}}>
-              {(()=>{const lv=levelFor(myScore);const nxt=nextLevel(myScore);return <>
+              {myTeam?.spectator?(
+                <span className="t-label-sm" style={{color:'var(--foto-2)'}}>👁 Toeschouwer-modus</span>
+              ):(()=>{const lv=levelFor(myScore);const nxt=nextLevel(myScore);return <>
                 <span className="t-label-sm t-accent">{lv.emoji} L{lv.level}</span>
                 {nxt?<span className="t-label-sm">{nxt.min-myScore} tot L{nxt.level}</span>:<span className="t-label-sm t-accent-2">Max</span>}
               </>;})()}
             </div>
           </div>
         </div>
-        <div style={{textAlign:'center',minWidth:56}}>
-          <div className="t-num" style={{fontSize:'var(--fs-24)',color:'var(--accent-2)',textShadow:'0 0 20px rgba(228,178,92,0.35)'}}>{myScore}</div>
-          <div className="t-label-sm" style={{marginTop:2}}>pts</div>
-        </div>
-        <div style={{textAlign:'right',minWidth:64}}>
-          {/* V30: Extra Tijd button removed with the timed-target system. */}
-          <div className="t-label-sm">{myChallenges} ch · {visitedLocs.size} POI</div>
-        </div>
+        {myTeam?.spectator?(
+          <>
+            <div style={{textAlign:'center',minWidth:56}}>
+              <div className="t-num" style={{fontSize:'var(--fs-20)',color:'var(--foto-2)',textShadow:'0 0 16px rgba(110,163,255,0.35)'}}>{(activityFeed||[]).filter(a=>a.photo).length}</div>
+              <div className="t-label-sm" style={{marginTop:2}}>foto's</div>
+            </div>
+            <div style={{textAlign:'right',minWidth:88}}>
+              <div className="t-label-sm" style={{lineHeight:'var(--lh-tight)'}}>{teams.filter(t=>t.id>0).length} teams</div>
+              <div className="t-label-sm t-accent" style={{lineHeight:'var(--lh-tight)',marginTop:2}}>{(()=>{const h=teams.find(t=>t.id===jorikTeamId);return h?`💍 ${h.emoji}`:'💍 alleen';})()}</div>
+            </div>
+          </>
+        ):(
+          <>
+            <div style={{textAlign:'center',minWidth:56}}>
+              <div className="t-num" style={{fontSize:'var(--fs-24)',color:'var(--accent-2)',textShadow:'0 0 20px rgba(228,178,92,0.35)'}}>{myScore}</div>
+              <div className="t-label-sm" style={{marginTop:2}}>pts</div>
+            </div>
+            <div style={{textAlign:'right',minWidth:64}}>
+              {/* V30: Extra Tijd button removed with the timed-target system. */}
+              <div className="t-label-sm">{myChallenges} ch · {visitedLocs.size} POI</div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* XP progress bar */}
@@ -3755,7 +3813,7 @@ function App(){
         <div className="finale-pulse-banner" role="status" aria-live="polite">
           <span style={{fontSize:16}}>🏆</span>
           <span className="t-card-label" style={{letterSpacing:'var(--ls-wider)'}}>FINALE LIVE</span>
-          <span className="t-caption" style={{opacity:0.85}}>dichtste bij Jorik wint · sprint naar de cirkel</span>
+          <span className="t-caption" style={{opacity:0.85}}>dichtste bij Jorik wint · loop snel naar de Markthal-cirkel</span>
         </div>
       )}
 
@@ -4058,7 +4116,14 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
 
   return(
     <div className="screen">
-      {showLateJoin&&(
+      {/* V35 P1 fix (Erik persona): when game is running AND cap-full, two
+          banners stacked in 200px of vertical space contradicted each other —
+          amber "je kunt nog steeds meedoen" directly above what was previously
+          a red "het spel zit vol" panel. Now we merge: if both conditions are
+          true, render ONE combined banner with both facts. The standalone cap-
+          full banner (below) stays for the rare case of "lobby full but spel
+          nog niet gestart". */}
+      {showLateJoin&&!teamSlotsFull&&(
         <div role="alert" aria-live="polite"
           style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.12)',border:'1px solid rgba(228,178,92,0.45)',color:'var(--accent-2)',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
           <div style={{fontSize:20,flexShrink:0}}>⚠️</div>
@@ -4066,6 +4131,23 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
             <div className="t-body-emph" style={{marginBottom:2}}>De wedstrijd is al gestart</div>
             <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
               Fase: <b>{phaseLabel||`Fase ${phase}`}</b> · je kunt nog steeds meedoen, maar een deel van de punten is al vergeven.
+            </div>
+          </div>
+          <button type="button" onClick={()=>setLateJoinDismissed(true)}
+            aria-label="Sluit waarschuwing"
+            style={{flexShrink:0,padding:'2px 8px',borderRadius:'var(--r-sm)',background:'transparent',border:'1px solid rgba(228,178,92,0.4)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-12)'}}>
+            Begrepen
+          </button>
+        </div>
+      )}
+      {showLateJoin&&teamSlotsFull&&(
+        <div role="alert" aria-live="polite"
+          style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.45)',color:'#fff',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
+          <div style={{fontSize:20,flexShrink:0}}>🔴</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div className="t-body-emph" style={{marginBottom:2,color:'var(--accent-2)'}}>Spel loopt · {MAX_TEAMS}/{MAX_TEAMS} teams gevuld</div>
+            <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
+              Fase: <b>{phaseLabel||`Fase ${phase}`}</b>. Geen nieuwe teams meer — tik op een team hierboven om je aan te sluiten, of bekijk als toeschouwer.
             </div>
           </div>
           <button type="button" onClick={()=>setLateJoinDismissed(true)}
@@ -4089,7 +4171,10 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
           V34 P0 fix (Erik): rewrote advice — old copy told players to "vraag de
           Game Master om een team te verwijderen" which would lose all that team's
           progress. New copy points at the join-existing flow + spectator door. */}
-      {teamSlotsFull&&(
+      {/* V35: skip when showLateJoin is true — that combined banner above already
+          covers cap-full + game-running together. This standalone version only
+          fires for "lobby full but spel nog niet gestart". */}
+      {teamSlotsFull&&!showLateJoin&&(
         <div role="alert" style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.4)',color:'#fff',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
           <div style={{fontSize:20,flexShrink:0}}>🔒</div>
           <div style={{flex:1,minWidth:0}}>
@@ -4829,10 +4914,13 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
       <div style={{position:'relative',height:'48vh',minHeight:280,flexShrink:0}}>
         <div ref={mapRef} style={{width:'100%',height:'100%'}}/>
 
-        {/* V5.1/V12: GPS status pill — softer copy, tap to force-wake when paused */}
-        <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer'}} title="Tik om GPS te activeren">
+        {/* V5.1/V12: GPS status pill — softer copy, tap to force-wake when paused.
+            V35 P1 fix (Hassan persona): pill used to say "GPS zoekt…" forever when
+            the user had denied permission, with no visual signal that retry is the
+            user's responsibility. Now branches on denied/unavailable explicitly. */}
+        <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer',background:gpsStatus==='denied'||gpsStatus==='unavailable'?'rgba(255,107,107,0.18)':undefined,borderColor:gpsStatus==='denied'||gpsStatus==='unavailable'?'rgba(255,107,107,0.4)':undefined,color:gpsStatus==='denied'||gpsStatus==='unavailable'?'#ff8a8a':undefined}} title={gpsStatus==='denied'?'Tik om opnieuw te proberen — eerst zet je locatie aan in Instellingen':'Tik om GPS te activeren'}>
           <span className={`gps-dot ${gpsStatus||'weak'}`}/>
-          {gpsStatus==='good'?'GPS actief':gpsStatus==='sleep'?'GPS paust':'GPS zoekt…'}
+          {gpsStatus==='denied'?'GPS uit · tik':gpsStatus==='unavailable'?'GPS niet bereikbaar':gpsStatus==='good'?'GPS actief':gpsStatus==='sleep'?'GPS paust':'GPS zoekt…'}
           {gpsSnap&&<span style={{color:'var(--foto)'}}>· op {gpsSnap}</span>}
           {gpsStatus==='sleep'&&<span className="snap-btn">tik om te activeren</span>}
         </div>
@@ -5299,7 +5387,7 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
                 <div className="t-caption t-muted">Stuur "PAUZE" naar alle teams</div>
               </div>
             </button>
-            <button onClick={async()=>{if(await ask('Hervat-bericht naar alle teams sturen?',{confirmLabel:'Stuur GO'}))onResume&&onResume()}}
+            <button onClick={async()=>{if(await ask('Hervat-bericht naar alle teams sturen? Scoring loopt sowieso door — dit is alleen een signaal naar de spelers dat ze weer mogen.',{confirmLabel:'Stuur GO'}))onResume&&onResume()}}
               className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
               <span style={{fontSize:20}}>▶</span>
               <div style={{textAlign:'left',flex:1}}>
@@ -5387,6 +5475,77 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
 }
 
 // ═══════════════════════════════════════════
+// V35: PACE-GUIDE — extracted from AdminReviewView's IIFE so it can own a real
+// useEffect that toasts on threshold crossings (Mike persona was missing the bar
+// breaks because the IIFE re-rendered silently). Also handles the stale-hint case
+// where "Druk op START in lobby" used to stay for 60 min after game start.
+// ═══════════════════════════════════════════
+function PaceGuide({phase}){
+  const SCHEDULE=[
+    {min:0,    label:'14:00 — Start spel',                 hint:'Druk op 🎮 START in lobby.',                                  step:'start'},
+    {min:60,   label:'15:00 — Bar 1 (~30 min)',            hint:'🍺 Trigger bar break. Jorik krijgt bar-set-piece.',           step:'bar1'},
+    {min:90,   label:'15:30 — Einde bar 1 / Fase 2 erna',  hint:'Bar overlay sluit automatisch. Geen actie.',                   step:'phase2'},
+    {min:180,  label:'17:00 — Bar 2 (~30 min)',            hint:'🍺 Trigger bar break #2.',                                    step:'bar2'},
+    {min:240,  label:'18:00 — Fase 3 transition',          hint:'Soft moment, geen actie nodig (admin kan phase forward).',     step:'phase3'},
+    {min:270,  label:'18:30 — Bar 3 (~30 min)',            hint:'🍺 Laatste bar break.',                                       step:'bar3'},
+    {min:300,  label:'19:00 — Markthal moment',            hint:'Jorik solo Hand-in-Hand Kameraden in Markthal — als hij daar kan zijn.',step:'markthal'},
+    {min:315,  label:'19:15 — FINALE (×1.5)',              hint:'🏆 Trigger Finale. Punten ×1.5 in laatste 15 min.',           step:'finale'},
+    {min:330,  label:'19:30 — Dinner / einde',             hint:'🥂 Start Finale-uitslag. Onthul prijs.',                      step:'end'},
+  ];
+  // V35: tick every 60s so nowIdx advances honestly (was: only on parent re-render).
+  const[tick,setTick]=React.useState(0);
+  React.useEffect(()=>{const id=setInterval(()=>setTick(t=>t+1),60000);return()=>clearInterval(id);},[]);
+  const dinner=dinerTs();
+  const startMs=dinner-(5.5*3600*1000);
+  const elapsedMin=Math.floor((Date.now()-startMs)/60000);
+  let nowIdx=0;
+  for(let i=0;i<SCHEDULE.length;i++){if(SCHEDULE[i].min<=elapsedMin)nowIdx=i;}
+  const nextIdx=Math.min(nowIdx+1,SCHEDULE.length-1);
+  const minToNext=SCHEDULE[nextIdx].min-elapsedMin;
+  // V35 P1 fix (Mike): toast on threshold cross so Mike notices the bar break trigger
+  // even when his attention is on a guest. Use a ref so we only toast on advance.
+  const lastIdxRef=React.useRef(nowIdx);
+  React.useEffect(()=>{
+    if(nowIdx!==lastIdxRef.current){
+      const moment=SCHEDULE[nowIdx];
+      // Only toast for action-worthy moments (skip the soft "Einde bar 1" / "phase3" types).
+      if(moment&&['bar1','bar2','bar3','markthal','finale','end'].includes(moment.step)){
+        try{
+          // Toast goes to the global app via window — AdminReviewView doesn't expose setToast.
+          if(window.__ssrSetToast)window.__ssrSetToast(`⏱ ${moment.label} — ${moment.hint}`);
+          if(navigator.vibrate)navigator.vibrate([200,80,200]);
+        }catch(e){}
+      }
+      lastIdxRef.current=nowIdx;
+    }
+  },[nowIdx]);
+  // V35 P1 fix (Mike): stale "Druk op START" hint when phase has already advanced.
+  const showStaleStartHint=nowIdx===0&&phase>=1&&elapsedMin>5;
+  return(
+    <div className="panel stack-3" style={{marginBottom:'var(--sp-4)',borderColor:'rgba(95,216,165,0.30)',background:'linear-gradient(155deg,rgba(95,216,165,0.08),rgba(255,255,255,0.015))'}}>
+      <div className="t-label t-success">⏱ Pace-guide (advies)</div>
+      <div className="row-3" style={{alignItems:'flex-start'}}>
+        <div style={{fontSize:24,flexShrink:0}}>📍</div>
+        <div className="flex-1">
+          <div className="t-card-label">Nu: {showStaleStartHint?'Spel loopt — wachten tot 15:00 voor bar 1':SCHEDULE[nowIdx].label}</div>
+          <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{showStaleStartHint?'Geen actie nodig. Volgende: 🍺 bar break om 15:00.':SCHEDULE[nowIdx].hint}</div>
+        </div>
+      </div>
+      {nextIdx>nowIdx&&(
+        <div className="row-3" style={{alignItems:'flex-start',opacity:0.85}}>
+          <div style={{fontSize:24,flexShrink:0}}>⏭</div>
+          <div className="flex-1">
+            <div className="t-card-label-sm">Volgende ({minToNext>=0?`over ${minToNext} min`:'inhalen'}): {SCHEDULE[nextIdx].label}</div>
+            <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{SCHEDULE[nextIdx].hint}</div>
+          </div>
+        </div>
+      )}
+      <div className="t-caption t-muted" style={{fontStyle:'italic'}}>Schema is suggestie. Niets vuurt automatisch — admin triggert handmatig.</div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════
 // V6: ADMIN REVIEW QUEUE
 // ═══════════════════════════════════════════
 function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=null,jorikMovedAt=null,onMoveJorik,onTriggerBarBreak,onEndBarBreak,barBreakActive,onStartFinalePhase,onStartFinale,phase=1,scores={},onAdjustScore,onRemoveTeam,onRenameTeam,reviewUndo,onUndoReview,onBroadcast,onResetGame,confirmAsync,jorikVisitedTeamIds,teamMemberCounts={},nowTs=Date.now()}){
@@ -5445,52 +5604,12 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 
       {/* V22: Admin pace-guide panel — soft suggestion only, helps Mike not forget to
            trigger bar breaks / phase transitions on time. Computes "where in the day are we"
-           from the wall clock + the hardcoded gameday window (14:00 – 19:30). */}
-      {(()=>{
-        const SCHEDULE=[
-          {min:0,    label:'14:00 — Start spel',                 hint:'Druk op 🎮 START in lobby.',                                  step:'start'},
-          {min:60,   label:'15:00 — Bar 1 (~30 min)',            hint:'🍺 Trigger bar break. Jorik krijgt bar-set-piece.',           step:'bar1'},
-          {min:90,   label:'15:30 — Einde bar 1 / Fase 2 erna',  hint:'Bar overlay sluit automatisch. Geen actie.',                   step:'phase2'},
-          {min:180,  label:'17:00 — Bar 2 (~30 min)',            hint:'🍺 Trigger bar break #2.',                                    step:'bar2'},
-          {min:240,  label:'18:00 — Fase 3 transition',          hint:'Soft moment, geen actie nodig (admin kan phase forward).',     step:'phase3'},
-          {min:270,  label:'18:30 — Bar 3 (~30 min)',            hint:'🍺 Laatste bar break.',                                       step:'bar3'},
-          {min:300,  label:'19:00 — Markthal moment',            hint:'Jorik solo Hand-in-Hand Kameraden in Markthal — als hij daar kan zijn.',step:'markthal'},
-          {min:315,  label:'19:15 — FINALE (×1.5)',              hint:'🏆 Trigger Finale. Punten ×1.5 in laatste 15 min.',           step:'finale'},
-          {min:330,  label:'19:30 — Dinner / einde',             hint:'🥂 Start Finale-uitslag. Onthul prijs.',                      step:'end'},
-        ];
-        // Compute minutes-from-start using the same DINER_DATE clock as the rest of the app.
-        // For dev (DINER_DATE > 7 days away) we fall back to "minutes since dev clock started".
-        const dinner=dinerTs(); // 19:30 game-day OR now+4h dev
-        const startMs=dinner-(5.5*3600*1000); // 14:00 game-day = dinner - 5.5h
-        const elapsedMin=Math.floor((Date.now()-startMs)/60000);
-        // "Now" = the latest scheduled item where min <= elapsedMin
-        let nowIdx=0;
-        for(let i=0;i<SCHEDULE.length;i++){if(SCHEDULE[i].min<=elapsedMin)nowIdx=i;}
-        const nextIdx=Math.min(nowIdx+1,SCHEDULE.length-1);
-        const minToNext=SCHEDULE[nextIdx].min-elapsedMin;
-        return(
-          <div className="panel stack-3" style={{marginBottom:'var(--sp-4)',borderColor:'rgba(95,216,165,0.30)',background:'linear-gradient(155deg,rgba(95,216,165,0.08),rgba(255,255,255,0.015))'}}>
-            <div className="t-label t-success">⏱ Pace-guide (advies)</div>
-            <div className="row-3" style={{alignItems:'flex-start'}}>
-              <div style={{fontSize:24,flexShrink:0}}>📍</div>
-              <div className="flex-1">
-                <div className="t-card-label">Nu: {SCHEDULE[nowIdx].label}</div>
-                <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{SCHEDULE[nowIdx].hint}</div>
-              </div>
-            </div>
-            {nextIdx>nowIdx&&(
-              <div className="row-3" style={{alignItems:'flex-start',opacity:0.85}}>
-                <div style={{fontSize:24,flexShrink:0}}>⏭</div>
-                <div className="flex-1">
-                  <div className="t-card-label-sm">Volgende ({minToNext>=0?`over ${minToNext} min`:'inhalen'}): {SCHEDULE[nextIdx].label}</div>
-                  <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{SCHEDULE[nextIdx].hint}</div>
-                </div>
-              </div>
-            )}
-            <div className="t-caption t-muted" style={{fontStyle:'italic'}}>Schema is suggestie. Niets vuurt automatisch — admin triggert handmatig.</div>
-          </div>
-        );
-      })()}
+           from the wall clock + the hardcoded gameday window (14:00 – 19:30).
+           V35 P1 fixes (Mike persona): now a real component with a useEffect that
+           toasts on threshold cross (was: silent — Mike missed bar-2 trigger if not
+           actively watching the tab). Stale "Druk op START in lobby" hint is also
+           swapped once phase>=1 (was: stayed for 60 min after game start). */}
+      <PaceGuide phase={phase}/>
 
       {/* Game-master controls */}
       <div className="panel stack-4" style={{marginBottom:'var(--sp-5)',borderColor:'rgba(228,178,92,0.28)',background:'linear-gradient(155deg,rgba(228,178,92,0.05),rgba(255,255,255,0.015))'}}>
@@ -5633,7 +5752,11 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
               <div style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:willFire?'rgba(228,178,92,0.12)':'rgba(110,163,255,0.06)',border:`1px solid ${willFire?'rgba(228,178,92,0.4)':'rgba(110,163,255,0.25)'}`,marginBottom:'var(--sp-3)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
                 <div style={{fontSize:18}}>⏰</div>
                 <div className="t-caption" style={{flex:1,lineHeight:'var(--lh-relaxed)'}}>
-                  <b>Jorik-resilience</b>: bij {holder?.emoji} {holder?.name||'?'} sinds {Math.floor(elapsedMs/60000)} min · {willFire?<span style={{color:'var(--accent-2)'}}>auto-rotate triggert nu (geen actieve bar break)</span>:<span>auto-rotate over {remainingMin} min als geen bar break</span>}
+                  {/* V35 P1 fix (Mike persona): countdown copy was identical regardless
+                      of bar-break state — confusing because resilience is PAUSED during
+                      a bar break (Jorik's bar set-piece needs the team to keep him).
+                      Now we explicitly say "bar break loopt — auto-rotate gepauzeerd". */}
+                  <b>Jorik-resilience</b>: bij {holder?.emoji} {holder?.name||'?'} sinds {Math.floor(elapsedMs/60000)} min · {barBreakActive?<span style={{color:'var(--foto-2)'}}>bar break loopt — auto-rotate gepauzeerd</span>:willFire?<span style={{color:'var(--accent-2)'}}>auto-rotate triggert nu</span>:<span>auto-rotate over {remainingMin} min als geen bar break</span>}
                 </div>
               </div>
             );
@@ -5969,6 +6092,19 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                 <div className="points-badge">+{ch.p}</div>
               </div>
               <p className="t-body" style={{marginBottom:'var(--sp-2)'}}>{ch.d}</p>
+              {/* V35 P1 fix (Tom persona): captain-side wp:1 secrecy chip. When the
+                  current team does NOT have Jorik AND the challenge is wp:1, render
+                  a subtle banner so the captain knows this footage is for the surprise
+                  edit and Jorik must not see it. Holding team already gets a hard
+                  secrecy lock above; this chip educates non-holders without spoiling. */}
+              {ch.wp===1&&!jorikInTeam&&!done&&(
+                <div className="panel-sm" style={{background:'rgba(228,178,92,0.08)',borderColor:'rgba(228,178,92,0.30)',padding:'var(--sp-2) var(--sp-3)',marginBottom:'var(--sp-2)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
+                  <span style={{fontSize:18}}>🎬</span>
+                  <div className="t-caption" style={{flex:1,lineHeight:'var(--lh-relaxed)'}}>
+                    <b style={{color:'var(--accent-2)'}}>Voor de bruiloftsedit</b> — Jorik mag dit niet zien. Pak iemand om de hoek, film discreet.
+                  </div>
+                </div>
+              )}
               {/* V30 (Phase 8): scoring clarity — explicit one-line rule.
                   Every L_DATA challenge is one-shot per team (the v20 unique
                   constraint on completed_challenges enforces this). Before V30
@@ -6022,8 +6158,10 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   const[processing,setProcessing]=useState(false);
   const quizLockRef=useRef(false);
 
-  // V16: spectator admin (myTeam.id === -1) can't be credited scoring
-  const isSpectator=myTeam?.spectator||myTeam?.id===-1;
+  // V16: spectator admin (myTeam.id === -1) can't be credited scoring.
+  // V35: also id===-2 (non-admin Toeschouwer added in V34).
+  const isSpectator=myTeam?.spectator||myTeam?.id===-1||myTeam?.id===-2;
+  const isAdminSpectator=isSpectator&&isAdmin;
   const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
   const gateRadius=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE;
   // V23: GPS_GATE_BYPASS (TEST_MODE) lets every team upload from anywhere —
@@ -6031,14 +6169,19 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   // Live behavior restored when TEST_MODE flips to false.
   const tooFar=isMedia&&!isAdmin&&!GPS_GATE_BYPASS&&dist!=null&&dist>gateRadius;
 
-  // V16: spectator guard — disable challenge completion since the score wouldn't persist
+  // V16: spectator guard — disable challenge completion since the score wouldn't persist.
+  // V35 P1 fix (Lisa persona): copy was always "Game Master kan geen punten scoren"
+  // regardless of role, and the hint "Join een team" doesn't apply to a Lisa-style
+  // observer who actively chose to spectate. Branch on actual role for both copy
+  // and tone — admin sees the GM framing, non-admin spectator sees the warm
+  // "you're watching, that's the whole point" framing.
   if(isSpectator){
     return(
-      <div className="gate-blocked" style={{background:'rgba(228,178,92,0.08)',borderColor:'rgba(228,178,92,0.25)'}}>
-        <div className="gate-icon">👑</div>
+      <div className="gate-blocked" style={{background:isAdminSpectator?'rgba(228,178,92,0.08)':'rgba(110,163,255,0.08)',borderColor:isAdminSpectator?'rgba(228,178,92,0.25)':'rgba(110,163,255,0.25)'}}>
+        <div className="gate-icon">{isAdminSpectator?'👑':'👁'}</div>
         <div className="flex-1">
-          <div className="gate-text t-accent">Game Master kan geen punten scoren</div>
-          <div className="gate-hint">Join een team om mee te spelen</div>
+          <div className="gate-text" style={{color:isAdminSpectator?'var(--accent-2)':'var(--foto-2)'}}>{isAdminSpectator?'Game Master kan geen punten scoren':'Je kijkt mee — alleen het team dat hier nu staat kan deze opdracht doen'}</div>
+          <div className="gate-hint">{isAdminSpectator?'Join een team om mee te spelen':'Pak je telefoon en sluit aan bij een team in de lobby als je wel mee wilt scoren'}</div>
         </div>
       </div>
     );
@@ -6402,6 +6545,13 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
           <h2 id="jorik-missions-title" className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,#e4b25c,#ff6b6b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Jorik-missies</h2>
           <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Alleen mogelijk terwijl Jorik bij jullie team is</div>
           <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>{doneSet.size}/{JORIK_MISSIONS.length} voltooid · {earnedPts}/{totalPts} pts</div>
+          {/* V35 P1 fix (Jorik persona): the cards advertise "+50 pts" but only +25 lands
+              because completeJorikMission scales by JORIK_SCORE_MULTIPLIER=0.5. Players
+              perceived this as a bug; teammates whispered "are we really getting credit?".
+              Disclose the rule explicitly so the math is honest from the first card open. */}
+          <div className="t-caption" style={{marginTop:'var(--sp-2)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.08)',border:'1px solid rgba(228,178,92,0.25)',color:'var(--accent-2)',lineHeight:'var(--lh-relaxed)'}}>
+            ✨ <b>Jorik-missies tellen voor de helft mee</b> — anders ontvoert het Jorik-team de bachelor en wint altijd.
+          </div>
         </div>
 
         {!jorikInTeam&&(
@@ -6451,7 +6601,7 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
                     <div className="t-card-title" style={{display:'flex',alignItems:'center',gap:'var(--sp-2)',flexWrap:'wrap'}}>
                       <span>{m.title}</span>
                       <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',background:'rgba(255,255,255,0.05)'}}>{m.cat}</span>
-                      <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'var(--accent-2)',borderColor:'var(--accent)'}}>+{m.pts} pts</span>
+                      <span className="chip" title={`Volledige waarde ${m.pts} × 0.5 multiplier = ${Math.round(m.pts*0.5)} pts`} style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'var(--accent-2)',borderColor:'var(--accent)'}}>+{Math.round(m.pts*0.5)} pts</span>
                       {m.weddingPipeline&&<span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'#ff6b6b',borderColor:'rgba(255,107,107,0.4)',background:'rgba(255,107,107,0.08)'}}>📹 bruiloft</span>}
                       {isRunning&&runTarget>0&&<span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'#5fd8a5',borderColor:'rgba(95,216,165,0.4)',background:'rgba(95,216,165,0.08)'}}>🔁 {runCount}/{runTarget} ruils</span>}
                     </div>
