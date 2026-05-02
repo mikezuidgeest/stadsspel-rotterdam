@@ -1475,6 +1475,12 @@ function App(){
   const[gpsSamples,setGpsSamples]=useState([]);
   const[gpsStatus,setGpsStatus]=useState('weak'); // good / weak / sleep / denied / unavailable
   const[gpsErrorSeen,setGpsErrorSeen]=useState(null); // {code,message} — latest GeolocationPositionError
+  // V34 P0 fix (Hassan persona): "Sluiten zonder GPS" button used to flip status
+  // back to 'weak' but never stopped watchPosition — the next geolocation errback
+  // would re-flip status to 'denied' within seconds and the full-screen modal
+  // returned in a flicker loop. This opt-out flag stops the watcher AND suppresses
+  // the modal until the user explicitly taps the GPS pill to retry.
+  const[gpsOptOut,setGpsOptOut]=useState(false);
   const[gpsSnap,setGpsSnap]=useState(null); // snapped-to POI name
   // V5 FEATURE 6: motion tracking
   const motionRef=useRef({lastMotion:Date.now(),still:false});
@@ -1641,6 +1647,9 @@ function App(){
     // Stop first then start — ensures a fresh watchPosition even if stale
     gpsCtrlRef.current.stop&&gpsCtrlRef.current.stop();
     gpsCtrlRef.current.start&&gpsCtrlRef.current.start();
+    // V34: tapping the GPS pill is an explicit re-engage — clear opt-out flag
+    // so the denial modal returns if the OS is still blocking us.
+    setGpsOptOut(false);
     setToast('📡 GPS wakker geschud');
   },[]);
 
@@ -2450,7 +2459,16 @@ function App(){
       }else{
         label=`${loc.ch[chIdx]?.ti} bij ${loc.n} voltooid!`;
       }
-      addActivity(label,isWrongZero?0:totalPts,photoData,locId);
+      // V34 P0 fix (Tom/Jorik personas): wp:1 entries used to land in the public
+      // activity feed and the FinaleScreen photo grid, leaking the wedding-edit
+      // surprise to anyone (including Jorik) glancing at a teammate's screen.
+      // We tag the message with a hidden [WP1] prefix so ActivityView and the
+      // FinaleScreen photo grid can filter Jorik-side viewers without needing
+      // a Supabase schema migration. Admin and the executing team's non-Jorik
+      // tabs still see the entry, but the marker is stripped on render.
+      const isWp1=loc.ch[chIdx]?.wp===1;
+      const taggedLabel=isWp1?`[WP1] ${label}`:label;
+      addActivity(taggedLabel,isWrongZero?0:totalPts,photoData,locId);
     }
 
     if(!isDynamicBonus&&loc&&loc.ch[chIdx]?.t==='quiz'){
@@ -2580,7 +2598,7 @@ function App(){
     prevJorikInTeamRef.current=jorikInTeam;
     if(prev===undefined)return; // initial mount — banner alone is enough
     if(prev===false && jorikInTeam===true){
-      setToast('💍 Jorik komt bij jullie team — 8 extra missies beschikbaar!');
+      setToast(`💍 Jorik komt bij jullie team — ${JORIK_MISSIONS.length} extra missies beschikbaar!`);
       try{if(navigator.vibrate)navigator.vibrate([120,60,120,60,240]);}catch(e){}
     }
   },[jorikInTeam]);
@@ -3327,7 +3345,7 @@ function App(){
           // so every player knows who begins with him.
           sb.from('activity_feed').insert({
             team_id:null, team_name:'Game Master', team_emoji:'💍', team_color:'#d4a054',
-            message:`💍 Jorik begint bij ${seedTeam.emoji||''} ${seedTeam.name}! Veel succes met de 8 Jorik-missies!`,
+            message:`💍 Jorik begint bij ${seedTeam.emoji||''} ${seedTeam.name}! Veel succes met de ${JORIK_MISSIONS.length} Jorik-missies!`,
             points:0, created_at:new Date().toISOString(),
           }).then(()=>{},()=>{});
           // Also the [JORIK] canonical marker so mid-game join clients pick it up
@@ -3397,10 +3415,25 @@ function App(){
         <div style={{height:'var(--sp-7)'}}/>
         {/* V23: dropped "≈4 uur buiten / Neem een power bank mee" tail per Mike's
             request. Live team-count survives so the splash still signals lobby
-            activity at a glance. Caption hidden entirely when there are no teams. */}
+            activity at a glance. Caption hidden entirely when there are no teams.
+            V34 P0 fix (Erik): when phase>=1 the splash lied — said "X teams in
+            de lobby" while the game had been running for 47 minutes. Now we
+            distinguish lobby vs running. */}
         {teams.length>0&&(
-          <div className="t-caption animate-in animate-in-6 text-center" style={{maxWidth:320,lineHeight:'var(--lh-relaxed)'}}>
-            <span className="t-accent-2" style={{fontWeight:'var(--fw-bold)'}}>{teams.length} team{teams.length===1?'':'s'}</span> in de lobby
+          <div className="t-caption animate-in animate-in-6 text-center" style={{maxWidth:340,lineHeight:'var(--lh-relaxed)'}}>
+            {phase>=1&&phase<5?(
+              <>
+                <span style={{color:'var(--danger)',fontWeight:'var(--fw-bold)'}}>🔴 Spel loopt</span>
+                {' — '}
+                <span className="t-accent-2" style={{fontWeight:'var(--fw-bold)'}}>{teams.length} team{teams.length===1?'':'s'}</span>
+                {' actief. Je kunt alsnog meedoen of meekijken.'}
+              </>
+            ):(
+              <>
+                <span className="t-accent-2" style={{fontWeight:'var(--fw-bold)'}}>{teams.length} team{teams.length===1?'':'s'}</span>
+                {' in de lobby'}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -3424,7 +3457,7 @@ function App(){
             <span style={{fontSize:16}}>⚙</span><span>Admin</span>
           </button>
         )}
-        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync}/>}
+        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync} promptAsync={promptAsync}/>}
         {/* V33: lobby needs the confirm-dialog mount point too — without this,
             confirmAsync() sets `dialog` state but no DialogSheet renders to show
             it, so admin menu confirmations silently no-op from the lobby. */}
@@ -3556,9 +3589,14 @@ function App(){
           {reviewQueue.length>0&&<span style={{background:'#ff4444',color:'#fff',fontSize:10,fontWeight:800,padding:'2px 6px',borderRadius:9}}>{reviewQueue.length}</span>}
         </button>
       )}
-      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync}/>}
-      {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal */}
-      {(gpsStatus==='denied'||gpsStatus==='unavailable')&&(
+      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync}/>}
+      {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal.
+          V34 (Hassan): updated iOS path to iOS 17/18 (in-Safari aA → Website-instellingen);
+          added "what still works without GPS" so the modal doesn't oversell failure;
+          the "Doorgaan zonder GPS" button now sets gpsOptOut+stops watchPosition so the
+          modal doesn't re-fire in a flicker loop; renamed "Probeer opnieuw" to be honest
+          about what the user must do first on iOS (re-prompt only fires after Settings change). */}
+      {(gpsStatus==='denied'||gpsStatus==='unavailable')&&!gpsOptOut&&(
         <div className="sheet-overlay" style={{zIndex:10000}}>
           <div className="sheet" style={{background:'linear-gradient(180deg,#3a0e0e 0%,var(--bg) 100%)',position:'fixed',left:'50%',top:'50%',transform:'translate(-50%,-50%)',maxWidth:440,width:'92%',maxHeight:'88vh',overflowY:'auto'}} role="alertdialog" aria-live="assertive" aria-labelledby="gps-error-title">
             <div style={{textAlign:'center',marginBottom:'var(--sp-4)'}}>
@@ -3568,8 +3606,20 @@ function App(){
               </h2>
               <div className="t-body" style={{marginTop:'var(--sp-2)'}}>
                 {gpsStatus==='denied'
-                  ?'Het spel heeft je locatie nodig om opdrachten vrij te geven bij POIs. Zonder GPS werkt vrijwel niets.'
-                  :'Je toestel kan op dit moment geen GPS-signaal vinden. Probeer naar buiten te lopen.'}
+                  ?'Het spel gebruikt je locatie om opdrachten in de buurt vrij te geven en foto-uploads te valideren. Géén tracking, géén opslag — alleen tijdens het spel.'
+                  :'Je toestel kan op dit moment geen GPS-signaal vinden. Probeer naar buiten te lopen, weg van hoge gebouwen.'}
+              </div>
+            </div>
+
+            <div className="panel" style={{marginBottom:'var(--sp-3)',background:'rgba(95,216,165,0.08)',borderColor:'rgba(95,216,165,0.25)'}}>
+              <div className="t-label-sm" style={{color:'var(--success)',marginBottom:'var(--sp-2)'}}>WAT WERKT NU NOG WEL</div>
+              <div className="t-caption" style={{lineHeight:'var(--lh-relaxed)'}}>
+                ✅ Quizvragen beantwoorden<br/>
+                ✅ Activity feed lezen — zien wat andere teams doen<br/>
+                ✅ Leaderboard volgen<br/>
+                ✅ Bar break-overlay deelnemen<br/>
+                ❌ Foto-opdrachten (kunnen niet gevalideerd worden)<br/>
+                ❌ POI's vrijspelen op de kaart
               </div>
             </div>
 
@@ -3577,10 +3627,11 @@ function App(){
               <div className="panel" style={{marginBottom:'var(--sp-3)'}}>
                 <div className="t-label" style={{marginBottom:'var(--sp-2)'}}>Zo zet je het weer aan:</div>
                 <div className="stack-2 t-body">
-                  <div>📱 <b>iPhone (Safari):</b> Instellingen → Safari → Locatie → <i>Sta toe</i>. Daarna ververs deze pagina.</div>
-                  <div>🤖 <b>Android (Chrome):</b> Tik op het 🔒-slotje in de adresbalk → <i>Locatie → Toestaan</i>. Daarna ververs.</div>
+                  <div>📱 <b>iPhone (Safari, iOS 17+):</b> tik op de <b>aA</b>-knop links in de adresbalk → <i>Website-instellingen</i> → <i>Locatie</i> → <i>Sta toe</i>. Daarna deze pagina verversen.</div>
+                  <div className="t-caption t-muted" style={{marginLeft:'var(--sp-3)'}}>Lukt het niet via aA? Ga naar <i>Instellingen → Apps → Safari → Locatie</i> en zet 'm op Sta toe.</div>
+                  <div>🤖 <b>Android (Chrome):</b> tik op het 🔒-slotje in de adresbalk → <i>Machtigingen → Locatie → Toestaan</i>. Daarna verversen.</div>
                   <div className="t-caption t-muted" style={{marginTop:'var(--sp-2)'}}>
-                    Browsers onthouden een weigering — je moet dit handmatig omkeren. Daarna deze pagina opnieuw laden.
+                    Browsers onthouden een weigering — Safari/Chrome vragen je niet opnieuw. Je moet het handmatig omkeren via bovenstaande stap.
                   </div>
                 </div>
               </div>
@@ -3593,11 +3644,19 @@ function App(){
             )}
 
             <div className="stack-2">
-              <button className="btn btn-cyan btn-lg" onClick={()=>{setGpsStatus('weak');wakeGps()}} style={{width:'100%'}}>
-                🔁 Probeer opnieuw
+              <button className="btn btn-cyan btn-lg" onClick={()=>{setGpsStatus('weak');setGpsErrorSeen(null);setGpsOptOut(false);wakeGps()}} style={{width:'100%'}}>
+                🔁 Ik heb het in Instellingen aangezet — probeer opnieuw
               </button>
-              <button className="btn btn-ghost" onClick={()=>{setGpsStatus('weak');setGpsErrorSeen(null)}} style={{width:'100%'}}>
-                Sluiten (zonder GPS spelen — niet aanbevolen)
+              <button className="btn btn-ghost" onClick={()=>{
+                // V34 P0 fix: stop the geolocation watcher AND set opt-out so the
+                // modal doesn't re-fire on the next errback. Player can re-engage
+                // by tapping the GPS pill (which calls wakeGps and resets opt-out).
+                try{gpsCtrlRef.current.stop&&gpsCtrlRef.current.stop();}catch(e){}
+                setGpsOptOut(true);
+                setGpsStatus('weak');
+                setGpsErrorSeen(null);
+              }} style={{width:'100%'}}>
+                Doorgaan zonder GPS — quizzes & feed werken nog
               </button>
             </div>
           </div>
@@ -3713,7 +3772,7 @@ function App(){
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
         {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
-        {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter} jorikTeamId={jorikTeamId}/>}
+        {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter} jorikTeamId={jorikTeamId} jorikInTeam={jorikInTeam}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} onRenameTeam={renameTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync} jorikVisitedTeamIds={jorikVisitedTeamIds} teamMemberCounts={teamMemberCounts} nowTs={nowTs}/>}
       </div>
 
@@ -3787,7 +3846,7 @@ function App(){
         /* V30: jorikInTeam already passed to ChallengeSheet — the new wp:1 secrecy lock reads it. No call-site change needed beyond the existing prop. */}
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
-      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync}/>}
+      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync} promptAsync={promptAsync}/>}
 
       {/* V19+: Jorik-specific missions — mirror of wedding, visible only when Jorik IS in team */}
       {/* V21: pos + barBreakActive passed so the panel can curate by context (loc-tagged + bar-only missions).
@@ -3881,6 +3940,37 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
       res=await sb.from('teams').insert(row).select().single();
     }
     return res;
+  };
+
+  // V34 P0 fix (Erik/Tom/Sandra personas): late-joiners + non-captain teammates
+  // had no way to join an existing team — only createFromPack/createCustom existed,
+  // both blocked by the 4-team cap. Now tapping a Bezet starter card triggers a
+  // confirm-dialog "Sluit aan bij {team}?". On confirm, we add the user's parsed
+  // member names to the existing team's `members` array and route them into the
+  // lobby with that team as their myTeam. No new team row is created — the cap is
+  // unaffected. Captain doesn't get a notification yet (P1 follow-up: captain
+  // approval); for V34 the social contract is "Mike's the GM, all-comers welcome".
+  const joinExistingTeam=async(team)=>{
+    if(busy)return;
+    const myMembers=parseMembers();
+    const ok=await (confirmAsync?confirmAsync(`Sluit je aan bij ${team.emoji} ${team.name}?\n\n${myMembers.length>0?`Spelers die je toevoegt: ${myMembers.join(', ')}`:'Je joint zonder namen toe te voegen — dat kan ook later via de captain.'}\n\nJe komt in de lobby terecht en speelt mee met dit team.`,{confirmLabel:'Ja, sluit aan'}):window.confirm(`Sluit je aan bij ${team.emoji} ${team.name}?`));
+    if(!ok)return;
+    setBusy(true);
+    if(!OFFLINE&&sb&&myMembers.length>0){
+      // Append my names to the team's members array. PostgREST doesn't expose
+      // array_append in standard updates, so we read-modify-write — small race
+      // window if two phones append at once, but acceptable for a 16-player game.
+      try{
+        const cur=await sb.from('teams').select('members').eq('id',team.id).single();
+        const existing=Array.isArray(cur?.data?.members)?cur.data.members:[];
+        const merged=[...existing];
+        myMembers.forEach(n=>{if(!merged.includes(n))merged.push(n);});
+        await sb.from('teams').update({members:merged}).eq('id',team.id);
+        team={...team,members:merged};
+      }catch(e){/* members column missing on older schema — proceed without */}
+    }
+    setBusy(false);
+    onJoin(team);
   };
 
   const createFromPack=async(pack)=>{
@@ -3995,14 +4085,17 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
       {/* V23: hard 4-team cap banner. Renders above the picker once 4 active
           teams exist. Mirrors the server-side enforce_team_cap() trigger from
           SUPABASE-V23-RESET.sql so the UI matches what the DB will actually
-          allow. Pool is 8 starter packs but only 4 may ever be active. */}
+          allow. Pool is 8 starter packs but only 4 may ever be active.
+          V34 P0 fix (Erik): rewrote advice — old copy told players to "vraag de
+          Game Master om een team te verwijderen" which would lose all that team's
+          progress. New copy points at the join-existing flow + spectator door. */}
       {teamSlotsFull&&(
-        <div role="alert" style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(255,107,107,0.12)',border:'1px solid rgba(255,107,107,0.4)',color:'#fff',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
+        <div role="alert" style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.4)',color:'#fff',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
           <div style={{fontSize:20,flexShrink:0}}>🔒</div>
           <div style={{flex:1,minWidth:0}}>
             <div className="t-body-emph" style={{marginBottom:2}}>{MAX_TEAMS}/{MAX_TEAMS} teams gevuld</div>
             <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
-              Het spel zit vol. Wacht tot een team plek maakt, of vraag de Game Master om een team te verwijderen.
+              Geen plek meer voor een nieuw team — maar je kunt nog steeds meedoen: tik op een team hierboven om je aan te sluiten, of bekijk het spel als toeschouwer.
             </div>
           </div>
         </div>
@@ -4070,12 +4163,20 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
               // it; locked means there are no slots left at all.
               const locked=teamSlotsFull&&!taken;
               const blocked=taken||locked;
-              const handleKey=(e)=>{if(!blocked&&!busy&&(e.key==='Enter'||e.key===' '||e.key===' ')){e.preventDefault();createFromPack(p);}};
+              // V34 P0 fix: Bezet card now triggers joinExistingTeam.
+              const onCardActivate=()=>{
+                if(busy)return;
+                if(taken&&takenTeam){joinExistingTeam(takenTeam);return;}
+                if(locked)return;
+                createFromPack(p);
+              };
+              const cardTappable=(taken&&!!takenTeam)||(!blocked);
+              const handleKey=(e)=>{if(cardTappable&&!busy&&(e.key==='Enter'||e.key===' ')){e.preventDefault();onCardActivate();}};
               return(
-                <div key={i} role="button" tabIndex={blocked||busy?-1:0} aria-label={`${shownName} · kies dit team`} aria-disabled={blocked||busy}
+                <div key={i} role="button" tabIndex={!cardTappable||busy?-1:0} aria-label={taken?`${shownName} · sluit aan${headcount>0?` (${headcount} spelers)`:''}`:`${shownName} · kies dit team`} aria-disabled={!cardTappable||busy}
                   className={`starter-card animate-in animate-in-${(i%4)+1} ${blocked?'taken':''}`}
-                  onClick={()=>!blocked&&!busy&&createFromPack(p)} onKeyDown={handleKey}
-                  style={{borderColor:blocked?'var(--border)':p.color,boxShadow:blocked?'none':`0 8px 24px ${p.color}28,${p.color}12 0px 0px 0px 1px inset,var(--sh-ring)`,opacity:locked?0.5:undefined}}>
+                  onClick={onCardActivate} onKeyDown={handleKey}
+                  style={{borderColor:blocked?'var(--border)':p.color,boxShadow:blocked?'none':`0 8px 24px ${p.color}28,${p.color}12 0px 0px 0px 1px inset,var(--sh-ring)`,opacity:locked?0.5:undefined,cursor:cardTappable?'pointer':'default'}}>
                   {!blocked&&(
                     <button type="button" className="starter-edit-btn" onClick={(e)=>renamePack(p,e)}
                       aria-label={`Naam aanpassen voor ${shownName}`} title="Naam aanpassen">✏️</button>
@@ -4084,7 +4185,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
                   <div className="starter-name">{shownName}</div>
                   {renamed&&<div className="t-caption" style={{marginTop:2,color:p.color,fontSize:'var(--fs-10)'}}>({p.name})</div>}
                   <div className="starter-color" style={{background:p.color}}/>
-                  {taken&&<div className="t-label-sm" style={{marginTop:'var(--sp-2)'}}>Bezet{headcount>0?` · 📱 ${headcount}`:''}</div>}
+                  {taken&&<div className="t-label-sm" style={{marginTop:'var(--sp-2)',color:'var(--accent-2)'}}>🤝 Sluit aan{headcount>0?` · ${headcount} spelers`:''}</div>}
                   {locked&&<div className="t-label-sm" style={{marginTop:'var(--sp-2)',color:'var(--video-2)'}}>🔒 Vol</div>}
                 </div>
               );
@@ -4129,16 +4230,22 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
         </div>
       )}
 
-      {/* Spectator admin path */}
-      {isAdmin&&(
-        <div className="panel text-center" style={{marginTop:'var(--sp-6)',borderStyle:'dashed',borderColor:'rgba(228,178,92,0.3)',background:'rgba(228,178,92,0.04)'}}>
-          <div className="t-label t-accent">Game Master</div>
-          <div className="t-body" style={{marginTop:'var(--sp-2)',marginBottom:'var(--sp-3)'}}>Liever alleen observeren zonder mee te spelen?</div>
-          <button className="btn btn-ghost btn-sm" onClick={()=>onJoin({id:-1,name:'Game Master',emoji:'👑',color:'#d4a054',score:0,spectator:true})}>
-            👑 Observeren als GM
-          </button>
-        </div>
-      )}
+      {/* V34 P0 fix (Lisa/Erik personas): spectator door used to be admin-only —
+          which forced Mike to share the admin URL with Lisa just so she could
+          observe, turning every spectator phone into a fully-armed admin phone.
+          Now ANY user can pick spectator mode. The admin-vs-non-admin split:
+          admins land as "Game Master" (id:-1, keeps admin powers); non-admin
+          spectators land as "Toeschouwer" (id:-2, no admin powers — see App
+          render guards on the ⚙ pill / AdminMenu / Beoordeel tab). */}
+      <div className="panel text-center" style={{marginTop:'var(--sp-6)',borderStyle:'dashed',borderColor:isAdmin?'rgba(228,178,92,0.3)':'rgba(110,163,255,0.3)',background:isAdmin?'rgba(228,178,92,0.04)':'rgba(110,163,255,0.04)'}}>
+        <div className="t-label" style={{color:isAdmin?'var(--accent-2)':'var(--foto-2)'}}>{isAdmin?'Game Master':'Niet meespelen?'}</div>
+        <div className="t-body" style={{marginTop:'var(--sp-2)',marginBottom:'var(--sp-3)'}}>{isAdmin?'Liever alleen observeren zonder mee te spelen?':'Geen probleem — kijk mee zonder team. Je ziet de leaderboard, de feed en alles wat de teams doen.'}</div>
+        <button className="btn btn-ghost btn-sm" onClick={()=>onJoin(isAdmin
+          ?{id:-1,name:'Game Master',emoji:'👑',color:'#d4a054',score:0,spectator:true}
+          :{id:-2,name:'Toeschouwer',emoji:'👁',color:'#6ea3ff',score:0,spectator:true})}>
+          {isAdmin?'👑 Observeren als GM':'👁 Bekijk als toeschouwer'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -4777,7 +4884,7 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
 // ═══════════════════════════════════════════
 // ACTIVITY FEED — V5: photo grid + filters
 // ═══════════════════════════════════════════
-function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId}){
+function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikInTeam}){
   // V30 (Phase 7): reactions are now DB-persisted via the feed_reactions table
   // (see SUPABASE-CATCHUP-PATCH-V30.sql). Before V30 reactions lived only in
   // React state so nobody else ever saw your tap — the social signal was
@@ -4945,13 +5052,20 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId}){
       });
     }
   };
-  // V30: 'others' filter removed in Less-is-More pass
-  const filtered=feed.filter(item=>{
+  // V30: 'others' filter removed in Less-is-More pass.
+  // V34 P0 fix (Tom/Jorik personas): filter out wp:1 wedding-pipeline entries
+  // when the current viewer's team is holding Jorik. The [WP1] prefix is added
+  // by completeChallenge for any ch.wp===1 submission. Other teams (and admin)
+  // still see the entries with the marker stripped on render.
+  const visibleFeed=jorikInTeam?feed.filter(item=>!String(item.message||'').startsWith('[WP1] ')):feed;
+  const filtered=visibleFeed.filter(item=>{
     if(filter==='photos')return !!item.photo;
     if(filter==='mine')return item.team_id===myTeamId;
     return true;
   });
-  const photos=feed.filter(i=>!!i.photo);
+  const photos=visibleFeed.filter(i=>!!i.photo);
+  // Strip the [WP1] marker before render so non-Jorik teammates see clean copy.
+  const renderMessage=(raw)=>String(raw||'').replace(/^\[WP1\] /,'');
 
   return(
     <div style={{height:'100%',overflowY:'auto',padding:'var(--sp-5)',paddingBottom:'var(--sp-10)'}}>
@@ -5010,7 +5124,9 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId}){
                     + own-team rows fall through unchanged. Heuristic match: message starts
                     with "💍 Jorik-missie:" or "[JORIK-MISSION]" or contains "Jorik ruil". */}
                 {(()=>{
-                  const msg=item.message||'';
+                  // V34: strip [WP1] marker before render — entries are pre-filtered for
+                  // Jorik's team in `visibleFeed`; non-Jorik teams + admin see clean copy.
+                  const msg=renderMessage(item.message);
                   const isJorikMissionRow=/^\s*[^\s]+\s*Jorik(-missie|-MISSION| ruil)/.test(msg)||msg.startsWith('[JORIK-MISSION]');
                   const iAmHolder=jorikTeamId!=null&&item.team_id===jorikTeamId&&myTeamId===jorikTeamId;
                   if(isJorikMissionRow&&!iAmHolder&&!isSystem){
@@ -5139,8 +5255,9 @@ function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClos
 // and Resume are broadcast-only (signal to teams, no scoring halt). Reset goes
 // to the lobby (DB intact). Hernieuw spel runs the full wipe + splash flow.
 // ═══════════════════════════════════════════
-function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync}){
+function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync,promptAsync}){
   const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
+  const askInput=promptAsync||((msg,def)=>Promise.resolve(window.prompt(msg,def)));
   if(!open)return null;
   const phaseLabel=phase===0?'Lobby (wachten)':phase===1?'Fase 1 — Zoektocht':phase===2?'Fase 2 — Geruchten':phase===3?'Fase 3 — Cirkel':phase===4?'Fase 4 — Finale (×1.5)':phase>=5?'Eindceremonie / klaar':'';
   const jorikHolder=jorikTeamId!=null?teams.find(t=>t.id===jorikTeamId):null;
@@ -5198,33 +5315,53 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
                 <div className="t-caption t-muted">Phase → 0 · teams + scores blijven</div>
               </div>
             </button>
-            <button onClick={async()=>{if(await ask('LET OP — alles wissen? Dit verwijdert élk team, élke score, élke voltooide opdracht en de hele activity feed uit de database. Iedereen wordt teruggestuurd naar het startscherm. Dit kan NIET ongedaan worden gemaakt.',{danger:true,confirmLabel:'Ja, wis alles'}))onWipeAndRestart&&onWipeAndRestart()}}
+            <button onClick={async()=>{
+              // V34 P0 fix (Lisa persona): the admin URL is forwarded freely (Mike
+              // texted it to Lisa to let her observe). Any spectator with the URL
+              // could accidentally tap "Hernieuw spel" and end the day. Two-stage
+              // confirm: standard confirm first, then a typed-confirm requiring
+              // the literal word "WIS" before the wipe fires. Mike types it once;
+              // Lisa-who-meant-to-tap-Pauze backs out at the prompt.
+              if(!await ask('LET OP — alles wissen? Dit verwijdert élk team, élke score, élke voltooide opdracht en de hele activity feed uit de database. Iedereen wordt teruggestuurd naar het startscherm. Dit kan NIET ongedaan worden gemaakt.',{danger:true,confirmLabel:'Volgende stap'}))return;
+              const typed=await askInput('Typ exact "WIS" om te bevestigen dat je écht alles wilt wissen.','');
+              if(typed==null)return;
+              if(String(typed).trim().toUpperCase()!=='WIS'){
+                await ask('Je tekst kwam niet overeen met "WIS". Geen wijzigingen — het spel blijft staan.',{confirmLabel:'OK'});
+                return;
+              }
+              onWipeAndRestart&&onWipeAndRestart();
+            }}
               className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',borderColor:'rgba(255,107,107,0.45)',background:'rgba(255,107,107,0.10)',color:'#fff'}}>
               <span style={{fontSize:20}}>🏠</span>
               <div style={{textAlign:'left',flex:1}}>
                 <div className="t-body-emph" style={{color:'var(--danger)'}}>Hernieuw spel</div>
-                <div className="t-caption t-muted">Wis alles · iedereen terug naar startscherm</div>
+                <div className="t-caption t-muted">Wis alles · iedereen terug naar startscherm · typ "WIS" om te bevestigen</div>
               </div>
             </button>
           </Section>
 
           <Section title="Finale">
-            <button onClick={async()=>{if(phase>=4){return;}if(await ask('Start de finale-fase? Alle scoring krijgt ×1.5 voor de laatste 20 minuten.',{confirmLabel:'Start finale-fase'}))onStartFinalePhase&&onStartFinalePhase()}}
-              disabled={phase>=4}
-              className="btn btn-cyan" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',opacity:phase>=4?0.4:1}}>
+            {/* V34 P0 fix (Mike audit): finale buttons were tappable from phase 0 — one
+                confirm-tap from the lobby would skip straight to the ceremony.
+                Now gated on phase>=1 (game must be running) to start finale-fase,
+                and phase>=4 (must already be in finale-fase) to start eindceremonie.
+                Also requires teams.length>0 so we don't fire a finale on an empty lobby. */}
+            <button onClick={async()=>{if(phase<1||phase>=4||teamCount===0){return;}if(await ask('Start de finale-fase? Alle scoring krijgt ×1.5 voor de laatste 20 minuten.',{confirmLabel:'Start finale-fase'}))onStartFinalePhase&&onStartFinalePhase()}}
+              disabled={phase<1||phase>=4||teamCount===0}
+              className="btn btn-cyan" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',opacity:(phase<1||phase>=4||teamCount===0)?0.4:1}}>
               <span style={{fontSize:20}}>🏁</span>
               <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">{phase===4?'Finale-fase loopt · ×1.5':'Start finale-fase (×1.5)'}</div>
-                <div className="t-caption" style={{opacity:0.85}}>Punten ×1.5 in de laatste 20 min</div>
+                <div className="t-body-emph">{phase===4?'Finale-fase loopt · ×1.5':phase<1?'Start spel eerst':'Start finale-fase (×1.5)'}</div>
+                <div className="t-caption" style={{opacity:0.85}}>{phase<1?'Beschikbaar zodra het spel loopt':'Punten ×1.5 in de laatste 20 min'}</div>
               </div>
             </button>
-            <button onClick={async()=>{if(phase>=5){return;}if(await ask('Spel beëindigen en naar de eindceremonie? Dit kan niet ongedaan worden gemaakt.',{danger:true,confirmLabel:'Start eindceremonie'}))onStartFinale&&onStartFinale()}}
-              disabled={phase>=5}
-              className="btn btn-gold" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',opacity:phase>=5?0.4:1}}>
+            <button onClick={async()=>{if(phase<4||phase>=5||teamCount===0){return;}if(await ask('Spel beëindigen en naar de eindceremonie? Dit kan niet ongedaan worden gemaakt.',{danger:true,confirmLabel:'Start eindceremonie'}))onStartFinale&&onStartFinale()}}
+              disabled={phase<4||phase>=5||teamCount===0}
+              className="btn btn-gold" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',opacity:(phase<4||phase>=5||teamCount===0)?0.4:1}}>
               <span style={{fontSize:20}}>🏆</span>
               <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">{phase>=5?'Finale loopt':'Start eindceremonie'}</div>
-                <div className="t-caption" style={{opacity:0.85}}>Onthul winnaar · Mike's prijs</div>
+                <div className="t-body-emph">{phase>=5?'Finale loopt':phase<4?'Start finale-fase eerst':'Start eindceremonie'}</div>
+                <div className="t-caption" style={{opacity:0.85}}>{phase<4?'Beschikbaar na de ×1.5 fase':'Onthul winnaar · Mike\'s prijs'}</div>
               </div>
             </button>
           </Section>
@@ -5436,16 +5573,51 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
               live UI. Shows red items that need Mike's attention before gameday + green
               items already complete. Detected by grepping the live L_DATA + game_state
               for placeholder strings. Doesn't block — it's a soft reminder. */}
-          <div style={{padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(255,107,107,0.05)',border:'1px solid rgba(255,107,107,0.25)',marginBottom:'var(--sp-3)'}}>
-            <div className="t-label t-accent" style={{marginBottom:'var(--sp-2)'}}>📋 Setup checklist</div>
-            <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
-              <div>❌ <b>3 bar names + GPS-coördinaten</b> — vul in via L_DATA category 'bar' of de bar-break dropdown</div>
-              <div>❌ <b>Winnaarsprijs</b> — bewerk de tekst "Mike onthult bij dinner" in LeaderboardView</div>
-              <div>❌ <b>Wedding-video framing</b> — Mike's tekst voor de bruiloftsedit (intro/outro)</div>
-              <div>❌ <b>Trade-starter object</b> — Mike's voorwerp voor de Jorik-ruil-mission</div>
-              <div style={{marginTop:'var(--sp-2)',color:'var(--text-tertiary)'}}>Checklist verschijnt alleen voor de Game Master, niet voor spelers. Geen blocker — gameday werkt zonder, maar deze items maken het premium.</div>
-            </div>
-          </div>
+          {/* V34 P0 fix (Mike persona): the V30 hardcoded ❌ checklist always lied —
+              it claimed every item was incomplete on every visit, even after Mike
+              had handled them outside the app. Now each item has a per-item dismiss
+              toggle (localStorage-backed) so Mike can flip ✅ when he's done. The
+              whole panel can be collapsed when all items are dismissed. */}
+          {(()=>{
+            const SETUP_ITEMS=[
+              {k:'bars',l:'3 bar names + GPS-coördinaten',h:"vul in via L_DATA category 'bar' of de bar-break dropdown"},
+              {k:'prize',l:'Winnaarsprijs',h:'bewerk de tekst "Mike onthult bij dinner" in LeaderboardView'},
+              {k:'wed-frame',l:'Wedding-video framing',h:"Mike's tekst voor de bruiloftsedit (intro/outro)"},
+              {k:'trade-obj',l:'Trade-starter object',h:"Mike's voorwerp voor de Jorik-ruil-mission"},
+            ];
+            const LS_KEY='ssr_v34_setup_checklist';
+            const[done,setDone]=React.useState(()=>{try{return JSON.parse(localStorage.getItem(LS_KEY)||'{}');}catch(e){return {};}});
+            const toggle=(k)=>{const next={...done,[k]:!done[k]};setDone(next);try{localStorage.setItem(LS_KEY,JSON.stringify(next));}catch(e){}};
+            const allDone=SETUP_ITEMS.every(it=>done[it.k]);
+            const[collapsed,setCollapsed]=React.useState(allDone);
+            if(collapsed){
+              return(
+                <div onClick={()=>setCollapsed(false)} style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(95,216,165,0.08)',border:'1px solid rgba(95,216,165,0.25)',marginBottom:'var(--sp-3)',cursor:'pointer',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
+                  <span>✅</span>
+                  <span className="t-caption" style={{flex:1,color:'var(--success)'}}>Setup-checklist afgevinkt — tik om te bekijken</span>
+                </div>
+              );
+            }
+            return(
+              <div style={{padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:allDone?'rgba(95,216,165,0.06)':'rgba(255,107,107,0.05)',border:`1px solid ${allDone?'rgba(95,216,165,0.25)':'rgba(255,107,107,0.25)'}`,marginBottom:'var(--sp-3)'}}>
+                <div className="row-between" style={{marginBottom:'var(--sp-2)'}}>
+                  <div className="t-label t-accent">📋 Setup checklist</div>
+                  {allDone&&<button onClick={()=>setCollapsed(true)} style={{padding:'2px 8px',borderRadius:'var(--r-sm)',background:'transparent',border:'1px solid var(--border)',color:'var(--text-tertiary)',cursor:'pointer',fontSize:'var(--fs-11)'}}>Verbergen</button>}
+                </div>
+                <div className="t-caption stack-2" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
+                  {SETUP_ITEMS.map(it=>(
+                    <div key={it.k} onClick={()=>toggle(it.k)} style={{cursor:'pointer',display:'flex',alignItems:'flex-start',gap:'var(--sp-2)',padding:'2px 0'}}>
+                      <span style={{fontSize:14,opacity:done[it.k]?1:0.85}}>{done[it.k]?'✅':'❌'}</span>
+                      <span style={{flex:1,opacity:done[it.k]?0.6:1,textDecoration:done[it.k]?'line-through':'none'}}>
+                        <b>{it.l}</b> — {it.h}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{marginTop:'var(--sp-2)',color:'var(--text-tertiary)',fontSize:'var(--fs-11)'}}>Tik om af te vinken. Alleen voor de Game Master · geen blocker.</div>
+              </div>
+            );
+          })()}
 
           {/* V30 — Jorik resilience status (issue #16): if a Jorik holder exists,
               show the time since last rotation + countdown to the V27 25-min auto-rotate
@@ -6364,8 +6536,17 @@ function BarBreakOverlay({info,onClose,onComplete}){
   };
 
   return(
-    <div className="barbreak-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="barbreak-title">
-      <div className="barbreak-card" style={{maxWidth:460,width:'92%'}} onClick={e=>e.stopPropagation()}>
+    /* V34 P0 fix (Sandra/Tom/Bart): backdrop-tap used to silently dismiss the
+       overlay (onClick={onClose} on the backdrop). Older guests + drunk users
+       lost the moment with one stray tap and the only re-entry was the easy-to-
+       miss minimised chip. Backdrop is now non-interactive; explicit "✕ Verberg"
+       button at top-right gives a clear, deliberate dismiss action. */
+    <div className="barbreak-overlay" role="dialog" aria-modal="true" aria-labelledby="barbreak-title">
+      <div className="barbreak-card" style={{maxWidth:460,width:'92%',position:'relative'}} onClick={e=>e.stopPropagation()}>
+        <button onClick={onClose} aria-label="Verberg bar-break overlay (chip blijft zichtbaar)"
+          style={{position:'absolute',top:'var(--sp-3)',right:'var(--sp-3)',zIndex:1,padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-pill)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.06)',color:'var(--text-secondary)',cursor:'pointer',fontSize:'var(--fs-12)',fontWeight:'var(--fw-medium)',display:'flex',alignItems:'center',gap:'var(--sp-1)'}}>
+          ✕ Verberg
+        </button>
         <div className="t-label t-accent" style={{textAlign:'center'}}>🍻 Bar break</div>
         <div id="barbreak-title" className="t-title" style={{marginTop:'var(--sp-2)',background:'linear-gradient(135deg,var(--accent-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>{info.name}</div>
         <div className="chip" style={{margin:`var(--sp-4) auto var(--sp-5)`,color:urgent?'var(--danger)':'var(--accent-2)',borderColor:urgent?'rgba(255,107,107,0.4)':'rgba(228,178,92,0.35)',background:urgent?'rgba(255,107,107,0.12)':'var(--accent-glow)',animation:urgent?'breathing 1s ease-in-out infinite':'none'}}>⏱ {secLeft>=60?`${Math.floor(secLeft/60)}m ${secLeft%60}s`:`${secLeft}s`} over</div>
@@ -6413,8 +6594,12 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
   // then by challenge count, then by creation order). Single source of truth for winner.
   const sorted=React.useMemo(()=>rankTeams(teams,scores,activityFeed),[teams,scores,activityFeed]);
   const winner=sorted[0];
-  // V18: full carousel — top-scoring photos first, expand/collapse
-  const allPhotos=(activityFeed||[]).filter(a=>a.photo).slice().sort((a,b)=>(b.points||0)-(a.points||0));
+  // V18: full carousel — top-scoring photos first, expand/collapse.
+  // V34 P0 fix (Jorik/Tom personas): exclude wp:1 wedding-pipeline photos from the
+  // public photo grid. Jorik will see this screen at the eindceremonie — surfacing
+  // wedding-edit footage here would spoil the 14-juni surprise. Match the [WP1]
+  // prefix added by completeChallenge for any ch.wp===1 submission.
+  const allPhotos=(activityFeed||[]).filter(a=>a.photo&&!String(a.message||'').startsWith('[WP1] ')).slice().sort((a,b)=>(b.points||0)-(a.points||0));
   const[photosExpanded,setPhotosExpanded]=useState(false);
   const initialPhotoCount=12;
   const photos=photosExpanded?allPhotos:allPhotos.slice(0,initialPhotoCount);
