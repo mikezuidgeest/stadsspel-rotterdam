@@ -136,6 +136,10 @@
     .btn:hover{transform:translateY(-1px)}
     .btn-cyan{background:linear-gradient(135deg,#7ab2ff,#4a7bd4);box-shadow:0 10px 28px rgba(110,163,255,0.35),0 2px 6px rgba(0,0,0,0.25)}
     .btn-cyan:hover{box-shadow:0 14px 34px rgba(110,163,255,0.42),0 2px 8px rgba(0,0,0,0.28)}
+    /* V37 P1 — success state for photo upload (Sandra audit). Stays visible
+       for ~6s after submit so low-tech users don't misread the morph as failure. */
+    .btn-success{background:linear-gradient(135deg,#5fd8a5,#3eaa7d);box-shadow:0 10px 28px rgba(95,216,165,0.35),0 2px 6px rgba(0,0,0,0.25);color:#0a0b10}
+    .btn-success:hover{box-shadow:0 14px 34px rgba(95,216,165,0.42),0 2px 8px rgba(0,0,0,0.28)}
     .btn-gold{background:linear-gradient(135deg,var(--accent-2),var(--accent-deep));box-shadow:var(--sh-glow-gold)}
     .btn-gold:hover{box-shadow:0 14px 38px rgba(228,178,92,0.42),0 2px 8px rgba(228,178,92,0.25)}
     .btn-ghost{background:var(--surface);color:var(--text-primary);border:1px solid var(--border);box-shadow:var(--sh-ring);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
@@ -784,7 +788,7 @@ const MOTION_AVAILABLE=typeof DeviceMotionEvent!=='undefined'&&
 const L_DATA=[
 {id:1,n:"Erasmusbrug",la:51.907792,lo:4.489798,e:"🌉",c:"bridge",r:25,ch:[
   {t:"photo",ti:"Erasmusbrug Pose",d:"Heel team in beeld op de brug, filmaffiche-pose. Captain vooraan in held-houding, rest in V-formatie erachter. Erasmusbrug duidelijk in beeld.",p:25,df:"medium"},
-  {t:"video",ti:"Brug Catwalk",d:"Team vormt een erehaag-rij over de Erasmusbrug, loopt samen plechtig richting camera alsof ze een onzichtbare bruidegom-stoet escorteren. Captain leidt de stoet, laatste teamlid roept aan het eind 'Voor Jorik!' luid in de camera. Min. 10 sec, gefilmd vanaf de andere kant.",p:35,df:"hard",wp:1},
+  {t:"video",ti:"Brug Catwalk",d:"Team vormt een erehaag-rij over de Erasmusbrug, loopt samen plechtig richting camera alsof ze een belangrijke optocht escorteren. Captain leidt de stoet, laatste teamlid roept aan het eind iets enthousiast in de camera. Min. 10 sec, gefilmd vanaf de andere kant.",p:35,df:"hard",wp:1},
   {t:"quiz",ti:"Brug Kennis",d:"Wat is de bijnaam van de Erasmusbrug?",a:"De Zwaan",o:["De Zwaan","De Harp","De Naald","Het Zeil"],p:15,df:"easy"}]},
 {id:2,n:"Markthal",la:51.920109,lo:4.486957,e:"🏗️",c:"landmark",r:25,ch:[
   {t:"photo",ti:"Plafond Cirkel",d:"Heel team staat in een cirkel op de Markthalvloer, allemaal kijken samen omhoog naar het 'Horn of Plenty'-plafond (11.000 m², Arno Coenen) met open mond. Captain in het midden. Vraag een voorbijganger om de foto te maken vanaf ooghoogte — plafond zichtbaar boven jullie hoofden.",p:25,df:"medium"},
@@ -825,7 +829,7 @@ const L_DATA=[
 {id:15,n:"Standbeeld Erasmus",la:51.9221,lo:4.4859,e:"📚",c:"art",r:10,ch:[
   {t:"photo",ti:"Erasmus Imitatie",d:"Imiteer de pose van Erasmus. Heel team doet mee.",p:20,df:"easy"},
   {t:"quiz",ti:"Erasmus Quiz",d:"Waarvoor is Erasmus het meest bekend?",a:"Lof der Zotheid",o:["Lof der Zotheid","Het Achterhuis","Max Havelaar","De Ontdekking van de Hemel"],p:20,df:"easy"}]},
-{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"video",ti:"Erasmus Fluistert",d:"Erasmus staat hier al sinds 1622 — oudste standbeeld van NL. Captain knielt voor het Erasmus-standbeeld en vraagt namens Jorik luidop om één concreet huwelijksadvies. Min. 2 teamleden eromheen als ooggetuigen. Een teamlid off-camera levert Erasmus' antwoord met minstens één Latijns-klinkend woord. Voor de bruiloftsedit.",p:35,df:"hard",wp:1}]},
+{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"video",ti:"Erasmus Fluistert",d:"Erasmus staat hier al sinds 1622 — oudste standbeeld van NL. Captain knielt voor het Erasmus-standbeeld en vraagt luidop om één concreet levensadvies. Min. 2 teamleden eromheen als ooggetuigen. Een teamlid off-camera levert Erasmus' antwoord met minstens één Latijns-klinkend woord.",p:35,df:"hard",wp:1}]},
 {id:17,n:"Zadkine Monument",la:51.9180,lo:4.4815,e:"🗿",c:"art",r:15,ch:[
   {t:"photo",ti:"Verwoeste Stad Pose",d:"Heel team recreëert de Zadkine-pose: armen omhoog, mond open, gezichten van schrik. Captain centraal voor het beeld, allemaal in beeld.",p:25,df:"medium"},
   {t:"quiz",ti:"Monument Quiz",d:"Aan welke gebeurtenis herinnert dit beeld?",a:"Bombardement Rotterdam 1940",o:["Bombardement Rotterdam 1940","Watersnoodramp 1953","Bevrijding 1945","Havenarbeidersstaking 1970"],p:25,df:"medium"}]},
@@ -875,7 +879,7 @@ const L_DATA=[
 {id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[{t:"video",ti:"Blind Bruidegom",d:"Team voert de captain geblinddoekt 1 onbekend hapje uit Fenix. Captain beschrijft de smaak met huwelijks-metaforen (\"zuur als de schoonmoeder\"). Captain + minstens 2 teamleden zichtbaar in beeld. Film.",p:30,df:"medium"}]},
 {id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"photo",ti:"Boom Knuffelen",d:"Captain knuffelt over de reling een drijvende boom in de Rijnhaven — 's werelds eerste drijvende stadspark, made in Rotterdam. Team eromheen met handen op het hart — 'een laatste boom voor de bruiloft'.",p:20,df:"easy"}]},
 {id:51,n:"Maastunnel",la:51.902719,lo:4.468246,e:"🚇",c:"landmark",r:20,ch:[
-  {t:"video",ti:"1070 Meter Gelofte",d:"De voetgangerstunnel is 1070m lang en dateert uit 1942. Loop tot ~halverwege (~5 min one-way), niet helemaal door. Captain reciteert daar een generieke trouwgelofte hardop — echo moet hoorbaar zijn. Rest van team in een rij erachter, roept in koor 'Ja!' voor Jorik. Allemaal in beeld. Daarna terug naar de ingang.",p:40,df:"hard",wp:1},
+  {t:"video",ti:"1070 Meter Galm",d:"De voetgangerstunnel is 1070m lang en dateert uit 1942. Loop tot ~halverwege (~5 min one-way), niet helemaal door. Captain reciteert daar hardop een plechtige verklaring — echo moet hoorbaar zijn. Rest van team in een rij erachter, roept in koor 'Ja!'. Allemaal in beeld. Daarna terug naar de ingang.",p:40,df:"hard",wp:1},
   {t:"quiz",ti:"Tunnel Quiz",d:"Wanneer werd de Maastunnel geopend?",a:"1942",o:["1942","1935","1950","1960"],p:20,df:"medium"}]},
 {id:52,n:"Het Park",la:51.906157,lo:4.470373,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Picknick Zonder Picknick",d:"Team ligt in het gras van Het Park aan de voet van de Euromast alsof er een picknick is — alleen zonder eten of kleed. Captain in het midden met denkbeeldige champagnefluit omhoog.",p:15,df:"easy"}]},
 {id:53,n:"Veerhaven",la:51.907406,lo:4.478667,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Verloofdenshoot",d:"Twee teamleden flankeren de captain en kijken hem/haar verliefd aan bij de historische zeilschepen van de Veerhaven — Rotterdams chicste oude jachthaven. De captain staart wanhopig in de lens. Eén op de knie.",p:20,df:"easy"}]},
@@ -902,7 +906,7 @@ const L_DATA=[
 {id:74,n:"De Gele Kanarie",la:51.924182,lo:4.489447,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Cheers met vreemden",d:"Klink in De Gele Kanarie — Rotterdams bierbrouwers-café aan de Goudsesingel met eigen brouwerij in de kelder — met twee onbekenden aan de bar. Foto met alle 4 gezichten zichtbaar.",p:30,df:"medium"}]},
 {id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Captain's Blessing",d:"Vraag een crew member / barman aan boord van Vessel 11 om Jorik's huwelijk te zegenen in nautische termen ('Goede wind en kalm water voor Jorik en zijn aanstaande'). Captain + minstens 2 teamleden naast de gezegende in beeld. Film het complete moment.",p:30,df:"medium"}]},
 {id:76,n:"BIRD Rotterdam",la:51.926726,lo:4.478851,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Debuutalbum",d:"Bandfoto voor BIRD in ZOHO — Rotterdams ruwste jazz/hiphop-podium: captain vooraan met denkbeeldige microfoon, team erachter als ritmesectie. Niemand mag glimlachen — albumcoverregel.",p:20,df:"easy"}]},
-{id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Vriendenbiecht",d:"Heel team voor de camera bij De Vrienden Live (min. 3 leden). Elk teamlid noemt één eigenschap van Jorik die zijn aanstaande waarschijnlijk nog niet kent. Geen Jorik in beeld nodig — dit is voor de bruiloftsedit. Eén lange take.",p:30,df:"medium",wp:1}]},
+{id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Vriendenbiecht",d:"Heel team voor de camera bij De Vrienden Live (min. 3 leden). Elk teamlid noemt iets opvallends — een gewoonte, een uitspraak, een verhaal — dat de buitenwereld waarschijnlijk nog niet kent. Eén lange take. (Captain weet via de team-brief om wie het écht gaat — film in een rustige hoek.)",p:30,df:"medium",wp:1}]},
 {id:78,n:"Hitz",la:51.9224,lo:4.4780,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Bruiloftshit voor Jorik",d:"In Hitz aan de Karel Doormanstraat — Rotterdams meezing-bar bij uitstek — kies samen één nummer dat de DJ (of speaker) draait. Binnen 30 sec verzinnen jullie nieuwe tekst op het refrein — moet gaan over Jorik's huwelijk. Hele team zingt mee, captain vooraan. Filmen.",p:30,df:"medium"}]},
 {id:79,n:"Sijf",la:51.917446,lo:4.474287,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Toost op Jorik",d:"Team aan tafel op het terras van Sijf op de Witte de Withstraat, glazen geheven richting de hemel als toost op Jorik. Captain houdt het glas het hoogst. Mag een biertje of cola zijn — gelijk welk.",p:15,df:"easy"}]},
 {id:80,n:"NRC",la:51.915542,lo:4.476326,e:"🍸",c:"bar",r:15,ch:[{t:"photo",ti:"Bachelor's Last Cocktail",d:"Captain bestelt een cocktail aan de bar van NRC op de Witte de Withstraat — Rotterdams cocktail-instituut in een oude krantendrukkerij — team eromheen. Captain houdt het glas voor het gezicht, alleen ogen zichtbaar boven de rand.",p:20,df:"easy"}]},
@@ -1200,6 +1204,22 @@ function saveSession(patch){
   }catch(e){LS_OK=false;}
 }
 function clearSession(){try{localStorage.removeItem(LS_KEY);}catch(e){}}
+// V37: stable per-device UUID, lifted from ActivityView to module scope so the
+// wp:1 wedding-pipeline filter can compare against the game_state.jorik_device_id
+// (set by Mike via AdminMenu → "Markeer Jorik's telefoon"). Same key as the V30
+// reactions device id — re-used so existing devices keep their identity.
+function getDeviceId(){
+  try{
+    let d=localStorage.getItem('ssr_device_id');
+    if(!d){
+      d=(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+      try{localStorage.setItem('ssr_device_id',d);}catch(e){}
+    }
+    return d;
+  }catch(e){
+    return Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+  }
+}
 // V20 (Audit item #1): stable per-browser session UUID.
 // Backing store for team_members (SUPABASE-CATCHUP-PATCH-V32.sql) so the admin
 // can see "Lions: 4 · Tigers: 2 · Bears: 1" headcount without auth/accounts.
@@ -1439,6 +1459,17 @@ function App(){
   // V20: track when Jorik last moved (local wall clock). Used for the auto-rotate
   // watcher (admin only) and the visible countdown badge (everyone).
   const[jorikMovedAt,setJorikMovedAt]=useState(null);
+  // V37 P0 — JORIK_DEVICE_ID architecture (V36-audit Jorik P0).
+  // game_state.jorik_device_id stores the UUID of Jorik's actual phone (set by
+  // Mike at game start via the AdminMenu "Markeer Jorik's telefoon" button).
+  // Every wp:1 wedding-pipeline gate filters when local deviceId === this value,
+  // regardless of whether the rotating Jorik token is currently with Jorik's team.
+  // Without this, the V34 jorikInTeam-based filter only fires when team-with-token
+  // contains Jorik — which is wrong, since Jorik (the person) sits in ONE team
+  // all day and the token rotates separately.
+  const[jorikDeviceId,setJorikDeviceId]=useState(null);
+  const myDeviceIdRef=useRef(getDeviceId());
+  const isJorikDevice=jorikDeviceId!=null&&myDeviceIdRef.current===jorikDeviceId;
   // V20: set of team ids that have ALREADY held Jorik (per activity_feed markers).
   // Source: SELECT message FROM activity_feed WHERE message LIKE '[JORIK] team=%'.
   // Used by AdminReviewView to render "✅ al bezocht" badges and warn before a
@@ -1861,6 +1892,10 @@ function App(){
           const persisted=gs.jorik_moved_at?new Date(gs.jorik_moved_at).getTime():null;
           setJorikMovedAt(persisted&&!isNaN(persisted)?persisted:Date.now());
         }
+        // V37: hydrate Jorik device id (set by admin via "Markeer Jorik's telefoon")
+        if(typeof gs.jorik_device_id==='string'&&gs.jorik_device_id.length>0){
+          setJorikDeviceId(gs.jorik_device_id);
+        }
         // V21 P1-fix #35: seed gmLastSeen from initial fetch too
         if(gs.gm_heartbeat){
           const hb=new Date(gs.gm_heartbeat).getTime();
@@ -1928,6 +1963,11 @@ function App(){
           }
           return gs.jorik_team_id;
         });
+      }
+      // V37: realtime sync of Jorik device id (when admin marks Jorik's phone, every
+      // other client picks up the new id and starts filtering wp:1 immediately).
+      if(typeof gs.jorik_device_id==='string'){
+        setJorikDeviceId(gs.jorik_device_id||null);
       }
       if(gs.bar_break_active){
         // Someone (admin) started a bar break — show the overlay
@@ -2138,6 +2178,8 @@ function App(){
         }
         if(gs.jorik_team_id!==undefined)setJorikTeamId(gs.jorik_team_id);
         if(gs.jorik_moved_at){const t=new Date(gs.jorik_moved_at).getTime();if(!isNaN(t))setJorikMovedAt(t);}
+        // V37: pick up Jorik device id during catch-up too
+        if(typeof gs.jorik_device_id==='string')setJorikDeviceId(gs.jorik_device_id||null);
         if(gs.gm_heartbeat){const t=new Date(gs.gm_heartbeat).getTime();if(!isNaN(t))setGmLastSeen(t);}
       },()=>{});
       // step 2 — teams: scores + spectator + underdog_bonus_last_break
@@ -2749,6 +2791,32 @@ function App(){
   //   origin='start'            → no prefix (startGame writes its own "💍 Jorik begint bij …" line elsewhere)
   // The "[JORIK] team={id}" marker line (history source of truth read by the
   // never-twice filter at v20:2358 via /\[JORIK\] team=(\d+)/) is UNCHANGED.
+  // V37 P0: Mike opens this on Jorik's actual phone (the one Jorik will hold all
+  // day). Captures the local deviceId and writes it to game_state.jorik_device_id.
+  // Every other client picks it up via the realtime subscription and starts
+  // filtering wp:1 wedding-pipeline content for the device that matches.
+  // `clear=true` unmarks (writes null), useful if Mike taps the wrong phone.
+  const markJorikDevice=useCallback((clear=false)=>{
+    if(!isAdmin)return;
+    const id=clear?null:myDeviceIdRef.current;
+    setJorikDeviceId(id);
+    if(!OFFLINE&&sb){
+      sb.from('game_state').update({jorik_device_id:id}).eq('id',1).then(()=>{
+        setToast(clear?'🧹 Jorik-telefoon gewist':'📱 Jorik-telefoon gemarkeerd · wp:1 inhoud wordt nu voor dit toestel verborgen');
+      },(err)=>{
+        // Pre-V37 DB without the column → friendly fallback.
+        const msg=String(err?.message||'').toLowerCase();
+        if(msg.includes('jorik_device_id')||err?.code==='42703'){
+          setToast('⚠️ Database mist jorik_device_id kolom — voer SUPABASE-V37-JORIK-DEVICE.sql uit');
+        }else{
+          setToast('⚠️ Markeren mislukt — probeer opnieuw');
+        }
+      });
+    }else{
+      setToast(clear?'🧹 Jorik-telefoon gewist (lokaal)':'📱 Jorik-telefoon gemarkeerd (lokaal)');
+    }
+  },[isAdmin]);
+
   const moveJorik=useCallback((targetTeamId,origin)=>{
     if(!isAdmin)return;
     const movedAtTs=Date.now();
@@ -3459,12 +3527,30 @@ function App(){
 
   // ═══════════ SPLASH ═══════════
   if(screen==='splash'){
+    // V37 P1 fix (Sandra audit): WhatsApp / Instagram / Facebook in-app browsers
+    // sandbox localStorage and lose the session on every Safari hand-off. Detect
+    // via UA and surface a one-shot tip at the top of splash so the user opens
+    // the link in real Safari before they invest tap-throughs.
+    const ua=typeof navigator!=='undefined'?(navigator.userAgent||''):'';
+    const isInAppBrowser=/FBAN|FBAV|Instagram|WhatsApp|Line\//i.test(ua);
+    // V37 splash chip stacking — TESTMODUS used to be a left-floating chip that
+    // collided with the V35-extended mute toggle ("tik om uit te zetten") on
+    // narrow viewports. Now it's a full-width thin banner stacked under the
+    // optional in-app-browser warning. GM chip stays as a left-floating chip;
+    // mute toggle stays in top-right. No more visual overlap.
+    const stickyTopOffset=(isInAppBrowser?60:0)+(TEST_MODE?32:0);
     return(
       <div className="screen-hero">
-        {isAdmin&&<div className="chip chip-gold animate-in" style={{position:'absolute',top:'var(--sp-6)'}}>👑 Game Master</div>}
-        {/* V23: TESTMODUS chip — only visible while TEST_MODE is on. Once we
-            flip the constant back to false for the live build, it disappears. */}
-        {TEST_MODE&&<div className="chip animate-in" style={{position:'absolute',top:isAdmin?'calc(var(--sp-6) + 36px)':'var(--sp-6)',background:'rgba(110,163,255,0.18)',border:'1px solid rgba(110,163,255,0.45)',color:'var(--foto-2)'}}>🧪 Generale repetitie · alle drempels uit</div>}
+        {isInAppBrowser&&(
+          <div role="alert" style={{position:'absolute',top:0,left:0,right:0,padding:'10px 14px',background:'rgba(228,178,92,0.18)',borderBottom:'1px solid rgba(228,178,92,0.4)',color:'#fff',fontSize:'var(--fs-12)',textAlign:'center',lineHeight:'var(--lh-relaxed)',zIndex:5}}>
+            ⚠️ Open deze link in <b>Safari</b> (of Chrome) voor de beste ervaring — in-app browsers verliezen je voortgang. Tik op de drie puntjes rechtsboven → "Open in browser".
+          </div>
+        )}
+        {/* V23: TESTMODUS banner — visible whenever TEST_MODE is on. V37: was a
+            chip competing with mute toggle for top-row space; now a full-width
+            thin banner that doesn't collide with anything. */}
+        {TEST_MODE&&<div role="status" style={{position:'absolute',top:isInAppBrowser?60:0,left:0,right:0,padding:'6px 14px',background:'rgba(110,163,255,0.16)',borderBottom:'1px solid rgba(110,163,255,0.35)',color:'var(--foto-2)',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',textAlign:'center',letterSpacing:'0.05em',zIndex:4}}>🧪 GENERALE REPETITIE · ALLE DREMPELS UIT</div>}
+        {isAdmin&&<div className="chip chip-gold animate-in" style={{position:'absolute',top:`calc(var(--sp-6) + ${stickyTopOffset}px)`,left:'var(--sp-6)'}}>👑 Game Master</div>}
         {/* V29 — mute toggle. Persists in localStorage; defaults to UNMUTED so first-load
             users hear the cues. Top-right placement keeps it discoverable but out of
             the splash hero's attention path.
@@ -3475,8 +3561,12 @@ function App(){
             the action for screen readers. */}
         <button onClick={toggleMuted} aria-label={muted?'Geluid aanzetten':'Geluid uitzetten'}
           className="chip animate-in" type="button"
-          style={{position:'absolute',top:'var(--sp-6)',right:'var(--sp-6)',cursor:'pointer',background:muted?'rgba(255,107,107,0.12)':'rgba(95,216,165,0.12)',border:`1px solid ${muted?'rgba(255,107,107,0.4)':'rgba(95,216,165,0.4)'}`,color:muted?'var(--video-2)':'var(--success)'}}>
-          {muted?'🔇 Geluid: uit (tik om aan te zetten)':'🔊 Geluid: aan (tik om uit te zetten)'}
+          title={muted?'Tik om geluid aan te zetten':'Tik om geluid uit te zetten'}
+          style={{position:'absolute',top:`calc(var(--sp-6) + ${stickyTopOffset}px)`,right:'var(--sp-6)',cursor:'pointer',background:muted?'rgba(255,107,107,0.12)':'rgba(95,216,165,0.12)',border:`1px solid ${muted?'rgba(255,107,107,0.4)':'rgba(95,216,165,0.4)'}`,color:muted?'var(--video-2)':'var(--success)'}}>
+          {/* V37: shorter splash text (parenthetical was colliding with TESTMODUS
+              chip on narrow viewports). Action description moves to the title +
+              aria-label so screen readers + hover-tooltip still get the verb. */}
+          {muted?'🔇 Geluid uit':'🔊 Geluid aan'}
         </button>
         <div style={{fontSize:96,animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
         <div style={{height:'var(--sp-6)'}}/>
@@ -3492,6 +3582,15 @@ function App(){
         }} style={{minWidth:240}}>
           {isAdmin?'Start als Game Master':'Speel mee'} <span>→</span>
         </button>
+        {/* V37 P1 fix (Hassan audit): GPS pre-prompt rationale. The OS prompt
+            used to fire cold ("Allow location?") with no in-app context — Hassan
+            (and Sandra) reflex-deny anything they don't trust. Now we surface a
+            short why-we-need-it line on splash so the user is informed BEFORE
+            tapping Speel mee → game view → wakeGps → OS prompt. Doesn't change
+            app boot flow, just primes the user. */}
+        <div className="t-caption animate-in animate-in-5 text-center" style={{marginTop:'var(--sp-3)',maxWidth:320,lineHeight:'var(--lh-relaxed)',color:'var(--text-secondary)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(110,163,255,0.06)',border:'1px solid rgba(110,163,255,0.18)'}}>
+          📍 Straks vragen we om je locatie. <b>Géén tracking, géén opslag</b> — alleen om opdrachten in de buurt vrij te geven en foto's te valideren.
+        </div>
         <div style={{height:'var(--sp-7)'}}/>
         {/* V23: dropped "≈4 uur buiten / Neem een power bank mee" tail per Mike's
             request. Live team-count survives so the splash still signals lobby
@@ -3537,7 +3636,7 @@ function App(){
             <span style={{fontSize:16}}>⚙</span><span>Admin</span>
           </button>
         )}
-        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync} promptAsync={promptAsync}/>}
+        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice}/>}
         {/* V33: lobby needs the confirm-dialog mount point too — without this,
             confirmAsync() sets `dialog` state but no DialogSheet renders to show
             it, so admin menu confirmations silently no-op from the lobby. */}
@@ -3669,7 +3768,7 @@ function App(){
           {reviewQueue.length>0&&<span style={{background:'#ff4444',color:'#fff',fontSize:10,fontWeight:800,padding:'2px 6px',borderRadius:9}}>{reviewQueue.length}</span>}
         </button>
       )}
-      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync}/>}
+      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice}/>}
       {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal.
           V34 (Hassan): updated iOS path to iOS 17/18 (in-Safari aA → Website-instellingen);
           added "what still works without GPS" so the modal doesn't oversell failure;
@@ -3852,11 +3951,24 @@ function App(){
         </div>
       </div>
 
-      {/* V18 (V14 B1): FINALE pulsing banner — highly visible when phase 4 is live */}
+      {/* V18 (V14 B1): FINALE pulsing banner — highly visible when phase 4 is live.
+          V37 P1 fix (Tom + Lisa audit): added aftelklok chip showing minutes until
+          dinner (when Mike triggers the eindceremonie). Players were estimating
+          time remaining; now they see it live. The countdown reads from dinerTs()
+          which is gameday's 19:30 endpoint (or +4h dev offset). When the value
+          hits 0 the chip just shows "0:00" — Mike still triggers eindceremonie
+          manually so we don't auto-fire. */}
       {phase===4&&(
         <div className="finale-pulse-banner" role="status" aria-live="polite">
           <span style={{fontSize:16}}>🏆</span>
           <span className="t-card-label" style={{letterSpacing:'var(--ls-wider)'}}>FINALE LIVE</span>
+          {(()=>{
+            const msLeft=Math.max(0,dinerTs()-nowTs);
+            const m=Math.floor(msLeft/60000);
+            const s=Math.floor((msLeft%60000)/1000);
+            const mmss=`${m}:${String(s).padStart(2,'0')}`;
+            return <span className="t-card-label" style={{letterSpacing:'var(--ls-wider)',color:msLeft<60000?'#ff8a8a':'var(--accent-2)',fontVariantNumeric:'tabular-nums'}} aria-label={`Aftelklok: ${m} minuten ${s} seconden tot eindceremonie`}>⏱ {mmss}</span>;
+          })()}
           <span className="t-caption" style={{opacity:0.85}}>dichtste bij Jorik wint · loop snel naar de Markthal-cirkel</span>
         </div>
       )}
@@ -3872,9 +3984,9 @@ function App(){
 
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
-        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)}/>}
-        {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter} jorikTeamId={jorikTeamId} jorikInTeam={jorikInTeam}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} isJorikDevice={isJorikDevice}/>}
+        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} gpsOptOut={gpsOptOut}/>}
+        {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter} jorikTeamId={jorikTeamId} jorikInTeam={jorikInTeam} isJorikDevice={isJorikDevice}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} onRenameTeam={renameTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync} jorikVisitedTeamIds={jorikVisitedTeamIds} teamMemberCounts={teamMemberCounts} nowTs={nowTs}/>}
       </div>
 
@@ -3944,11 +4056,11 @@ function App(){
       {phase===5&&<FinaleScreen teams={teams} scores={scores} myTeam={myTeam} elapsed={elapsed} activityFeed={activityFeed} jorikTeamId={jorikTeamId}/>}
 
       {/* Bottom sheet for challenges */}
-      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam}/>
+      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam} isJorikDevice={isJorikDevice}/>
         /* V30: jorikInTeam already passed to ChallengeSheet — the new wp:1 secrecy lock reads it. No call-site change needed beyond the existing prop. */}
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
-      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync} promptAsync={promptAsync}/>}
+      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice}/>}
 
       {/* V19+: Jorik-specific missions — mirror of wedding, visible only when Jorik IS in team */}
       {/* V21: pos + barBreakActive passed so the panel can curate by context (loc-tagged + bar-only missions).
@@ -4107,7 +4219,11 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
   const joinExistingTeam=async(team)=>{
     if(busy)return;
     const myMembers=parseMembers();
-    const ok=await (confirmAsync?confirmAsync(`Sluit je aan bij ${team.emoji} ${team.name}?\n\n${myMembers.length>0?`Spelers die je toevoegt: ${myMembers.join(', ')}`:'Je joint zonder namen toe te voegen — dat kan ook later via de captain.'}\n\nJe komt in de lobby terecht en speelt mee met dit team.`,{confirmLabel:'Ja, sluit aan'}):window.confirm(`Sluit je aan bij ${team.emoji} ${team.name}?`));
+    // V37 P1 fix (Erik audit): old copy promised "Je komt in de lobby terecht"
+    // but post-V36-hot-fix the auto-flip lands joiners directly in the game when
+    // phase>=1. New copy is honest about both flows.
+    const phaseRunning=phase>=1;
+    const ok=await (confirmAsync?confirmAsync(`Sluit je aan bij ${team.emoji} ${team.name}?\n\n${myMembers.length>0?`Spelers die je toevoegt: ${myMembers.join(', ')}`:'Je joint zonder namen toe te voegen — dat kan ook later via de captain.'}\n\n${phaseRunning?'Je sluit direct aan in het lopende spel — je begint met 0 punten maar speelt voor het team-totaal.':'Je komt in de lobby terecht. Het spel start zodra de Game Master op start drukt.'}`,{confirmLabel:'Ja, sluit aan'}):window.confirm(`Sluit je aan bij ${team.emoji} ${team.name}?`));
     if(!ok)return;
     setBusy(true);
     if(!OFFLINE&&sb&&myMembers.length>0){
@@ -4645,7 +4761,7 @@ function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus}){
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,pendingMine,completed,completedPts,visitedLocs,jorikMissionsDone,onShowJorikMissions}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,pendingMine,completed,completedPts,visitedLocs,jorikMissionsDone,onShowJorikMissions,isJorikDevice=false}){
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
   const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
@@ -4719,7 +4835,8 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
           Ranking tab could read the full wedding-edit progress and spoil the surprise.
           Tightened gate to: !jorikInTeam && a real player team. Same fix below for the
           🤫 Geheime missie banner. */}
-      {!jorikInTeam&&myTeam?.id>0&&!myTeam?.spectator&&(()=>{
+      {/* V37: also filter when this device IS Jorik's phone (regardless of token state). */}
+      {!jorikInTeam&&myTeam?.id>0&&!myTeam?.spectator&&!isJorikDevice&&(()=>{
         const wpChallenges=[];
         L_DATA.forEach(loc=>{(loc.ch||[]).forEach((ch,idx)=>{if(ch.wp)wpChallenges.push({loc,ch,idx});});});
         // V22: cross-check completedPts > 0 so a rejected (0-pt) submission doesn't falsely
@@ -4762,8 +4879,8 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       })()}
 
       {/* Wedding video mission */}
-      {/* V36 hot-fix (Lisa P0): same spectator gate as the wp:1 progress chip above. */}
-      {!jorikInTeam&&!weddingDone&&myTeam?.id>0&&!myTeam?.spectator&&(
+      {/* V36 hot-fix (Lisa P0): spectator gate. V37 (Jorik P0): also gate on !isJorikDevice. */}
+      {!jorikInTeam&&!weddingDone&&myTeam?.id>0&&!myTeam?.spectator&&!isJorikDevice&&(
         <div className="secret-banner" onClick={onShowWedding} style={{marginBottom:'var(--sp-3)',marginTop:0}}>
           <div className="secret-badge">🤫 Geheime missie</div>
           <div className="t-card-label" style={{marginTop:'var(--sp-2)'}}>Bruiloftsvideo opnemen</div>
@@ -4888,7 +5005,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 // ═══════════════════════════════════════════
 // MAP VIEW
 // ═══════════════════════════════════════════
-function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,nowTs,jorikInTeam=false,jorikMissionsDone=null,onShowJorikMissions=null}){
+function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,nowTs,jorikInTeam=false,jorikMissionsDone=null,onShowJorikMissions=null,gpsOptOut=false}){
   const mapRef=useRef(null);
   const mapInst=useRef(null);
   const markersRef=useRef([]);
@@ -5034,13 +5151,23 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
         {/* V5.1/V12: GPS status pill — softer copy, tap to force-wake when paused.
             V35 P1 fix (Hassan persona): pill used to say "GPS zoekt…" forever when
             the user had denied permission, with no visual signal that retry is the
-            user's responsibility. Now branches on denied/unavailable explicitly. */}
-        <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer',background:gpsStatus==='denied'||gpsStatus==='unavailable'?'rgba(255,107,107,0.18)':undefined,borderColor:gpsStatus==='denied'||gpsStatus==='unavailable'?'rgba(255,107,107,0.4)':undefined,color:gpsStatus==='denied'||gpsStatus==='unavailable'?'#ff8a8a':undefined}} title={gpsStatus==='denied'?'Tik om opnieuw te proberen — eerst zet je locatie aan in Instellingen':'Tik om GPS te activeren'}>
-          <span className={`gps-dot ${gpsStatus||'weak'}`}/>
-          {gpsStatus==='denied'?'GPS uit · tik':gpsStatus==='unavailable'?'GPS niet bereikbaar':gpsStatus==='good'?'GPS actief':gpsStatus==='sleep'?'GPS paust':'GPS zoekt…'}
-          {gpsSnap&&<span style={{color:'var(--foto)'}}>· op {gpsSnap}</span>}
-          {gpsStatus==='sleep'&&<span className="snap-btn">tik om te activeren</span>}
-        </div>
+            user's responsibility. Now branches on denied/unavailable explicitly.
+            V37 P2 fix (smoke-test catch): also branch on gpsOptOut. After Hassan
+            tapped "Doorgaan zonder GPS", the V34 fix flipped gpsStatus back to
+            'weak' so the pill misleadingly said "GPS zoekt…" — the opt-out state
+            wasn't visually represented anywhere. Now the pill explicitly shows
+            "GPS uit · tik" with red styling whenever opt-out is active. */}
+        {(()=>{
+          const isOff=gpsStatus==='denied'||gpsStatus==='unavailable'||gpsOptOut;
+          return(
+            <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer',background:isOff?'rgba(255,107,107,0.18)':undefined,borderColor:isOff?'rgba(255,107,107,0.4)':undefined,color:isOff?'#ff8a8a':undefined}} title={gpsOptOut?'GPS staat uit (jij koos zonder GPS te spelen) — tik om opnieuw te proberen':gpsStatus==='denied'?'Tik om opnieuw te proberen — eerst zet je locatie aan in Instellingen':'Tik om GPS te activeren'}>
+              <span className={`gps-dot ${isOff?'denied':(gpsStatus||'weak')}`}/>
+              {gpsOptOut?'GPS uit · tik om aan te zetten':gpsStatus==='denied'?'GPS uit · tik':gpsStatus==='unavailable'?'GPS niet bereikbaar':gpsStatus==='good'?'GPS actief':gpsStatus==='sleep'?'GPS paust':'GPS zoekt…'}
+              {gpsSnap&&<span style={{color:'var(--foto)'}}>· op {gpsSnap}</span>}
+              {gpsStatus==='sleep'&&<span className="snap-btn">tik om te activeren</span>}
+            </div>
+          );
+        })()}
 
         {/* V12: legend — bottom-left, stacked (V30: offset reduced since map is now fixed-height) */}
         <div style={{position:'absolute',bottom:10,left:10,zIndex:1000,padding:'6px 8px',borderRadius:10,backdropFilter:'blur(12px)',background:'rgba(8,9,13,0.7)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:3,fontSize:9,color:'var(--text-secondary)'}}>
@@ -5089,7 +5216,7 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
 // ═══════════════════════════════════════════
 // ACTIVITY FEED — V5: photo grid + filters
 // ═══════════════════════════════════════════
-function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikInTeam}){
+function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikInTeam,isJorikDevice=false}){
   // V30 (Phase 7): reactions are now DB-persisted via the feed_reactions table
   // (see SUPABASE-CATCHUP-PATCH-V30.sql). Before V30 reactions lived only in
   // React state so nobody else ever saw your tap — the social signal was
@@ -5262,7 +5389,11 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikI
   // when the current viewer's team is holding Jorik. The [WP1] prefix is added
   // by completeChallenge for any ch.wp===1 submission. Other teams (and admin)
   // still see the entries with the marker stripped on render.
-  const visibleFeed=jorikInTeam?feed.filter(item=>!String(item.message||'').startsWith('[WP1] ')):feed;
+  // V37 P0 (Jorik audit finding): also filter on Jorik's own device, regardless of
+  // which team currently holds the rotating Jorik token. The V34 jorikInTeam-based
+  // filter only fires when the team-with-token contains Jorik — wrong, since Jorik
+  // (the person) sits in ONE team all day and the token rotates separately.
+  const visibleFeed=(jorikInTeam||isJorikDevice)?feed.filter(item=>!String(item.message||'').startsWith('[WP1] ')):feed;
   const filtered=visibleFeed.filter(item=>{
     if(filter==='photos')return !!item.photo;
     if(filter==='mine')return item.team_id===myTeamId;
@@ -5460,7 +5591,7 @@ function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClos
 // and Resume are broadcast-only (signal to teams, no scoring halt). Reset goes
 // to the lobby (DB intact). Hernieuw spel runs the full wipe + splash flow.
 // ═══════════════════════════════════════════
-function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync,promptAsync}){
+function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync,promptAsync,jorikDeviceId=null,isJorikDevice=false,onMarkJorikDevice}){
   const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
   const askInput=promptAsync||((msg,def)=>Promise.resolve(window.prompt(msg,def)));
   if(!open)return null;
@@ -5582,8 +5713,57 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
             </button>
           </Section>
 
+          {/* V37 P0 — Jorik device marker. Mike opens this menu on Jorik's actual
+              phone at game start and taps the button. The local deviceId is written
+              to game_state.jorik_device_id; every other client picks it up via the
+              realtime sub and hides wp:1 wedding-pipeline content from that device.
+              This is the structural fix for the V36-audit Jorik P0 (the team-based
+              jorikInTeam filter misfires when the rotating Jorik token sits with a
+              team that doesn't contain Jorik). */}
+          <Section title="🤵 Bruiloftsedit-bescherming">
+            {jorikDeviceId&&isJorikDevice&&(
+              <div className="panel-sm" style={{background:'rgba(95,216,165,0.08)',borderColor:'rgba(95,216,165,0.3)',padding:'var(--sp-2) var(--sp-3)',marginBottom:'var(--sp-2)'}}>
+                <div className="t-caption" style={{color:'var(--success)',lineHeight:'var(--lh-relaxed)'}}>✅ Dit toestel is gemarkeerd als Jorik's telefoon. Wedding-pipeline inhoud is hier verborgen.</div>
+              </div>
+            )}
+            {jorikDeviceId&&!isJorikDevice&&(
+              <div className="panel-sm" style={{background:'rgba(110,163,255,0.06)',borderColor:'rgba(110,163,255,0.25)',padding:'var(--sp-2) var(--sp-3)',marginBottom:'var(--sp-2)'}}>
+                <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>📱 Jorik's telefoon is gemarkeerd op een ander toestel. Hier zie je alle wedding-pipeline inhoud (admin / captain view).</div>
+              </div>
+            )}
+            <button onClick={async()=>{
+              if(jorikDeviceId&&!isJorikDevice){
+                // Different phone is already marked — confirm before overriding.
+                const ok=await (confirmAsync?confirmAsync('Een ander toestel is al gemarkeerd als Jorik\'s telefoon. Wil je dit toestel als Jorik markeren? (Het oude markeertoestel ziet vanaf nu wel weer wedding-pipeline inhoud.)',{confirmLabel:'Ja, markeer dit toestel'}):Promise.resolve(window.confirm('Override?')));
+                if(!ok)return;
+              }
+              onMarkJorikDevice&&onMarkJorikDevice(false);
+              onClose();
+            }}
+              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
+              <span style={{fontSize:20}}>📱</span>
+              <div style={{textAlign:'left',flex:1}}>
+                <div className="t-body-emph">{isJorikDevice?'Hermarkeer dit toestel als Jorik':'Markeer dit toestel als Jorik\'s telefoon'}</div>
+                <div className="t-caption t-muted">Wedding-pipeline inhoud wordt verborgen voor dit specifieke toestel · doe dit aan het begin van de dag op Jorik's telefoon</div>
+              </div>
+            </button>
+            {jorikDeviceId&&(
+              <button onClick={async()=>{
+                const ok=await (confirmAsync?confirmAsync('Jorik-telefoon markering wissen? Vanaf nu valt de wp:1 filter terug op de team-gebaseerde gate (minder veilig — alleen aanbevolen als je Jorik\'s telefoon kwijt bent of een nieuwe gaat markeren).',{confirmLabel:'Wis markering',danger:true}):Promise.resolve(window.confirm('Clear?')));
+                if(!ok)return;
+                onMarkJorikDevice&&onMarkJorikDevice(true);
+                onClose();
+              }}
+                className="btn btn-ghost btn-sm" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-2)',color:'var(--text-tertiary)',marginTop:'var(--sp-1)'}}>
+                <span style={{fontSize:14}}>🧹</span>
+                <span className="t-caption">Wis Jorik-telefoon markering</span>
+              </button>
+            )}
+          </Section>
+
           <div className="t-caption t-muted" style={{textAlign:'center',padding:'var(--sp-3)',lineHeight:'var(--lh-relaxed)'}}>
-            Voor een schema-wipe (incl. tabellen die de UI niet kent): draai <code>SUPABASE-V23-RESET.sql</code> in de Supabase SQL editor.
+            Voor een schema-wipe (incl. tabellen die de UI niet kent): draai <code>SUPABASE-V23-RESET.sql</code> in de Supabase SQL editor.<br/>
+            <b>V37 nieuw:</b> draai <code>SUPABASE-V37-JORIK-DEVICE.sql</code> één keer voor de wp:1 device-filter te activeren.
           </div>
         </div>
       </div>
@@ -5671,6 +5851,11 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
   const[barChoice,setBarChoice]=React.useState('');
   const[barCustom,setBarCustom]=React.useState('');
   const[showTeamAdmin,setShowTeamAdmin]=React.useState(false);
+  // V37 P1 (Mike audit): GM controls panel auto-collapses when queue is busy
+  // (≥6 items) so review cards don't sink below the fold. Initialized lazily so
+  // it captures the queue length on first render but doesn't fight the admin's
+  // manual toggle thereafter.
+  const[gmPanelOpen,setGmPanelOpen]=React.useState(()=>queue.length<6);
   const[undoLeft,setUndoLeft]=React.useState(0);
   const[broadcastMsg,setBroadcastMsg]=React.useState('');
   // V25 (#53): reject-reason picker — tracks which review row has the picker expanded
@@ -5728,9 +5913,18 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
            swapped once phase>=1 (was: stayed for 60 min after game start). */}
       <PaceGuide phase={phase}/>
 
-      {/* Game-master controls */}
+      {/* Game-master controls.
+          V37 P1 fix (Mike audit): when the review queue is busy (≥6 items), the
+          GM controls panel + pace-guide pre-roll pushed the first review card
+          below the fold. Default state is now collapsed when queue.length>=6;
+          admin taps the header to expand. Local state tracks user's manual
+          override so the collapse heuristic doesn't fight a deliberate expand. */}
       <div className="panel stack-4" style={{marginBottom:'var(--sp-5)',borderColor:'rgba(228,178,92,0.28)',background:'linear-gradient(155deg,rgba(228,178,92,0.05),rgba(255,255,255,0.015))'}}>
-        <div className="t-label t-accent">🎛 Game Master controls</div>
+        <div onClick={()=>setGmPanelOpen(v=>!v)} className="row-between" style={{cursor:'pointer',userSelect:'none'}}>
+          <div className="t-label t-accent">🎛 Game Master controls</div>
+          <div className="t-caption t-muted">{gmPanelOpen?'▼ verberg':`▸ ${queue.length>=6?`${queue.length} in wachtrij — `:''}toon`}</div>
+        </div>
+        {gmPanelOpen&&<>
 
         {/* Jorik tracker */}
         <div>
@@ -5957,6 +6151,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
             Voor een volledige DB-wipe: draai <code>SUPABASE-GAMEDAY-RESET.sql</code> Block A/B.
           </div>
         </div>
+        </>}
       </div>
 
       {/* Review queue header */}
@@ -6094,7 +6289,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 // ═══════════════════════════════════════════
 // CHALLENGE BOTTOM SHEET — V5: dynamic quiz rotation + photo feed
 // ═══════════════════════════════════════════
-function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam,jorikInTeam}){
+function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam,jorikInTeam,isJorikDevice=false}){
   // V29 (§4): Escape-to-close wasn't wired. Backdrop click was, but the ✕
   // button was a dim 26px text glyph on no background — Mike couldn't find
   // it in his screenshots. Below we (a) listen for Escape globally while this
@@ -6168,7 +6363,13 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
           // map / TaskList by the holding team — defeating the secrecy. Now if the
           // holding team opens a wp:1 challenge, the card shows a secrecy lock
           // explaining why and offering no upload action. Non-holders see normal.
-          const isSecretWp=ch.wp===1&&jorikInTeam;
+          // V37: Jorik's own phone also gets the secrecy lock — without this, when
+          // Jorik (the person) is in a team that doesn't currently hold the rotating
+          // token, opening any wp:1 card renders the full bruiloft-themed description
+          // (V37 P0 #2 sanitises the descriptions but the secrecy lock is the visible-
+          // even-if-sanitised guard). The original "team-currently-holds-token" gate
+          // stays as the secondary lock for the holding team's mid-rotation safety.
+          const isSecretWp=ch.wp===1&&(jorikInTeam||isJorikDevice);
           // V10: distinguish wrong-gegokt (pts=0) from correct completion
           const ptsEarned=completedPts[idx];
           const wasWrong=done && ptsEarned===0;
@@ -6180,20 +6381,25 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
             ?`🔒 Loop naar ${loc.n} · foto maken · dan opent de quiz`
             :'🔒 Eerst een foto-opdracht — dan opent de quiz';
           // V30 — secrecy lock takes precedence over the quiz-locked overlay.
+          // V37 — copy branches on isJorikDevice: holding-team teammates already
+          // know the surprise so we keep the explicit "bruiloftsvideo · 14 juni"
+          // wording; Jorik's own phone gets an innocuous "andere teams doen dit"
+          // message that doesn't leak the surprise. Title (ch.ti) is innocent
+          // ("Brug Catwalk" etc.) so it can render either way.
           if(isSecretWp&&!done){
             return(
               <div key={idx} className="ch-card" style={{position:'relative',borderColor:'rgba(228,178,92,0.35)',background:'linear-gradient(155deg,rgba(228,178,92,0.08),rgba(255,107,107,0.04))'}}>
                 <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-2)'}}>
                   <div className="flex-1">
-                    <span className="ch-type" style={{background:'rgba(228,178,92,0.18)',color:'var(--accent-2)'}}>geheim</span>
+                    <span className="ch-type" style={{background:'rgba(228,178,92,0.18)',color:'var(--accent-2)'}}>{isJorikDevice?'team-only':'geheim'}</span>
                     <h3 className="t-card-label" style={{marginTop:'var(--sp-2)'}}>{ch.ti}</h3>
                   </div>
                   <div className="points-badge">+{ch.p}</div>
                 </div>
                 <div style={{padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(0,0,0,0.25)',border:'1px dashed rgba(228,178,92,0.45)'}}>
-                  <div style={{fontSize:24,marginBottom:'var(--sp-1)'}}>🤫💍</div>
-                  <div className="t-card-label t-accent" style={{marginBottom:'var(--sp-1)'}}>Geheime bruiloftsmissie</div>
-                  <div className="t-caption" style={{lineHeight:'var(--lh-relaxed)',color:'var(--text-secondary)'}}>Deze missie is voor de surprise bruiloftsvideo van Jorik op 14 juni. Jullie team heeft Jorik nu — laat een ander team dit doen. De missie wordt weer beschikbaar zodra Jorik bij de volgende bar break naar een ander team gaat.</div>
+                  <div style={{fontSize:24,marginBottom:'var(--sp-1)'}}>{isJorikDevice?'🙌':'🤫💍'}</div>
+                  <div className="t-card-label t-accent" style={{marginBottom:'var(--sp-1)'}}>{isJorikDevice?'Niet voor jou vandaag':'Geheime bruiloftsmissie'}</div>
+                  <div className="t-caption" style={{lineHeight:'var(--lh-relaxed)',color:'var(--text-secondary)'}}>{isJorikDevice?'Deze opdracht is gereserveerd voor de andere teams. Jij hebt vandaag andere dingen te doen — kijk op de kaart voor opdrachten waar je wél punten kan halen.':'Deze missie is voor de surprise bruiloftsvideo van Jorik op 14 juni. Jullie team heeft Jorik nu — laat een ander team dit doen. De missie wordt weer beschikbaar zodra Jorik bij de volgende bar break naar een ander team gaat.'}</div>
                 </div>
               </div>
             );
@@ -6218,7 +6424,12 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                   "is real player team" — spectators with myTeam.spectator=true
                   satisfied the !jorikInTeam check and saw the explicit "Voor de
                   bruiloftsedit · Jorik mag dit niet zien" reveal. */}
-              {ch.wp===1&&!jorikInTeam&&!done&&myTeam?.id>0&&!myTeam?.spectator&&(
+              {/* V37: also gate captain-side wp:1 chip on !isJorikDevice — without this,
+                  Jorik's own phone (in a non-token-holding team) saw the explicit
+                  "🎬 Voor de bruiloftsedit · Jorik mag dit niet zien" reveal. The
+                  isSecretWp gate above already short-circuits before this renders,
+                  but the redundant gate keeps the contract explicit. */}
+              {ch.wp===1&&!jorikInTeam&&!isJorikDevice&&!done&&myTeam?.id>0&&!myTeam?.spectator&&(
                 <div className="panel-sm" style={{background:'rgba(228,178,92,0.08)',borderColor:'rgba(228,178,92,0.30)',padding:'var(--sp-2) var(--sp-3)',marginBottom:'var(--sp-2)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
                   <span style={{fontSize:18}}>🎬</span>
                   <div className="t-caption" style={{flex:1,lineHeight:'var(--lh-relaxed)'}}>
@@ -6277,6 +6488,14 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   const[quizAnswer,setQuizAnswer]=useState(null);
   const[quizFeedback,setQuizFeedback]=useState(null);
   const[processing,setProcessing]=useState(false);
+  // V37 P1 fix (Sandra audit finding): the cyan upload button used to morph
+  // straight from "📸 Foto opnemen" → "📸 Opnieuw proberen" after submit, which
+  // low-tech users read as "the upload failed, try again". Now we hold an
+  // intermediate "✅ Foto verstuurd · wacht op beoordeling" success-green state
+  // for ~6 seconds before the "Opnieuw" affordance appears, so the success is
+  // legible. Auto-clears so a real "I want to retry with a different photo"
+  // flow still works.
+  const[justSubmitted,setJustSubmitted]=useState(false);
   const quizLockRef=useRef(false);
 
   // V16: spectator admin (myTeam.id === -1) can't be credited scoring.
@@ -6359,6 +6578,11 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
       }
 
       onComplete(locId,chIdx,ch.p,shareable);
+      // V37 P1: hold the success-confirmation state for ~6s before the upload
+      // button reverts to "Opnieuw" affordance. Sandra-grade users no longer
+      // misread the morph as failure.
+      setJustSubmitted(true);
+      setTimeout(()=>setJustSubmitted(false),6000);
     };
     r.onerror=()=>{setProcessing(false);onComplete(locId,chIdx,ch.p,null)};
     r.readAsDataURL(f);
@@ -6479,8 +6703,15 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
       {/* V19+: drop capture="environment" so iOS/Android show the native
           take-photo-or-pick-from-library sheet. Desktop keeps the regular picker. */}
       <input ref={fileRef} type="file" accept={accept} style={{display:'none'}} onChange={handleFile}/>
-      <button className="btn btn-cyan" onClick={()=>fileRef.current?.click()} disabled={processing} style={{width:'100%'}}>
-        {processing?'⏳ Verwerken...':preview?(ch.t==='video'?'🎬 Opnieuw opnemen':'📸 Opnieuw proberen'):(ch.t==='video'?'🎬 Video opnemen of kiezen':ch.t==='creative'?'📸 Foto/video opnemen of kiezen':'📸 Foto opnemen of kiezen')}
+      <button className={`btn ${justSubmitted?'btn-success':'btn-cyan'}`} onClick={()=>!justSubmitted&&fileRef.current?.click()} disabled={processing||justSubmitted} style={{width:'100%'}}>
+        {processing
+          ?'⏳ Verwerken...'
+          :justSubmitted
+            ?'✅ Foto verstuurd · wacht op beoordeling'
+            :preview
+              ?(ch.t==='video'?'🎬 Opnieuw opnemen':'📸 Opnieuw proberen')
+              :(ch.t==='video'?'🎬 Video opnemen of kiezen':ch.t==='creative'?'📸 Foto/video opnemen of kiezen':'📸 Foto opnemen of kiezen')
+        }
       </button>
       {/* V21 P1-fix #29: hint text explaining the native picker has both camera & library options */}
       {!preview&&!processing&&(
