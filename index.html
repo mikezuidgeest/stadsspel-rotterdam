@@ -83,7 +83,11 @@
     .t-body-emph{font-family:var(--font-body);font-size:var(--fs-14);font-weight:var(--fw-semi);letter-spacing:var(--ls-normal);line-height:var(--lh-normal);color:var(--text-primary)}
     .t-caption{font-family:var(--font-body);font-size:var(--fs-12);font-weight:var(--fw-regular);letter-spacing:var(--ls-normal);line-height:var(--lh-snug);color:var(--text-tertiary)}
     .t-label{font-family:var(--font-display);font-size:var(--fs-11);font-weight:var(--fw-bold);letter-spacing:var(--ls-wider);text-transform:uppercase;color:var(--text-secondary)}
-    .t-label-sm{font-family:var(--font-display);font-size:var(--fs-10);font-weight:var(--fw-bold);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--text-tertiary)}
+    /* V36 P1 fix (Sandra/Bart personas): HUD font-sizes were below readable for older
+       players (bifocal-Sandra) + drunk eyes (Bart at 17:30). Bumped t-label-sm
+       from 10px → 11px (Apple HIG minimum for body-adjacent labels). 1px change
+       lifts readability significantly without disturbing layout. */
+    .t-label-sm{font-family:var(--font-display);font-size:var(--fs-11);font-weight:var(--fw-bold);letter-spacing:var(--ls-widest);text-transform:uppercase;color:var(--text-tertiary)}
     .t-num{font-family:var(--font-display);font-variant-numeric:tabular-nums;font-weight:var(--fw-black);letter-spacing:var(--ls-tight);line-height:1}
 
     .t-accent{color:var(--accent)!important}
@@ -244,7 +248,10 @@
     /* V13: Bottom tab bar — floating pill */
     .tab-bar{position:fixed;bottom:max(10px,env(safe-area-inset-bottom));left:10px;right:10px;z-index:10000;backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);background:rgba(14,15,22,0.78);border:1px solid var(--border-strong);border-radius:var(--r-pill);display:flex;padding:6px;box-shadow:0 18px 40px rgba(0,0,0,0.5),var(--sh-ring)}
     @media (min-width:560px){.tab-bar{left:calc(50% - 200px);right:auto;width:400px}}
-    .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:10px 0;background:none;border:none;color:var(--text-tertiary);font-size:9px;font-weight:600;cursor:pointer;transition:color .25s var(--ease-out),transform .3s var(--spring);letter-spacing:0.03em;text-transform:uppercase;position:relative;border-radius:var(--r-pill);-webkit-tap-highlight-color:transparent}
+    /* V36 P1 fix (Sandra/Bart personas): WCAG 2.5.5 says 44x44 minimum touch target.
+       padding:10px + 2 lines × ~14px combined = ~38-41px. Bumped to 12px padding + 11px font
+       so the visible/hit-tappable surface is comfortably ≥44px even on small phones. */
+    .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:12px 0;background:none;border:none;color:var(--text-tertiary);font-size:11px;font-weight:600;cursor:pointer;transition:color .25s var(--ease-out),transform .3s var(--spring);letter-spacing:0.03em;text-transform:uppercase;position:relative;border-radius:var(--r-pill);-webkit-tap-highlight-color:transparent;min-height:44px}
     .tab-btn .tab-icon{font-size:20px;transition:transform .35s var(--spring),filter .25s}
     .tab-btn.active{color:var(--accent)}
     .tab-btn.active::before{content:'';position:absolute;inset:4px;background:var(--accent-glow);border-radius:var(--r-pill);z-index:-1;animation:fadeInPop .3s var(--spring) both}
@@ -1676,8 +1683,14 @@ function App(){
   useEffect(()=>{if(toast){const t=setTimeout(()=>setToast(null),4000);return()=>clearTimeout(t)}},[toast]);
   // V35: expose setToast on window so PaceGuide (a leaf component nested in
   // AdminReviewView) can fire toasts on threshold-cross without prop-drilling.
-  // Cleared on App unmount so a hot-reload doesn't leak a stale closure.
-  useEffect(()=>{window.__ssrSetToast=setToast;return()=>{if(window.__ssrSetToast===setToast)delete window.__ssrSetToast;};},[]);
+  // V36 fix (auditor #2): the previous useEffect-based assignment had a race —
+  // child components' effects fire BEFORE parent effects in React, so PaceGuide's
+  // first-mount threshold check could find `window.__ssrSetToast === undefined`.
+  // Assign synchronously during render (setToast is a stable React state setter,
+  // safe to reassign on every render) so children always find a valid binding.
+  // The cleanup-on-unmount happens via the small useEffect below; no leak.
+  if(typeof window!=='undefined')window.__ssrSetToast=setToast;
+  useEffect(()=>()=>{if(typeof window!=='undefined'&&window.__ssrSetToast===setToast)delete window.__ssrSetToast;},[]);
   useEffect(()=>{if(scorePopup){const t=setTimeout(()=>setScorePopup(null),1200);return()=>clearTimeout(t)}},[scorePopup]);
 
   // V14: 1-second tick for countdown clocks (HUD + bar break)
@@ -1823,6 +1836,13 @@ function App(){
           // Game already started — skip lobby
           setPhase(gs.phase);
           if(gs.started_at)setGameStart(new Date(gs.started_at).getTime());
+          // V36 fix (caught during V35 testing): the realtime UPDATE handler at
+          // ~line 1898 correctly does `setScreen(s=>s==='lobby'?'game':s)` when
+          // game starts, but this INITIAL fetch path didn't — so a fresh-mount
+          // late-joiner with phase already >=1 stayed pinned on lobby until the
+          // next game_state UPDATE. Spectators who joined post-start saw an
+          // empty lobby + no path forward. Mirror the same flip here.
+          setScreen(s=>s==='lobby'?'game':s);
         }
         if(gs.bar_break_active){
           // Bar break is currently live
@@ -1963,15 +1983,18 @@ function App(){
     sb.from('activity_feed').select('*').order('created_at',{ascending:false}).limit(500).then(res=>{
       if(res.data&&res.data.length){
         // V24: surface a recent broadcast on initial mount so a player who
-        // joins mid-announcement still sees it. Threshold: within the last
-        // 30 sec of activity_feed time. Older broadcasts stay in the feed
-        // tab but don't re-fire as a banner (would be confusing).
+        // joins mid-announcement still sees it.
+        // V36 P1 fix (Erik persona): threshold raised from 30 sec → 5 min so a
+        // late-joiner / cold-mount user has a chance to see the most recent GM
+        // announcement (Mike's "everyone to Markthal!" lands at T+0; Erik arrives
+        // at T+45s and used to see nothing). 5 min is short enough that a stale
+        // bar-end-soon broadcast doesn't surface AFTER the bar break ended.
         const recentBroadcast=res.data.find(a=>{
           if(a.team_emoji!==BROADCAST_EMOJI)return false;
           const msg=a.message||'';
           if(msg.startsWith('['))return false;
           const ageMs=Date.now()-new Date(a.created_at).getTime();
-          return ageMs<30000;
+          return ageMs<5*60*1000;
         });
         if(recentBroadcast)showBroadcast(recentBroadcast.message,recentBroadcast.created_at);
         setActivityFeed(prev=>{
@@ -3478,7 +3501,7 @@ function App(){
 
   // ═══════════ TEAM SETUP ═══════════
   if(screen==='setup'){
-    return <TeamSetup teams={teams} setTeams={setTeams} onJoin={(team)=>{setMyTeam(team);setScreen('lobby')}} isAdmin={isAdmin} promptAsync={promptAsync} confirmAsync={confirmAsync} teamMemberCounts={teamMemberCounts} phase={phase}/>;
+    return <TeamSetup teams={teams} setTeams={setTeams} onJoin={(team)=>{setMyTeam(team);setScreen('lobby')}} isAdmin={isAdmin} promptAsync={promptAsync} confirmAsync={confirmAsync} teamMemberCounts={teamMemberCounts} phase={phase} scores={scores} jorikTeamId={jorikTeamId} activityFeed={activityFeed} barBreakActive={barBreakActive}/>;
   }
 
   // ═══════════ LOBBY ═══════════
@@ -3936,7 +3959,59 @@ function App(){
 // ═══════════════════════════════════════════
 // TEAM SETUP — V5: starter packs + custom
 // ═══════════════════════════════════════════
-function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamMemberCounts={},phase=0}){
+// V36 P1 fix (Erik/Bart personas): late-joiners + offline-recovery players had
+// no way to see what happened during their absence. Expandable summary inside
+// the existing late-join warning shows top team, current Jorik holder, last bar
+// break, and the 3 most recent activity entries. Strips [WP1] markers so wedding
+// pipeline shots stay secret. One-tap-to-expand; default collapsed so it doesn't
+// dominate the team-pick screen.
+function CatchupSummary({teams=[],scores={},jorikTeamId=null,activityFeed=[],barBreakActive=null}){
+  const[open,setOpen]=React.useState(false);
+  const ranked=React.useMemo(()=>{
+    return teams.filter(t=>t.id>0).map(t=>({t,score:scores[t.id]||t.score||0})).sort((a,b)=>b.score-a.score);
+  },[teams,scores]);
+  const top=ranked[0];
+  const holder=jorikTeamId!=null?teams.find(t=>t.id===jorikTeamId):null;
+  const recent=React.useMemo(()=>{
+    // Strip [WP1] markers + system rows; keep last 3
+    return (activityFeed||[]).filter(a=>{
+      const m=String(a.message||'');
+      if(m.startsWith('[JORIK] team='))return false;
+      return true;
+    }).slice(0,3).map(a=>({...a,message:String(a.message||'').replace(/^\[WP1\] /,'')}));
+  },[activityFeed]);
+  return(
+    <div style={{marginTop:'var(--sp-2)',width:'100%'}}>
+      <button type="button" onClick={()=>setOpen(o=>!o)}
+        style={{padding:'2px 8px',borderRadius:'var(--r-sm)',background:'transparent',border:'1px dashed rgba(228,178,92,0.45)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-12)'}}>
+        {open?'▼ Verberg samenvatting':'📊 Wat heb je gemist?'}
+      </button>
+      {open&&(
+        <div style={{marginTop:'var(--sp-2)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-sm)',background:'rgba(0,0,0,0.25)',border:'1px solid rgba(255,255,255,0.06)',color:'var(--text-secondary)'}}>
+          {top&&<div className="t-caption" style={{lineHeight:'var(--lh-relaxed)'}}><b style={{color:top.t.color}}>{top.t.emoji} {top.t.name}</b> staat op kop met <b>{top.score} pts</b></div>}
+          {holder?(
+            <div className="t-caption" style={{lineHeight:'var(--lh-relaxed)',marginTop:2}}>💍 Jorik is bij <b style={{color:holder.color}}>{holder.emoji} {holder.name}</b></div>
+          ):(
+            <div className="t-caption" style={{lineHeight:'var(--lh-relaxed)',marginTop:2}}>💍 Jorik loopt nog alleen</div>
+          )}
+          {barBreakActive&&barBreakActive.name&&<div className="t-caption" style={{lineHeight:'var(--lh-relaxed)',marginTop:2}}>🍻 Bar break loopt nu bij <b>{barBreakActive.name}</b></div>}
+          {recent.length>0&&(
+            <div style={{marginTop:'var(--sp-2)',paddingTop:'var(--sp-2)',borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+              <div className="t-label-sm" style={{color:'var(--text-tertiary)',marginBottom:2}}>LAATSTE 3</div>
+              {recent.map((a,i)=>(
+                <div key={i} className="t-caption" style={{lineHeight:'var(--lh-relaxed)',opacity:0.85}}>
+                  {a.team_emoji||'📢'} {a.team_name||'Game Master'}: {a.message.slice(0,80)}{a.message.length>80?'…':''}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamMemberCounts={},phase=0,scores={},jorikTeamId=null,activityFeed=[],barBreakActive=null}){
   const[mode,setMode]=useState('quick'); // 'quick' | 'custom'
   const[name,setName]=useState('');
   const[emoji,setEmoji]=useState('');
@@ -4125,13 +4200,14 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
           nog niet gestart". */}
       {showLateJoin&&!teamSlotsFull&&(
         <div role="alert" aria-live="polite"
-          style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.12)',border:'1px solid rgba(228,178,92,0.45)',color:'var(--accent-2)',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
+          style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.12)',border:'1px solid rgba(228,178,92,0.45)',color:'var(--accent-2)',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)',flexWrap:'wrap'}}>
           <div style={{fontSize:20,flexShrink:0}}>⚠️</div>
-          <div style={{flex:1,minWidth:0}}>
+          <div style={{flex:1,minWidth:200}}>
             <div className="t-body-emph" style={{marginBottom:2}}>De wedstrijd is al gestart</div>
             <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
               Fase: <b>{phaseLabel||`Fase ${phase}`}</b> · je kunt nog steeds meedoen, maar een deel van de punten is al vergeven.
             </div>
+            <CatchupSummary teams={teams} scores={scores} jorikTeamId={jorikTeamId} activityFeed={activityFeed} barBreakActive={barBreakActive}/>
           </div>
           <button type="button" onClick={()=>setLateJoinDismissed(true)}
             aria-label="Sluit waarschuwing"
@@ -4142,13 +4218,14 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
       )}
       {showLateJoin&&teamSlotsFull&&(
         <div role="alert" aria-live="polite"
-          style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.45)',color:'#fff',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)'}}>
+          style={{marginBottom:'var(--sp-4)',padding:'var(--sp-3) var(--sp-4)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.45)',color:'#fff',display:'flex',alignItems:'flex-start',gap:'var(--sp-3)',flexWrap:'wrap'}}>
           <div style={{fontSize:20,flexShrink:0}}>🔴</div>
-          <div style={{flex:1,minWidth:0}}>
+          <div style={{flex:1,minWidth:200}}>
             <div className="t-body-emph" style={{marginBottom:2,color:'var(--accent-2)'}}>Spel loopt · {MAX_TEAMS}/{MAX_TEAMS} teams gevuld</div>
             <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
               Fase: <b>{phaseLabel||`Fase ${phase}`}</b>. Geen nieuwe teams meer — tik op een team hierboven om je aan te sluiten, of bekijk als toeschouwer.
             </div>
+            <CatchupSummary teams={teams} scores={scores} jorikTeamId={jorikTeamId} activityFeed={activityFeed} barBreakActive={barBreakActive}/>
           </div>
           <button type="button" onClick={()=>setLateJoinDismissed(true)}
             aria-label="Sluit waarschuwing"
@@ -4281,7 +4358,20 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
         </div>
       )}
 
-      {mode==='custom'&&(
+      {/* V36 P2 fix (Erik persona): pre-V36 the custom-team form was fully
+          interactive even when teamSlotsFull — user filled in name+icon+color
+          and only learned at Submit it couldn't proceed. Replace the whole
+          custom panel with a placeholder when full so the user immediately
+          understands their options. */}
+      {mode==='custom'&&teamSlotsFull&&(
+        <div className="panel text-center" style={{borderStyle:'dashed',borderColor:'rgba(228,178,92,0.3)',background:'rgba(228,178,92,0.04)'}}>
+          <div style={{fontSize:32}}>🔒</div>
+          <div className="t-card-label" style={{marginTop:'var(--sp-2)',color:'var(--accent-2)'}}>Geen ruimte voor een nieuw team</div>
+          <div className="t-body" style={{marginTop:'var(--sp-2)',color:'var(--text-secondary)'}}>{MAX_TEAMS}/{MAX_TEAMS} teams zijn gevuld. Tik op een team hierboven om je aan te sluiten, of bekijk het spel als toeschouwer.</div>
+          <button className="btn btn-ghost btn-sm" style={{marginTop:'var(--sp-3)'}} onClick={()=>setMode('quick')}>← Terug naar starter packs</button>
+        </div>
+      )}
+      {mode==='custom'&&!teamSlotsFull&&(
         <div className="stack-3">
           <div className="panel">
             <div className="t-label" style={{marginBottom:'var(--sp-2)'}}>Teamnaam</div>
@@ -4307,9 +4397,9 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
               ))}
             </div>
           </div>
-          <button className="btn btn-cyan btn-lg" onClick={createCustom} disabled={!name||!emoji||!color||busy||teamSlotsFull}
+          <button className="btn btn-cyan btn-lg" onClick={createCustom} disabled={!name||!emoji||!color||busy}
             style={{width:'100%'}}>
-            {busy?'⏳ Aanmaken…':teamSlotsFull?`🔒 ${MAX_TEAMS}/${MAX_TEAMS} teams gevuld`:'Team aanmaken & joinen'}
+            {busy?'⏳ Aanmaken…':'Team aanmaken & joinen'}
           </button>
           {err&&<div className="panel-sm t-body-emph t-danger text-center" style={{background:'rgba(255,107,107,0.12)',borderColor:'rgba(255,107,107,0.35)'}}>⚠ {err}</div>}
         </div>
@@ -6246,10 +6336,32 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   // V7: one shot. Correct → full points. Wrong → 0 pts, challenge marked done.
   // V7.1: ref-based lock — state is async, so two fast taps could both pass the
   // `if(quizAnswer)` check before React re-renders the disabled buttons.
+  // V36 P1 fix (Sandra/Bart/Hassan personas): all three personas reported
+  // mistapping the quiz (older fingers, drunk fingers, ungloved-cold fingers).
+  // First tap now stages the answer ("Bevestig: X?") for `medium` and `hard`
+  // quizzes; tapping the same answer again or "Bevestig" commits. `easy` quizzes
+  // stay one-shot — the difficulty curve still bites if you didn't read carefully.
+  // The 600ms grace lets a mistapper visually catch the staged answer + back out.
+  const[stagedAnswer,setStagedAnswer]=React.useState(null); // V36
+  const[graceUntil,setGraceUntil]=React.useState(0); // V36
   const handleQuiz=opt=>{
     if(quizLockRef.current)return;
+    // V36: grace window for medium+hard quizzes. Easy quizzes commit immediately.
+    const useGrace=ch.df==='medium'||ch.df==='hard';
+    if(useGrace){
+      const now=Date.now();
+      // First tap on this option, OR same option but past the grace window: stage it.
+      if(stagedAnswer!==opt||now>graceUntil){
+        setStagedAnswer(opt);
+        setGraceUntil(now+600);
+        try{if(navigator.vibrate)navigator.vibrate(8);}catch(e){}
+        return;
+      }
+      // Second tap on same option within the grace window: COMMIT.
+    }
     quizLockRef.current=true;
     setQuizAnswer(opt);
+    setStagedAnswer(null);
     if(opt===ch.a){
       setQuizFeedback('correct');
       // V29 audio + haptic cue. Correct answer = bright two-tone bell + short tap.
@@ -6267,8 +6379,9 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   };
 
   if(ch.t==='quiz'){
-    // V12: advertise stakes clearly before the tap
-    const stakes=ch.df==='hard'?'⚡ Eén kans · hard — 4 opties, weinig ruimte voor geluk':ch.df==='medium'?'⚡ Eén kans · medium — denk goed na':'⚡ Eén kans · easy — fout = 0 pts, geen herkansing';
+    // V12: advertise stakes clearly before the tap.
+    // V36: stakes copy mentions the new "tik 2x om te bevestigen" rule on medium+hard.
+    const stakes=ch.df==='hard'?'⚡ Eén kans · hard — 4 opties · tik 2x om te bevestigen':ch.df==='medium'?'⚡ Eén kans · medium — tik 2x om te bevestigen':'⚡ Eén kans · easy — fout = 0 pts, geen herkansing';
     return(
       <div style={{marginTop:'var(--sp-3)'}}>
         <div className="t-body-emph t-danger" style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-sm)',background:'rgba(255,107,107,0.1)',border:'1px solid rgba(255,107,107,0.25)',marginBottom:'var(--sp-3)'}}>
@@ -6276,18 +6389,22 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
         </div>
         {ch.o.map((opt,i)=>{
           const isChosen=quizAnswer===opt;
+          const isStaged=stagedAnswer===opt&&!quizAnswer;
           const isRightAnswer=opt===ch.a;
           // During wrong-feedback, highlight the correct answer in green too
           const revealRight=quizFeedback==='wrong'&&isRightAnswer;
           const letter=String.fromCharCode(65+i); // A / B / C / D
           return(
             <button key={i}
-              className={`quiz-option ${isChosen?(quizFeedback==='correct'?'correct':'wrong'):''} ${revealRight?'correct':''}`}
+              className={`quiz-option ${isChosen?(quizFeedback==='correct'?'correct':'wrong'):''} ${revealRight?'correct':''} ${isStaged?'staged':''}`}
               onClick={()=>handleQuiz(opt)}
-              aria-label={`Antwoord ${letter}: ${opt}`}
+              aria-label={isStaged?`Bevestig antwoord ${letter}: ${opt}`:`Antwoord ${letter}: ${opt}`}
+              style={isStaged?{borderColor:'var(--accent-2)',background:'rgba(228,178,92,0.12)',boxShadow:'0 0 0 2px rgba(228,178,92,0.35)'}:undefined}
               disabled={!!quizAnswer}>
               <span aria-hidden="true" style={{display:'inline-block',width:22,height:22,lineHeight:'22px',borderRadius:11,background:'rgba(255,255,255,0.06)',textAlign:'center',fontWeight:800,fontSize:11,marginRight:10,color:'var(--text-secondary)'}}>{letter}</span>
-              {opt}{revealRight&&<span style={{marginLeft:8,fontSize:11,fontWeight:700}}>← juist</span>}
+              {opt}
+              {isStaged&&<span style={{marginLeft:8,fontSize:11,fontWeight:700,color:'var(--accent-2)'}}>← tik nogmaals om te bevestigen</span>}
+              {revealRight&&<span style={{marginLeft:8,fontSize:11,fontWeight:700}}>← juist</span>}
             </button>
           );
         })}
