@@ -3290,6 +3290,27 @@ function App(){
     if(myTeam)saveSession({screen,myTeam,phase,gameStart,tab});
   },[screen,myTeam,phase,gameStart,tab]);
 
+  // V36 hot-fix (Erik persona P0 SHIP-BLOCKER): the V36 spectator initial-mount
+  // auto-flip at v36.html:1845 only fires inside the game_state initial-fetch
+  // effect. A first-time mid-game joiner flow is:
+  //   1. Page loads → realtime fetches phase=2 → initial-fetch flip is no-op
+  //      because screen is still 'splash' at that moment.
+  //   2. User taps "Speel mee" → setScreen('setup').
+  //   3. User picks team or "👁 Bekijk als toeschouwer" → onJoin sets myTeam +
+  //      setScreen('lobby').
+  //   4. User stuck on lobby — no further game_state event arrives, so the
+  //      realtime UPDATE flip at v36.html:1917 never fires. The "Start spel
+  //      (testmodus)" button is also a silent no-op (startGame() early-returns
+  //      when phase>0). Only escape: page reload.
+  // This effect closes the gap: any time we have a team/spectator AND phase>=1
+  // AND we're parked on lobby, flip to game. Also covers the post-reload case
+  // where realtime arrives before the user has navigated past splash.
+  useEffect(()=>{
+    if(myTeam&&phase>=1&&phase<6&&screen==='lobby'){
+      setScreen('game');
+    }
+  },[myTeam,phase,screen]);
+
   // V35 P1 fix (Erik/Sandra personas): silent phase transitions confused everyone
   // who was tabbed away or new to the day. Now fire a toast on every advance so
   // late-joiners + players in the middle of an upload see the world change. Skip
@@ -4692,8 +4713,13 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       </div>
 
       {/* V21: WEDDING-VIDEO PIPELINE — 4 hand-picked landmarks deliver the surprise edit.
-          Computes from L_DATA wp:1 + completed[locId][chIdx]. Hidden when Jorik is IN the team. */}
-      {!jorikInTeam&&(()=>{
+          Computes from L_DATA wp:1 + completed[locId][chIdx]. Hidden when Jorik is IN the team.
+          V36 hot-fix (Lisa P0 audit finding): spectators (id=-2 / myTeam.spectator) had
+          jorikInTeam=false so the !jorikInTeam gate let them through. A spectator at the
+          Ranking tab could read the full wedding-edit progress and spoil the surprise.
+          Tightened gate to: !jorikInTeam && a real player team. Same fix below for the
+          🤫 Geheime missie banner. */}
+      {!jorikInTeam&&myTeam?.id>0&&!myTeam?.spectator&&(()=>{
         const wpChallenges=[];
         L_DATA.forEach(loc=>{(loc.ch||[]).forEach((ch,idx)=>{if(ch.wp)wpChallenges.push({loc,ch,idx});});});
         // V22: cross-check completedPts > 0 so a rejected (0-pt) submission doesn't falsely
@@ -4736,7 +4762,8 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       })()}
 
       {/* Wedding video mission */}
-      {!jorikInTeam&&!weddingDone&&(
+      {/* V36 hot-fix (Lisa P0): same spectator gate as the wp:1 progress chip above. */}
+      {!jorikInTeam&&!weddingDone&&myTeam?.id>0&&!myTeam?.spectator&&(
         <div className="secret-banner" onClick={onShowWedding} style={{marginBottom:'var(--sp-3)',marginTop:0}}>
           <div className="secret-badge">🤫 Geheime missie</div>
           <div className="t-card-label" style={{marginTop:'var(--sp-2)'}}>Bruiloftsvideo opnemen</div>
@@ -6187,7 +6214,11 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                   a subtle banner so the captain knows this footage is for the surprise
                   edit and Jorik must not see it. Holding team already gets a hard
                   secrecy lock above; this chip educates non-holders without spoiling. */}
-              {ch.wp===1&&!jorikInTeam&&!done&&(
+              {/* V36 hot-fix (Lisa P0): also gate the captain-side wp:1 chip on
+                  "is real player team" — spectators with myTeam.spectator=true
+                  satisfied the !jorikInTeam check and saw the explicit "Voor de
+                  bruiloftsedit · Jorik mag dit niet zien" reveal. */}
+              {ch.wp===1&&!jorikInTeam&&!done&&myTeam?.id>0&&!myTeam?.spectator&&(
                 <div className="panel-sm" style={{background:'rgba(228,178,92,0.08)',borderColor:'rgba(228,178,92,0.30)',padding:'var(--sp-2) var(--sp-3)',marginBottom:'var(--sp-2)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
                   <span style={{fontSize:18}}>🎬</span>
                   <div className="t-caption" style={{flex:1,lineHeight:'var(--lh-relaxed)'}}>
