@@ -1966,8 +1966,15 @@ function App(){
       }
       // V37: realtime sync of Jorik device id (when admin marks Jorik's phone, every
       // other client picks up the new id and starts filtering wp:1 immediately).
-      if(typeof gs.jorik_device_id==='string'){
-        setJorikDeviceId(gs.jorik_device_id||null);
+      // V37.1 hot-fix (Jorik audit P1): the original `typeof === 'string'` check
+      // excluded null, so when Mike tapped "Wis Jorik-telefoon markering" the
+      // null UPDATE didn't propagate — other clients kept the stale UUID and
+      // continued filtering for a phone Mike no longer thought was Jorik.
+      // Use `'jorik_device_id' in gs` so we react to both set-to-string AND
+      // set-to-null payloads.
+      if('jorik_device_id' in gs){
+        const v=gs.jorik_device_id;
+        setJorikDeviceId(typeof v==='string'&&v.length>0?v:null);
       }
       if(gs.bar_break_active){
         // Someone (admin) started a bar break — show the overlay
@@ -2179,7 +2186,8 @@ function App(){
         if(gs.jorik_team_id!==undefined)setJorikTeamId(gs.jorik_team_id);
         if(gs.jorik_moved_at){const t=new Date(gs.jorik_moved_at).getTime();if(!isNaN(t))setJorikMovedAt(t);}
         // V37: pick up Jorik device id during catch-up too
-        if(typeof gs.jorik_device_id==='string')setJorikDeviceId(gs.jorik_device_id||null);
+        // V37.1: same null-propagation fix as the realtime UPDATE handler — accept null clears
+        if('jorik_device_id' in gs){const v=gs.jorik_device_id;setJorikDeviceId(typeof v==='string'&&v.length>0?v:null);}
         if(gs.gm_heartbeat){const t=new Date(gs.gm_heartbeat).getTime();if(!isNaN(t))setGmLastSeen(t);}
       },()=>{});
       // step 2 — teams: scores + spectator + underdog_bonus_last_break
@@ -3543,7 +3551,7 @@ function App(){
       <div className="screen-hero">
         {isInAppBrowser&&(
           <div role="alert" style={{position:'absolute',top:0,left:0,right:0,padding:'10px 14px',background:'rgba(228,178,92,0.18)',borderBottom:'1px solid rgba(228,178,92,0.4)',color:'#fff',fontSize:'var(--fs-12)',textAlign:'center',lineHeight:'var(--lh-relaxed)',zIndex:5}}>
-            ⚠️ Open deze link in <b>Safari</b> (of Chrome) voor de beste ervaring — in-app browsers verliezen je voortgang. Tik op de drie puntjes rechtsboven → "Open in browser".
+            ⚠️ Open deze link in <b>Safari</b> (of Chrome) voor de beste ervaring — in-app browsers verliezen je voortgang. Tik rechtsboven op de drie puntjes (<b>⋮</b>) of het deel-icoon → kies <b>"Open in Safari"</b> (iPhone) of <b>"Open in Chrome"</b> (Android).
           </div>
         )}
         {/* V23: TESTMODUS banner — visible whenever TEST_MODE is on. V37: was a
@@ -4646,7 +4654,7 @@ function SkeletonRow(){
   );
 }
 
-function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus}){
+function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus,gpsOptOut=false}){
   // V23: when TASKLIST_NEARBY_ONLY (default true), the list under the map is
   // capped to TASKLIST_NEARBY_N nearest non-completed missions. The map itself
   // still shows all 102 markers — this only affects the scrollable mission
@@ -4673,7 +4681,11 @@ function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus}){
     //   - GPS denied/unavailable → static placeholder + actionable instruction (no shimmer — nothing is loading)
     //   - GPS weak/searching → shimmer skeleton (active loading)
     //   - first-fix-not-yet → shimmer skeleton (active loading)
-    const denied=gpsStatus==='denied'||gpsStatus==='unavailable';
+    // V37.1 hot-fix (Hassan audit P2): TaskList didn't receive `gpsOptOut`, so the
+    // shimmer/loading copy ("zoekt nu je locatie") rendered below the red "GPS uit"
+    // pill — directly contradicting it. Now treat opt-out as the same intent as
+    // denied: show the no-GPS placeholder + suggest re-engaging via the pill.
+    const denied=gpsStatus==='denied'||gpsStatus==='unavailable'||gpsOptOut;
     const loadingGps=!pos&&!denied;
     let rows=[];
     if(pos){
@@ -4683,7 +4695,7 @@ function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus}){
     return(
       <section style={{marginTop:'var(--sp-5)'}}>
         <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Dichtstbij je nu ({headerSuffix})</h3>
-        {denied&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,107,107,0.4)',borderRadius:'var(--r-md)',fontSize:13,color:'var(--video-2)',marginBottom:'var(--sp-3)'}}>📍🚫 Locatie geweigerd — schakel GPS in via je telefooninstellingen om de dichtstbijzijnde missies te zien.</div>}
+        {denied&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,107,107,0.4)',borderRadius:'var(--r-md)',fontSize:13,color:'var(--video-2)',marginBottom:'var(--sp-3)'}}>{gpsOptOut?'📍 GPS staat uit (jij koos zonder GPS te spelen). Tik op de rode GPS-pil hierboven om opnieuw te proberen.':'📍🚫 Locatie geweigerd — schakel GPS in via je telefooninstellingen om de dichtstbijzijnde missies te zien.'}</div>}
         {loadingGps&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS-fix — zoekt nu je locatie. Een paar seconden geduld.</div>}
         {loadingGps&&[0,1,2].map(i=><SkeletonRow key={i}/>)}
         {!loadingGps&&rows.length===0&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Geen openstaande missies in de buurt — alles in deze radius is al gedaan.</div>}
@@ -5207,7 +5219,7 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
             </div>
           );
         })()}
-        <TaskList pos={pos} onSelect={onSelect} completed={completed} visitedLocs={visitedLocs} gpsStatus={gpsStatus}/>
+        <TaskList pos={pos} onSelect={onSelect} completed={completed} visitedLocs={visitedLocs} gpsStatus={gpsStatus} gpsOptOut={gpsOptOut}/>
       </div>
     </div>
   );
@@ -6735,7 +6747,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
 // ═══════════════════════════════════════════
 // WEDDING VIDEO MISSION
 // ═══════════════════════════════════════════
-function WeddingMission({onClose,onComplete,done,jorikInTeam,confirmAsync}){
+function WeddingMission({onClose,onComplete,done,jorikInTeam,confirmAsync,isJorikDevice=false}){
   const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
   const fileRef=useRef(null);
   const retakeRef=useRef(null);
@@ -6750,6 +6762,17 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam,confirmAsync}){
     return()=>window.removeEventListener('keydown',onKey);
   },[onClose]);
   const titleId='wedding-title';
+
+  // V37.1 hot-fix (Jorik audit P1): defense-in-depth — the WeddingMission modal
+  // contains the most explicit "Bruiloftsvideo voor Jorik · 14 juni" reveal in
+  // the entire app. The trigger banner upstream (LeaderboardView) is gated on
+  // !isJorikDevice, but if anything ever opens this modal on Jorik's device
+  // (programmatically, via deep link, via a future entry point), the modal
+  // would still leak. Hard-gate render here too. Closes the leak unconditionally.
+  if(isJorikDevice){
+    if(typeof onClose==='function')setTimeout(onClose,0);
+    return null;
+  }
 
   return(
     <>
