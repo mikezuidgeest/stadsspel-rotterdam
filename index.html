@@ -499,6 +499,162 @@
     .task-group-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-tertiary);margin:14px 0 8px;padding-left:2px}
     .task-group-label.unlock{color:var(--creatief-2)}
     .task-group-label.preview{color:var(--accent-2)}
+    /* ═══ V38: FLIPPERCOIN · V39 polish: extruded 3D gold token (40 stacked slices) on casino felt ═══ */
+    .flipcoin-stage{text-align:center;padding:var(--sp-7) var(--sp-4) var(--sp-6);border-radius:var(--r-lg);background:
+      /* casino felt — emerald + subtle radial spotlight */
+      radial-gradient(ellipse at 50% 35%,rgba(255,235,170,0.10),transparent 55%),
+      radial-gradient(ellipse at 50% 100%,rgba(0,0,0,0.30),transparent 60%),
+      repeating-radial-gradient(circle at 12% 18%,rgba(255,255,255,0.012) 0,rgba(255,255,255,0.012) 1px,transparent 1px,transparent 3px),
+      linear-gradient(170deg,#0e2f23 0%,#0a2018 100%);
+      border:1px solid rgba(228,178,92,0.18);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.04),inset 0 -40px 80px rgba(0,0,0,0.45);
+      margin-bottom:var(--sp-5);overflow:hidden;position:relative}
+    .flipcoin-mystery{display:flex;gap:var(--sp-3);margin:var(--sp-5) 0}
+    .flipcoin-mystery-card{flex:1;padding:var(--sp-5) var(--sp-3);border-radius:var(--r-md);background:rgba(255,255,255,0.03);border:1px solid var(--border);text-align:center;position:relative;overflow:hidden}
+    .flipcoin-mystery-card::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 8px,rgba(255,255,255,0.015) 8px,rgba(255,255,255,0.015) 16px)}
+    .flipcoin-mystery-icon{font-size:var(--fs-30);margin-bottom:var(--sp-2);filter:blur(4px);opacity:0.5}
+    .flipcoin-mystery-label{font-size:var(--fs-11);color:var(--text-tertiary);font-weight:var(--fw-semi);letter-spacing:var(--ls-wide)}
+    .flipcoin-btn{display:inline-flex;align-items:center;gap:var(--sp-2);padding:var(--sp-4) var(--sp-7);border:none;border-radius:var(--r-pill);background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:#fff;font-family:var(--font-display);font-size:var(--fs-15);font-weight:var(--fw-bold);cursor:pointer;transition:all .2s var(--spring);box-shadow:var(--sh-glow-gold);letter-spacing:var(--ls-snug)}
+    .flipcoin-btn:active{transform:scale(0.95)}
+    .flipcoin-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+    /* ─── V39 premium: extruded coin in deep perspective ─── */
+    .flipcoin-anim{width:200px;height:200px;margin:var(--sp-4) auto var(--sp-7);perspective:1600px;position:relative}
+    /* Ground shadow — scales inversely with toss height for fake depth */
+    .flipcoin-shadow{position:absolute;left:50%;bottom:-30px;width:160px;height:24px;margin-left:-80px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,0.65),rgba(0,0,0,0.22) 55%,transparent 75%);filter:blur(3px);transform-origin:center;animation:coinShadow 2.5s var(--ease-out) forwards;will-change:transform,opacity}
+    .flipcoin-coin{width:100%;height:100%;position:relative;transform-style:preserve-3d;will-change:transform}
+    .flipcoin-coin.flipping{animation:coinFlip 2.5s cubic-bezier(0.22,0.61,0.36,1) forwards}
+    .flipcoin-coin.landed-video{animation:coinFlipVideo 2.5s cubic-bezier(0.22,0.61,0.36,1) forwards}
+    /* V39+: settled state — coin sits showing the result, with glow pulse + tiny breathing scale */
+    .flipcoin-coin.settled{animation:coinSettled 1.5s ease-in-out infinite alternate}
+    .flipcoin-coin.settled.photo{filter:drop-shadow(0 12px 28px rgba(0,0,0,0.6)) drop-shadow(0 0 22px rgba(110,163,255,0.45))}
+    .flipcoin-coin.settled.video{filter:drop-shadow(0 12px 28px rgba(0,0,0,0.6)) drop-shadow(0 0 22px rgba(255,123,123,0.45))}
+    /* V39 premium — extruded edge: 40 thin slices stacked along Z to form a physical rim band.
+       Even slices use a brighter gold (peak of the milled "reed"), odd slices a darker recess. */
+    .flipcoin-slice{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 50%,#f0c373 0%,#d4a341 60%,#a07820 100%);box-shadow:inset 0 0 0 2px #6d5212;will-change:transform}
+    .flipcoin-slice.dark{background:radial-gradient(circle at 50% 50%,#a07820 0%,#7a5a18 60%,#4d3a10 100%);box-shadow:inset 0 0 0 2px #2e2208}
+    /* Coin face cap — gold metallic with rim, scallop notches, sheen, embossed icon slot.
+       Pushed forward/back along Z so the slices form the cylinder between them. */
+    .flipcoin-face{position:absolute;inset:0;border-radius:50%;display:flex;align-items:center;justify-content:center;backface-visibility:hidden;background:
+      /* sheen highlight top-left */
+      radial-gradient(circle at 30% 28%,rgba(255,255,255,0.55) 0%,rgba(255,255,255,0) 28%),
+      /* rim color band */
+      radial-gradient(circle at 50% 50%,#fbe27a 0%,#f0c373 38%,#d4a341 56%,#a07820 78%,#6d5212 100%);
+      box-shadow:
+        /* outer crisp rim */
+        inset 0 0 0 4px #8c6a1f,
+        inset 0 0 0 5px rgba(255,234,160,0.55),
+        /* inner relief */
+        inset 0 6px 14px rgba(255,255,255,0.30),
+        inset 0 -8px 16px rgba(80,55,10,0.55),
+        /* outside cast shadow + golden glow */
+        0 8px 22px rgba(0,0,0,0.55),
+        0 0 30px rgba(255,200,80,0.30)}
+    .flipcoin-face-front{transform:translateZ(30px)}
+    .flipcoin-face-back{transform:translateZ(-30px) rotateY(180deg)}
+    /* V39+: specular sheen sweep removed — it tracked independently of the coin's rotation
+       and read as a separate light bar swirling around the coin, breaking the 3D illusion. */
+    /* ─── V39+ celebration layer ─── */
+    /* CoinBurst — sparks emitted FROM the coin face at landing. Each spark uses its own
+       --angle (deg) and --dist (px) to fan outward in a 360° pattern with gravity pull. */
+    .flipcoin-burst{position:absolute;inset:50% 0 0 50%;width:0;height:0;pointer-events:none;z-index:2}
+    .flipcoin-spark{position:absolute;left:0;top:0;width:8px;height:8px;margin-left:-4px;margin-top:-4px;border-radius:50%;opacity:0;will-change:transform,opacity;animation:coinSpark 1100ms cubic-bezier(0.16,0.84,0.44,1) forwards}
+    .flipcoin-spark.streamer{width:3px;height:14px;border-radius:1.5px;margin-left:-1.5px;margin-top:-7px}
+    .flipcoin-spark.gold{background:radial-gradient(circle,#fff5c4 0%,#f0c373 50%,#a07820 100%);box-shadow:0 0 8px rgba(240,195,115,0.85)}
+    .flipcoin-spark.photo{background:radial-gradient(circle,#dfe9ff 0%,#6ea3ff 50%,#3a6ac8 100%);box-shadow:0 0 8px rgba(110,163,255,0.85)}
+    .flipcoin-spark.video{background:radial-gradient(circle,#ffd6d6 0%,#ff7b7b 50%,#c84a4a 100%);box-shadow:0 0 8px rgba(255,123,123,0.85)}
+    @keyframes coinSpark{
+      0%{opacity:0;transform:translate(0,0) scale(0.4)}
+      8%{opacity:1;transform:translate(calc(cos(var(--angle)) * 14px),calc(sin(var(--angle)) * 14px)) scale(1.1)}
+      55%{opacity:1;transform:translate(calc(cos(var(--angle)) * var(--dist)),calc(sin(var(--angle)) * var(--dist) - 18px)) scale(0.85)}
+      100%{opacity:0;transform:translate(calc(cos(var(--angle)) * calc(var(--dist) * 1.05)),calc(sin(var(--angle)) * var(--dist) + 60px)) scale(0.5)}
+    }
+    /* Impact flash — single bright radial flare from coin center at landing */
+    .flipcoin-flash{position:absolute;inset:50% 0 0 50%;width:300px;height:300px;margin:-150px 0 0 -150px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.85) 0%,rgba(255,235,170,0.55) 25%,rgba(255,200,80,0) 60%);mix-blend-mode:screen;pointer-events:none;opacity:0;animation:coinFlash 350ms ease-out forwards;will-change:transform,opacity;z-index:1}
+    @keyframes coinFlash{
+      0%{opacity:0;transform:scale(0.2)}
+      30%{opacity:1;transform:scale(1)}
+      100%{opacity:0;transform:scale(1.6)}
+    }
+    /* Verdict ring — expanding outline pulse from coin center on landing */
+    .flipcoin-ring{position:absolute;inset:50% 0 0 50%;width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:50%;border:3px solid rgba(255,255,255,0.7);pointer-events:none;opacity:0;animation:coinRing 700ms ease-out forwards;will-change:transform,opacity;z-index:1}
+    .flipcoin-ring.photo{border-color:rgba(110,163,255,0.85)}
+    .flipcoin-ring.video{border-color:rgba(255,123,123,0.85)}
+    @keyframes coinRing{
+      0%{opacity:0;transform:scale(0.4);border-width:4px}
+      30%{opacity:0.95}
+      100%{opacity:0;transform:scale(2.2);border-width:1px}
+    }
+    /* Inner recessed disc holding the embossed icon */
+    .flipcoin-disc{width:62%;height:62%;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:
+      radial-gradient(circle at 30% 30%,rgba(255,255,255,0.18),rgba(0,0,0,0) 45%),
+      radial-gradient(circle at 50% 50%,#d4a341 0%,#a07820 100%);
+      box-shadow:inset 0 4px 8px rgba(0,0,0,0.45),inset 0 -3px 6px rgba(255,234,160,0.35),0 0 0 2px rgba(120,85,20,0.6)}
+    .flipcoin-icon{width:60%;height:60%;color:#3a280a;filter:drop-shadow(0 1px 0 rgba(255,235,170,0.65)) drop-shadow(0 -1px 0 rgba(0,0,0,0.45))}
+    .flipcoin-pts{font-family:var(--font-display);font-weight:900;font-size:13px;color:#3a280a;letter-spacing:.5px;text-shadow:0 1px 0 rgba(255,235,170,0.65),0 -1px 0 rgba(0,0,0,0.35);line-height:1}
+    /* Decorative dots ringing the rim — Vegas chip vibe */
+    .flipcoin-rim-dots{position:absolute;inset:6px;border-radius:50%;pointer-events:none;background:
+      repeating-conic-gradient(from 0deg,rgba(80,55,10,0.55) 0deg 4deg,transparent 4deg 16deg);
+      -webkit-mask:radial-gradient(circle,transparent 70%,#000 71%,#000 81%,transparent 82%);
+      mask:radial-gradient(circle,transparent 70%,#000 71%,#000 81%,transparent 82%)}
+    /* Edge cylinder slices — fake the rim thickness when the coin is sideways */
+    .flipcoin-edge{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+    .flipcoin-edge-slice{position:absolute;left:50%;top:0;width:2px;height:100%;margin-left:-1px;background:linear-gradient(180deg,#8c6a1f,#d4a341 25%,#fbe27a 50%,#d4a341 75%,#8c6a1f);transform-origin:50% 50%}
+    /* Toss arc — anticipation crouch → high tumble (Y+X) → drop → impact squash → final wobble → settle.
+       Held at final pose from 88% onward so the eye registers the result. */
+    @keyframes coinFlip{
+      0%{transform:translateY(0) rotateY(0) rotateX(0) scale(1)}
+      4%{transform:translateY(10px) rotateY(-30deg) rotateX(-8deg) scale(0.86)}
+      14%{transform:translateY(-60px) rotateY(540deg) rotateX(140deg) scale(1.12)}
+      40%{transform:translateY(-180px) rotateY(1260deg) rotateX(360deg) scale(1.08)}
+      58%{transform:translateY(-140px) rotateY(1620deg) rotateX(540deg) scale(1.06)}
+      76%{transform:translateY(-12px) rotateY(2040deg) rotateX(700deg) scale(1.02)}
+      82%{transform:translateY(10px) rotateY(2160deg) rotateX(720deg) scaleX(1.20) scaleY(0.85)}
+      86%{transform:translateY(-6px) rotateY(2160deg) rotateX(720deg) scaleX(0.96) scaleY(1.04)}
+      90%{transform:translateY(0) rotateY(2168deg) rotateX(720deg) rotateZ(2deg) scale(1)}
+      94%{transform:translateY(0) rotateY(2152deg) rotateX(720deg) rotateZ(-1.5deg) scale(1)}
+      100%{transform:translateY(0) rotateY(2160deg) rotateX(720deg) rotateZ(0) scale(1)}
+    }
+    @keyframes coinFlipVideo{
+      0%{transform:translateY(0) rotateY(0) rotateX(0) scale(1)}
+      4%{transform:translateY(10px) rotateY(-30deg) rotateX(-8deg) scale(0.86)}
+      14%{transform:translateY(-60px) rotateY(540deg) rotateX(140deg) scale(1.12)}
+      40%{transform:translateY(-180px) rotateY(1260deg) rotateX(360deg) scale(1.08)}
+      58%{transform:translateY(-140px) rotateY(1800deg) rotateX(540deg) scale(1.06)}
+      76%{transform:translateY(-12px) rotateY(2160deg) rotateX(700deg) scale(1.02)}
+      82%{transform:translateY(10px) rotateY(2340deg) rotateX(720deg) scaleX(1.20) scaleY(0.85)}
+      86%{transform:translateY(-6px) rotateY(2340deg) rotateX(720deg) scaleX(0.96) scaleY(1.04)}
+      90%{transform:translateY(0) rotateY(2348deg) rotateX(720deg) rotateZ(2deg) scale(1)}
+      94%{transform:translateY(0) rotateY(2332deg) rotateX(720deg) rotateZ(-1.5deg) scale(1)}
+      100%{transform:translateY(0) rotateY(2340deg) rotateX(720deg) rotateZ(0) scale(1)}
+    }
+    /* Settled state — gentle breathing glow + scale, runs while user admires the landed coin */
+    @keyframes coinSettled{
+      from{transform:scale(1)}
+      to{transform:scale(1.03)}
+    }
+    @keyframes coinShadow{
+      0%{transform:scale(1);opacity:0.55}
+      14%{transform:scale(0.7);opacity:0.35}
+      40%{transform:scale(0.32);opacity:0.14}
+      58%{transform:scale(0.48);opacity:0.22}
+      76%{transform:scale(0.9);opacity:0.42}
+      82%{transform:scale(1.28);opacity:0.7}
+      90%{transform:scale(1.05);opacity:0.58}
+      100%{transform:scale(1.1);opacity:0.6}
+    }
+    @media (prefers-reduced-motion: reduce){
+      .flipcoin-coin.flipping,.flipcoin-coin.landed-video{animation-duration:.5s}
+      .flipcoin-coin.settled{animation:none}
+      .flipcoin-shadow{display:none}
+    }
+    /* Reveal card */
+    .flipcoin-reveal{animation:flipcoinReveal .5s var(--spring) both;animation-delay:.3s}
+    @keyframes flipcoinReveal{from{opacity:0;transform:translateY(16px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .flipcoin-reveal-badge{display:inline-flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1) var(--sp-3);border-radius:var(--r-pill);font-size:var(--fs-11);font-weight:var(--fw-bold);letter-spacing:var(--ls-wide);margin-bottom:var(--sp-3)}
+    .flipcoin-reveal-badge.photo{background:rgba(110,163,255,0.15);color:var(--foto-2)}
+    .flipcoin-reveal-badge.video{background:rgba(255,123,123,0.15);color:var(--video-2)}
+    .flipcoin-hidden-card{padding:var(--sp-3);border-radius:var(--r-sm);background:rgba(255,255,255,0.02);border:1px dashed rgba(255,255,255,0.08);text-align:center;margin-bottom:var(--sp-3);opacity:0.4}
+    .flipcoin-tagline{font-size:var(--fs-12);color:var(--text-tertiary);font-style:italic;margin-top:var(--sp-3);letter-spacing:var(--ls-normal)}
   </style>
 </head>
 <body>
@@ -1345,7 +1501,8 @@ function App(){
         ctx.resume().then(()=>setAudioCapability('capable'),()=>setAudioCapability('blocked'));
       }
       const t=ctx.currentTime;
-      const tones=kind==='score'?[660,990]:kind==='correct'?[523,784]:kind==='wrong'?[330,165]:kind==='broadcast'?[440]:kind==='upload'?[392]:[660];
+      // V38: 'flip' cue — ascending shimmer for the Flippercoin animation
+      const tones=kind==='flip'?[440,554,659,880]:kind==='score'?[660,990]:kind==='correct'?[523,784]:kind==='wrong'?[330,165]:kind==='broadcast'?[440]:kind==='upload'?[392]:[660];
       tones.forEach((freq,i)=>{
         const osc=ctx.createOscillator();
         const gain=ctx.createGain();
@@ -1378,7 +1535,9 @@ function App(){
     // V29: also hang on window so deep child components (ChallengeAction handleQuiz)
     // can fire cues without prop-drilling. Always best-effort try/catch on the consumer side.
     try{window.__ssrPlayCue=playCue;}catch(e){}
-  },[playCue,tap]);
+    // V39: expose confetti trigger for FlippercoinGate reveal celebration.
+    try{window.__ssrTriggerConfetti=triggerConfetti;}catch(e){}
+  },[playCue,tap,triggerConfetti]);
   const showBroadcast=useCallback((message,createdAt)=>{
     if(!message)return;
     const id=createdAt||Date.now();
@@ -4394,7 +4553,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
       <div className="text-center">
         <div style={{fontSize:64,filter:'drop-shadow(0 6px 16px rgba(228,178,92,0.35))'}}>💍</div>
         <h1 className="t-title animate-in" style={{marginTop:'var(--sp-3)'}}>Kies je team</h1>
-        <p className="t-body animate-in animate-in-1" style={{marginTop:'var(--sp-2)'}}>Tik op een starter pack of maak je eigen · {activeTeamCount}/{MAX_TEAMS} teams</p>
+        <p className="t-body animate-in animate-in-1" style={{marginTop:'var(--sp-2)'}}>Tik op een starterpakket of maak je eigen · {activeTeamCount}/{MAX_TEAMS} teams</p>
       </div>
       <div style={{height:'var(--sp-6)'}}/>
 
@@ -4466,7 +4625,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
 
       {mode==='quick'&&(
         <div>
-          <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>Starter packs</div>
+          <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>Starterpakketten</div>
           <div className="starter-grid">
             {STARTER_PACKS.map((p,i)=>{
               const taken=usedEmojis.includes(p.emoji)||usedNames.includes(p.name.toLowerCase());
@@ -4525,7 +4684,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
           <div style={{fontSize:32}}>🔒</div>
           <div className="t-card-label" style={{marginTop:'var(--sp-2)',color:'var(--accent-2)'}}>Geen ruimte voor een nieuw team</div>
           <div className="t-body" style={{marginTop:'var(--sp-2)',color:'var(--text-secondary)'}}>{MAX_TEAMS}/{MAX_TEAMS} teams zijn gevuld. Tik op een team hierboven om je aan te sluiten, of bekijk het spel als toeschouwer.</div>
-          <button className="btn btn-ghost btn-sm" style={{marginTop:'var(--sp-3)'}} onClick={()=>setMode('quick')}>← Terug naar starter packs</button>
+          <button className="btn btn-ghost btn-sm" style={{marginTop:'var(--sp-3)'}} onClick={()=>setMode('quick')}>← Terug naar starterpakketten</button>
         </div>
       )}
       {mode==='custom'&&!teamSlotsFull&&(
@@ -6363,6 +6522,200 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 // ═══════════════════════════════════════════
 // CHALLENGE BOTTOM SHEET — V5: dynamic quiz rotation + photo feed
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// V38: FLIPPERCOIN MECHANIC
+// ═══════════════════════════════════════════
+// The Flippercoin applies ONLY to locations that have BOTH a photo AND a video
+// challenge. Quiz/creative challenges are completely unaffected. Teams complete
+// exactly one media challenge per location — the coin decides which.
+//
+// Eligible locations (auto-detected from L_DATA):
+//   id:1  Erasmusbrug    — photo(25) vs video(35)
+//   id:10 Laurenskerk    — photo(30) vs video(30)
+//   id:12 Stadhuis       — photo(30) vs video(30)
+//   id:20 Oude Haven     — 2×photo(20,30) vs video(30)
+//
+// Design: 50/50 by default. Video challenges are worth more points — the risk/
+// reward is communicated via UI badges after the reveal.
+
+function isFlippercoinLocation(loc){
+  if(!loc||!loc.ch)return false;
+  const types=loc.ch.map(c=>c.t);
+  return types.includes('photo')&&types.includes('video');
+}
+
+// Deterministic per-team per-location so the result survives refresh.
+// Uses team id + location id as seed stored in localStorage.
+function getFlipResult(locId,teamId){
+  const key=`flipcoin_${teamId}_${locId}`;
+  try{
+    const stored=localStorage.getItem(key);
+    if(stored==='photo'||stored==='video')return stored;
+  }catch(e){}
+  return null; // not yet flipped
+}
+function storeFlipResult(locId,teamId,result){
+  const key=`flipcoin_${teamId}_${locId}`;
+  try{localStorage.setItem(key,result);}catch(e){}
+}
+
+function FlippercoinGate({loc,teamId,onReveal,children}){
+  const[flipState,setFlipState]=useState('idle'); // idle | flipping | landed | revealed
+  const[result,setResult]=useState(()=>getFlipResult(loc.id,teamId));
+  // pendingOutcome holds the random result during the animation, before reveal
+  const[pendingOutcome,setPendingOutcome]=useState(null);
+
+  // If already flipped (from localStorage), skip animation
+  useEffect(()=>{
+    if(result){setFlipState('revealed');}
+  },[result]);
+
+  const doFlip=()=>{
+    if(flipState!=='idle')return;
+    // Decide: 50/50 photo vs video
+    const outcome=Math.random()<0.5?'photo':'video';
+    setPendingOutcome(outcome);
+    setFlipState('flipping');
+    // Haptic burst during flip
+    try{if(navigator.vibrate)navigator.vibrate([15,30,15,30,15,30,15,50,20]);}catch(e){}
+    // Web Audio coin-flip sound: rising metallic shimmer
+    try{
+      const playCue=window.__ssrPlayCue;
+      if(playCue)playCue('flip'); // V38: ascending shimmer for coin flip
+    }catch(e){}
+    // V39+: spin animation 2.5s → land + celebrate (1.5s admiring the coin) → reveal challenge.
+    // The 'landed' state keeps the coin on-screen with a glow pulse while the user sees the result.
+    setTimeout(()=>{
+      // Spin finished — store result, transition to 'landed' (coin still visible, glow pulse).
+      setFlipState('landed');
+      storeFlipResult(loc.id,teamId,outcome);
+      // Celebration haptic + landing cue
+      try{if(navigator.vibrate)navigator.vibrate([35,30,60,30,20]);}catch(e){}
+      try{const c=window.__ssrPlayCue;if(c)c('score');}catch(e){}
+      // V39+: generic confetti removed. Celebration now lives inside the coin stage
+      // as coin-anchored sparks + radial flash + expanding ring (see .flipcoin-burst,
+      // .flipcoin-flash, .flipcoin-ring). Result-coloured, spatially tied to the coin.
+    },2500);
+    setTimeout(()=>{
+      // After the admire-window, transition to revealed (shows challenge details).
+      setResult(outcome);
+      setFlipState('revealed');
+      onReveal&&onReveal(outcome);
+    },4000);
+  };
+
+  // Find the photo and video challenges for the mystery preview
+  const photoIdxs=loc.ch.map((c,i)=>c.t==='photo'?i:-1).filter(i=>i>=0);
+  const videoIdxs=loc.ch.map((c,i)=>c.t==='video'?i:-1).filter(i=>i>=0);
+
+  if(flipState==='revealed'&&result){
+    // Pass through — the parent ChallengeSheet will filter challenges
+    return children(result,photoIdxs,videoIdxs);
+  }
+
+  // Pre-flip: mysterious hidden state
+  return(
+    <div className="flipcoin-stage">
+      <div className="t-label" style={{marginBottom:'var(--sp-2)',color:'var(--accent-2)'}}>FLIPPERCOIN</div>
+      <div className="t-card-title" style={{marginBottom:'var(--sp-1)'}}>Wat beslist het lot?</div>
+      <div className="t-caption" style={{color:'var(--text-secondary)',marginBottom:'var(--sp-2)'}}>
+        Deze locatie heeft een foto- én een video-opdracht.<br/>De munt kiest welke jullie team doet.
+      </div>
+
+      {/* Mystery cards — V39+: flavor copy only, points hidden until landed coin reveals them.
+          Triple-printing points (here + coin face + reveal badge) killed the surprise. */}
+      <div className="flipcoin-mystery">
+        <div className="flipcoin-mystery-card">
+          <div className="flipcoin-mystery-icon">📸</div>
+          <div className="flipcoin-mystery-label">Het moment</div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',fontSize:'var(--fs-14)',color:'var(--text-tertiary)',fontWeight:'var(--fw-bold)'}}>of</div>
+        <div className="flipcoin-mystery-card">
+          <div className="flipcoin-mystery-icon">🎥</div>
+          <div className="flipcoin-mystery-label">Het verhaal</div>
+        </div>
+      </div>
+
+      {/* V39 premium: extruded 3D coin — 60 stacked slices form a physical rim,
+          two SVG-iconed faces cap the cylinder, specular sheen sweeps the surface.
+          Rendered for BOTH flipping (mid-air) and landed (admiring the result) states. */}
+      {(flipState==='flipping'||flipState==='landed')&&(
+        <div className="flipcoin-anim" aria-live="polite" aria-label="Munt wordt gegooid">
+          <div className={`flipcoin-coin ${flipState==='landed'?(pendingOutcome==='video'?'settled video':'settled photo'):(pendingOutcome==='video'?'landed-video':'flipping')}`}>
+            {/* Edge slices — 60 layers from z=-29.5 to z=+29.5 (60px coin thickness on a 200px
+                disc gives a chunky 1:3.3 ratio so depth reads even face-on). Alternating
+                bright/dark gradients simulate the milled-reed edge of a real coin. */}
+            {Array.from({length:60},(_,i)=>{
+              const z=-29.5+i;
+              const dark=i%2===1;
+              return <div key={`s${i}`} className={dark?'flipcoin-slice dark':'flipcoin-slice'} aria-hidden="true" style={{transform:`translateZ(${z}px)`}}/>;
+            })}
+            <div className="flipcoin-face flipcoin-face-front">
+              <span className="flipcoin-rim-dots" aria-hidden="true"/>
+              <div className="flipcoin-disc">
+                <svg className="flipcoin-icon" viewBox="0 0 100 100" aria-hidden="true">
+                  {/* Embossed camera */}
+                  <path d="M38 30 L45 22 L62 22 L69 30 L84 30 Q90 30 90 36 L90 76 Q90 82 84 82 L16 82 Q10 82 10 76 L10 36 Q10 30 16 30 Z" fill="currentColor"/>
+                  <circle cx="50" cy="56" r="16" fill="#a07820"/>
+                  <circle cx="50" cy="56" r="13" fill="currentColor"/>
+                  <circle cx="50" cy="56" r="9" fill="#a07820"/>
+                  <circle cx="46" cy="52" r="3" fill="#fbe27a" opacity="0.7"/>
+                  <rect x="74" y="36" width="8" height="4" rx="1" fill="#a07820"/>
+                </svg>
+                <div className="flipcoin-pts">FOTO +{loc.ch[photoIdxs[0]]?.p}</div>
+              </div>
+            </div>
+            <div className="flipcoin-face flipcoin-face-back">
+              <span className="flipcoin-rim-dots" aria-hidden="true"/>
+              <div className="flipcoin-disc">
+                <svg className="flipcoin-icon" viewBox="0 0 100 100" aria-hidden="true">
+                  {/* Embossed clapperboard */}
+                  <path d="M10 28 L88 32 L86 46 L8 42 Z" fill="currentColor"/>
+                  <path d="M22 28 L17 44 M36 29 L31 45 M50 30 L45 46 M64 31 L59 47 M78 32 L73 48" stroke="#a07820" strokeWidth="2.5" strokeLinecap="round"/>
+                  <rect x="10" y="48" width="78" height="36" rx="3" fill="currentColor"/>
+                  {/* film play triangle in body */}
+                  <path d="M40 58 L62 66 L40 74 Z" fill="#a07820"/>
+                </svg>
+                <div className="flipcoin-pts">VIDEO +{loc.ch[videoIdxs[0]]?.p}</div>
+              </div>
+            </div>
+          </div>
+          <div className="flipcoin-shadow" aria-hidden="true"/>
+          {/* V39+ celebration layer — flash + ring + 24 sparks emitted FROM the coin
+              on landing. Result-coloured. Replaces the generic top-of-viewport confetti
+              that read as disconnected score-popup decoration. */}
+          {flipState==='landed'&&(
+            <>
+              <div className={`flipcoin-flash`} aria-hidden="true"/>
+              <div className={`flipcoin-ring ${pendingOutcome==='video'?'video':'photo'}`} aria-hidden="true"/>
+              <div className="flipcoin-burst" aria-hidden="true">
+                {Array.from({length:24},(_,i)=>{
+                  // Fan sparks in a 360° pattern with slight randomness, mix gold + outcome colour + streamer shape
+                  const angle=(i*15+(i*37)%17)*Math.PI/180;
+                  const dist=110+((i*53)%50);
+                  const kind=i%3===0?'streamer':'';
+                  const colour=i%2===0?'gold':(pendingOutcome==='video'?'video':'photo');
+                  const delay=(i%5)*18;
+                  return <div key={`spark${i}`} className={`flipcoin-spark ${colour} ${kind}`} style={{['--angle']:angle+'rad',['--dist']:dist+'px',animationDelay:delay+'ms'}}/>;
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* CTA button */}
+      {flipState==='idle'&&(
+        <button className="flipcoin-btn" onClick={doFlip}>
+          🪙 Munt Gooien
+        </button>
+      )}
+
+      <div className="flipcoin-tagline">Vang een moment… of creëer het verhaal.</div>
+    </div>
+  );
+}
+
 function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam,jorikInTeam,isJorikDevice=false}){
   // V29 (§4): Escape-to-close wasn't wired. Backdrop click was, but the ✕
   // button was a dim 26px text glyph on no background — Mike couldn't find
@@ -6380,8 +6733,22 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
   const{band}=locBand(pos,loc);
   // V7.1 hotfix: only lock quizzes when the location actually HAS a photo challenge to unlock against.
   // Otherwise quiz-only locations (Spido Kade, BlueCity, Willemswerf) would be permanently unreachable.
-  const hasAnyPhoto=loc.ch.some(ch=>ch.t==='photo'||ch.t==='video'||ch.t==='creative');
-  const hasPhotoCompleted=loc.ch.some((ch,i)=>(ch.t==='photo'||ch.t==='video'||ch.t==='creative')&&completed[i]);
+  // V38: for Flippercoin locations, only consider the coin-selected media challenge
+  // as the gate for quiz unlock — otherwise quizzes stay locked forever if the
+  // non-selected media type is the only "photo" type the location has.
+  const hasAnyPhoto=loc.ch.some((ch,i)=>{
+    const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
+    if(!isMedia)return false;
+    // If flippercoin is active, only count visible challenges
+    if(isFlipLoc&&flipVisibleIdx&&!flipVisibleIdx.has(i))return false;
+    return true;
+  });
+  const hasPhotoCompleted=loc.ch.some((ch,i)=>{
+    const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
+    if(!isMedia)return false;
+    if(isFlipLoc&&flipVisibleIdx&&!flipVisibleIdx.has(i))return false;
+    return completed[i];
+  });
 
   // V5: compute the quiz to show for this visit (rotate through unseen)
   // We render one rotating-quiz slot that replaces all the location's built-in quizzes.
@@ -6390,6 +6757,40 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
   const allLocQuizzesDone=locQuizIndexes.length>0&&locQuizIndexes.every(i=>completed[i]);
   // The rotated quiz is only relevant once all built-in quizzes are done; then we draw from the pool
   const rotatedQuiz=allLocQuizzesDone?pickQuiz(loc,seenQuizzes||new Set()):null;
+
+  // V38: Flippercoin mechanic — detect if this location qualifies
+  const isFlipLoc=isFlippercoinLocation(loc);
+  const[flipResult,setFlipResult]=useState(()=>{
+    if(!isFlipLoc||!myTeam)return null;
+    return getFlipResult(loc.id,myTeam.id);
+  });
+
+  // V38: determine which challenge indexes are visible based on the flip result.
+  // Quiz and creative challenges always show. Photo/video: only the coin-selected type.
+  // For Oude Haven (2 photos + 1 video): if coin says 'photo', pick the higher-points one.
+  const flipVisibleIdx=React.useMemo(()=>{
+    if(!isFlipLoc||!flipResult)return null; // all visible (no flip yet or not a flip location)
+    const visible=new Set();
+    const photoIdxs=[];
+    const videoIdxs=[];
+    loc.ch.forEach((ch,i)=>{
+      if(ch.t==='quiz'||ch.t==='creative'){visible.add(i);return;}
+      if(ch.t==='photo')photoIdxs.push(i);
+      if(ch.t==='video')videoIdxs.push(i);
+    });
+    if(flipResult==='photo'){
+      // If multiple photos, pick the one with highest points
+      if(photoIdxs.length>1){
+        photoIdxs.sort((a,b)=>loc.ch[b].p-loc.ch[a].p);
+        visible.add(photoIdxs[0]); // highest-points photo
+      }else if(photoIdxs.length===1){
+        visible.add(photoIdxs[0]);
+      }
+    }else if(flipResult==='video'){
+      videoIdxs.forEach(i=>visible.add(i));
+    }
+    return visible;
+  },[isFlipLoc,flipResult,loc]);
 
   return(
     <>
@@ -6402,6 +6803,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
             <h2 className="t-section">{loc.n}</h2>
             <div className="row-2" style={{marginTop:'var(--sp-2)',flexWrap:'wrap'}}>
               <span className="chip chip-blue">{loc.c}</span>
+              {isFlipLoc&&<span className="chip" style={{background:'rgba(228,178,92,0.14)',borderColor:'rgba(228,178,92,0.3)',color:'var(--accent-2)'}}>🪙 Flippercoin</span>}
               <a href={`https://www.google.com/maps/dir/?api=1&destination=${loc.la},${loc.lo}&travelmode=walking`} target="_blank" rel="noopener noreferrer"
                 className="chip" style={{background:'rgba(95,216,165,0.14)',borderColor:'rgba(95,216,165,0.3)',color:'var(--creatief-2)',textDecoration:'none'}}>🧭 Route</a>
             </div>
@@ -6426,7 +6828,40 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
           </div>
         </div>
 
+        {/* V38: Flippercoin gate — if location has both photo+video, require coin flip first */}
+        {isFlipLoc&&!flipResult&&myTeam&&(
+          <FlippercoinGate loc={loc} teamId={myTeam.id} onReveal={(r)=>setFlipResult(r)}>
+            {()=>null}
+          </FlippercoinGate>
+        )}
+        {/* V38: after flip, show which challenge the coin selected */}
+        {isFlipLoc&&flipResult&&(
+          <div className="flipcoin-reveal" style={{marginBottom:'var(--sp-4)'}}>
+            <div className={`flipcoin-reveal-badge ${flipResult}`}>
+              {flipResult==='photo'?'📸 Foto-opdracht':'🎥 Video-opdracht'} ontgrendeld
+            </div>
+            <div className="t-caption">De Flippercoin heeft gesproken — {flipResult==='video'?'video levert meer punten op!':'maak een epische foto!'}</div>
+          </div>
+        )}
+
         {loc.ch.map((ch,idx)=>{
+          // V38: Flippercoin visibility filter — hide non-selected media challenges
+          if(isFlipLoc&&flipResult&&flipVisibleIdx&&!flipVisibleIdx.has(idx)){
+            // Show a greyed-out "hidden by coin" card for the non-selected type
+            const isMedia=ch.t==='photo'||ch.t==='video';
+            if(isMedia&&!completed[idx]){
+              return(
+                <div key={idx} className="flipcoin-hidden-card">
+                  <span style={{fontSize:'var(--fs-12)'}}>{ch.t==='photo'?'📸':'🎥'} {ch.ti}</span>
+                  <div className="t-caption" style={{marginTop:'var(--sp-1)'}}>🪙 Niet geselecteerd door de Flippercoin</div>
+                </div>
+              );
+            }
+          }
+          // V38: if flippercoin location but not yet flipped, hide media challenges
+          if(isFlipLoc&&!flipResult&&(ch.t==='photo'||ch.t==='video')){
+            return null; // hidden until coin is flipped
+          }
           const done=completed[idx];
           const isQuiz=ch.t==='quiz';
           const locked=isQuiz&&hasAnyPhoto&&!hasPhotoCompleted;
