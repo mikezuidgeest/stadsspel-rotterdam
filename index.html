@@ -539,6 +539,11 @@ const GHOST_MAX_USES=TIME_CHARGE_MAX;
 const FIRST_BONUS=10;
 const BAR_BREAK_BONUS=25;
 const WEDDING_VIDEO_BONUS=50;
+const MOST_MISSIONS_BONUS=100;
+const SIDE_QUESTS=[
+  {id:'sq_kerken',label:'Alle Kerken',emoji:'⛪',required:[10,68,105],bonus:100,locKey:-10},
+  {id:'sq_bruggen',label:'Alle Bruggen',emoji:'🌉',required:[1,8,9,55],bonus:100,locKey:-11},
+];
 const NEARBY_RADIUS=500; // meters
 const GPS_INTERVAL=10000; // 10s
 
@@ -787,157 +792,126 @@ const MOTION_AVAILABLE=typeof DeviceMotionEvent!=='undefined'&&
 // ═══════════════════════════════════════════
 const L_DATA=[
 {id:1,n:"Erasmusbrug",la:51.907792,lo:4.489798,e:"🌉",c:"bridge",r:25,ch:[
-  {t:"photo",ti:"Erasmusbrug Pose",d:"Heel team in beeld op de brug, filmaffiche-pose. Captain vooraan in held-houding, rest in V-formatie erachter. Erasmusbrug duidelijk in beeld.",p:25,df:"medium"},
-  {t:"video",ti:"Brug Catwalk",d:"Team vormt een erehaag-rij over de Erasmusbrug, loopt samen plechtig richting camera alsof ze een belangrijke optocht escorteren. Captain leidt de stoet, laatste teamlid roept aan het eind iets enthousiast in de camera. Min. 10 sec, gefilmd vanaf de andere kant.",p:35,df:"hard",wp:1},
-  {t:"quiz",ti:"Brug Kennis",d:"Wat is de bijnaam van de Erasmusbrug?",a:"De Zwaan",o:["De Zwaan","De Harp","De Naald","Het Zeil"],p:15,df:"easy"}]},
+  {t:"photo",ti:"De Zwaan-vlucht",d:"Team in V-vorm op de brug, allemaal armen wijd als zwanenvleugels. Captain voorop. Witte pyloon zichtbaar op de achtergrond.",p:25,df:"medium"},
+  {t:"video",ti:"Held over De Zwaan",d:"Hele team tilt één teamlid horizontaal omhoog — armen gekruist over de borst, ogen dicht, alsof het een 'gevallen held' uit een film is. Team loopt zo minstens 6 meter door over de brug. Iedereen in beeld, gefilmd vanaf de zijkant.",p:35,df:"hard",wp:1},
+  {t:"quiz",ti:"Wie was Erasmus?",d:"Naar wie is de Erasmusbrug genoemd?",a:"Een schrijver-filosoof uit Rotterdam",o:["Een schrijver-filosoof uit Rotterdam","Een burgemeester","Een schip","Een architect"],p:15,df:"easy"}]},
 {id:2,n:"Markthal",la:51.920109,lo:4.486957,e:"🏗️",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Plafond Cirkel",d:"Heel team staat in een cirkel op de Markthalvloer, allemaal kijken samen omhoog naar het 'Horn of Plenty'-plafond (11.000 m², Arno Coenen) met open mond. Captain in het midden. Vraag een voorbijganger om de foto te maken vanaf ooghoogte — plafond zichtbaar boven jullie hoofden.",p:25,df:"medium"},
-  {t:"creative",ti:"Proeverij Challenge",d:"Koop het raarste ding in de Markthal. Captain geblinddoekt, team eromheen, allemaal in beeld terwijl de captain blind proeft. Reacties van het team meefilmen.",p:35,df:"hard"},
-  {t:"quiz",ti:"Markthal Trivia",d:"Hoeveel m² is het kunstwerk op het plafond?",a:"11.000 m²",o:["11.000 m²","5.000 m²","8.500 m²","15.000 m²"],p:25,df:"medium"}]},
+  {t:"photo",ti:"Markthal-Hap",d:"Koop samen één snack in de Markthal. Groepsselfie met de snack zichtbaar in beeld én het plafond-kunstwerk op de achtergrond.",p:25,df:"medium"},
+  {t:"creative",ti:"Geblinddoekte Proef",d:"Captain geblinddoekt. Team koopt iets raars uit de Markthal en laat captain proeven. Captain raadt hardop wat het is — alleen punten als hij het goed heeft. Hele team in beeld, reacties meefilmen.",p:35,df:"hard"},
+  {t:"quiz",ti:"Wonen onder de Boog",d:"Hoeveel appartementen zitten er in de boog van de Markthal?",a:"228",o:["102","228","350","450"],p:25,df:"medium"}]},
 {id:3,n:"Kubuswoningen",la:51.920394,lo:4.490127,e:"🎲",c:"architecture",r:15,ch:[
-  {t:"photo",ti:"Scheef Huwelijk",d:"Team staat 45 graden gekanteld onder een kubus. Captain in het midden roept: 'Net als een goed huwelijk: scheef maar staat als een huis.'",p:20,df:"easy"},
-  {t:"quiz",ti:"Kubus Quiz",d:"Wie ontwierp de kubuswoningen?",a:"Piet Blom",o:["Piet Blom","Rem Koolhaas","Berlage","Rietveld"],p:25,df:"medium"}]},
+  {t:"photo",ti:"Hou 'm Tegen!",d:"Net als de toeristenfoto bij de Toren van Pisa: hele team voor een kubus, allemaal armen omhoog alsof jullie hem tegenhouden van vallen. Gezichten van zware inspanning, knieën door, captain meest dramatisch in het midden. Foto vanaf de overkant zodat het perspectief werkt.",p:20,df:"easy"},
+  {t:"quiz",ti:"De Architect",d:"Wie ontwierp de Kubuswoningen?",a:"Piet Blom",o:["Piet Blom","Rem Koolhaas","Berlage","Rietveld"],p:25,df:"medium"}]},
 {id:4,n:"Euromast",la:51.905405,lo:4.466604,e:"🗼",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Toren Perspectief",d:"Heel team in beeld: één persoon 'houdt' of 'eet' de Euromast in perspectief, de rest reageert overdreven. Captain centraal, iedereen erop.",p:25,df:"medium"},
-  {t:"quiz",ti:"Euromast Hoogte",d:"Hoe hoog is de Euromast?",a:"185 meter",o:["185 meter","165 meter","200 meter","150 meter"],p:20,df:"easy"}]},
+  {t:"photo",ti:"Hoog, Hoger, Hoogst!",d:"Hele team voor de Euromast, allemaal armen omhoog of wijzend naar de top. Foto van laag standpunt (van onderen) zodat de hele toren in beeld komt. Iedereen erop.",p:25,df:"medium"},
+  {t:"quiz",ti:"Voor Welke Wereld?",d:"Voor welke gelegenheid werd de Euromast gebouwd in 1960?",a:"De Floriade (bloemententoonstelling)",o:["De Floriade (bloemententoonstelling)","De Olympische Spelen","De Wereldtentoonstelling","Een koninklijk huwelijk"],p:20,df:"easy"}]},
 {id:5,n:"Hotel New York",la:51.904092,lo:4.484505,e:"🏨",c:"historic",r:15,ch:[
-  {t:"creative",ti:"Emigranten Scene",d:"Heel team speelt afscheidsscène voor Hotel New York: captain vertrekt naar Amerika, team zwaait dramatisch met zakdoeken. Iedereen in beeld, één take.",p:35,df:"hard"},
-  {t:"photo",ti:"New York Stijl",d:"Heel team in 'Roaring Twenties' pose bij de ingang van Hotel New York. Captain als gangster-baas, team als entourage. Allemaal erop.",p:25,df:"medium"}]},
+  {t:"creative",ti:"De Crew",d:"Hele team voor Hotel New York. Bolle borst, breed staan, serieuze blikken — albumcover-energie. Geen glimlachen. Captain in het midden, armen over elkaar. Beide torens zichtbaar achter het team.",p:35,df:"hard"},
+  {t:"quiz",ti:"Hoeveel Emigranten?",d:"Hoeveel Nederlanders emigreerden tussen 1873 en 1971 vanaf deze pier naar de VS?",a:"~400.000",o:["~50.000","~400.000","~1.000.000","~3.000.000"],p:25,df:"medium"}]},
 {id:6,n:"SS Rotterdam",la:51.8978,lo:4.473277,e:"🚢",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Titanic Pose",d:"Heel team Titanic-pose voor de SS Rotterdam: captain vooraan met armen wijd, team erachter als bemanning. Allemaal in beeld, schip duidelijk zichtbaar.",p:25,df:"medium"},
-  {t:"quiz",ti:"Schip Kennis",d:"In welk jaar maakte de SS Rotterdam haar laatste reis?",a:"2000",o:["2000","1997","2005","1990"],p:25,df:"medium"}]},
+  {t:"photo",ti:"Titanic Pose",d:"Hele team voor de SS Rotterdam in Titanic-pose: één teamlid vooraan met armen wijd (\"I'm flying\"), een ander teamlid erachter met armen om hem/haar heen. Rest van het team als bemanning eromheen, allemaal in beeld. Schip duidelijk zichtbaar.",p:25,df:"medium"},
+  {t:"quiz",ti:"Hoe Lang?",d:"Hoe lang is de SS Rotterdam (van boeg tot heck)?",a:"228 m",o:["185 m","228 m","270 m","310 m"],p:25,df:"medium"}]},
 {id:7,n:"Rotterdam Centraal",la:51.924639,lo:4.469133,e:"🚂",c:"landmark",r:20,ch:[
-  {t:"video",ti:"Verloren Bagage",d:"Team interviewt de captain bij de bagagebanken van Rotterdam Centraal — onder het iconische puntdak — wat laat hij/zij hier achter? Captain + minstens 2 teamleden in beeld. Min. 20 sec.",p:30,df:"medium"},
-  {t:"quiz",ti:"Station Kennis",d:"Wanneer werd het huidige Rotterdam Centraal geopend?",a:"2014",o:["2014","2010","2018","2012"],p:20,df:"easy"}]},
+  {t:"video",ti:"Stoomtrein",d:"Hele team zit in een lange rij op de grond voor Rotterdam Centraal — schouders aan schouders. Allemaal samen wiebelen voor- en achterwaarts (roei-beweging) om een ouderwetse stoomtrein na te bootsen. Voorste teamlid doet stoom-armen. Min. 12 sec, hele team in beeld.",p:30,df:"medium"},
+  {t:"quiz",ti:"De Heropening",d:"Wanneer werd het huidige Rotterdam Centraal geopend?",a:"2014",o:["2014","2010","2018","2012"],p:20,df:"easy"}]},
 {id:8,n:"De Hef",la:51.913745,lo:4.498184,e:"🏗️",c:"bridge",r:15,ch:[
-  {t:"photo",ti:"Hef Silhouet",d:"Team vormt een silhouet-rij voor De Hef bij tegenlicht. Captain vooraan, armen omhoog, rest in een lijn. Allemaal in beeld.",p:25,df:"medium"},
-  {t:"quiz",ti:"Hef Quiz",d:"Jeff Bezos wilde De Hef demonteren. Hoe reageerde Rotterdam?",a:"Dreigde met eieren gooien",o:["Dreigde met eieren gooien","Ging akkoord","Eiste 10 miljoen","Negeerde het"],p:30,df:"hard"}]},
-{id:9,n:"Willemsbrug",la:51.917202,lo:4.491591,e:"🔴",c:"bridge",r:15,ch:[{t:"photo",ti:"Rode Loper",d:"Captain loopt over de Willemsbrug als koning, team vormt erehaag aan beide kanten. Skyline zichtbaar achter de captain.",p:20,df:"easy"}]},
+  {t:"photo",ti:"Hef-Brug",d:"Hele team vormt een levende kopie van De Hef: twee teamleden links en twee rechts staan recht omhoog (de torens). Twee teamleden in het midden tillen samen één teamlid horizontaal omhoog (het ophaal-deel). Rest van het team eromheen kijkt mee. Foto met de echte Hef op de achtergrond.",p:25,df:"medium"},
+  {t:"quiz",ti:"Eieren voor Bezos",d:"Jeff Bezos wilde De Hef tijdelijk demonteren voor zijn megajacht. Hoe reageerde Rotterdam?",a:"Dreigde met eieren gooien",o:["Dreigde met eieren gooien","Ging akkoord","Eiste 10 miljoen","Negeerde het"],p:30,df:"hard"}]},
+{id:9,n:"Willemsbrug",la:51.917202,lo:4.491591,e:"🔴",c:"bridge",r:15,ch:[{t:"photo",ti:"Marathonfinish",d:"Eén teamlid rent vanuit het midden van de rode Willemsbrug naar het team toe — vuisten in de lucht, alsof hij/zij net een marathon wint. Heel team staat aan één kant van de brug in een rij, klapt en juicht luidkeels. Iedereen op de brug, rode kleur duidelijk zichtbaar in beeld.",p:20,df:"easy"}]},
 {id:10,n:"Laurenskerk",la:51.921551,lo:4.485452,e:"⛪",c:"historic",r:20,ch:[
-  {t:"photo",ti:"Kerktoren Shot",d:"Heel team in beeld: één persoon 'houdt' de Laurenskerk-toren in perspectief, de rest helpt hem dragen of kijkt vol bewondering. Iedereen erop.",p:25,df:"medium"},
+  {t:"photo",ti:"Vrijgezellenboeket — De Vangst",d:"Pluk een stel straatbloemen of onkruid bij de Laurenskerk. Captain staat met de rug naar de kerk en gooit het boeket over de schouder. Foto op het moment dat het boeket in de lucht hangt: iedereen gestrekt, handen omhoog, ogen groot van verlangen. Kerkgevel zichtbaar op de achtergrond. De gezichten zijn het verhaal — maak ze groot in beeld.",p:30,df:"medium"},
+  {t:"video",ti:"Vrijgezellenboeket — De Gooi",d:"Pluk een stel straatbloemen of onkruid bij de Laurenskerk. Heel team staat met de rug naar de kerk. Captain gooit het boeket over de schouder — wie het vangt, trouwt als eerste. Film de gooi én de reacties. Kerkgevel zichtbaar op de achtergrond. Iedereen in beeld.",p:30,df:"medium"},
   {t:"quiz",ti:"Kerk Kennis",d:"De Laurenskerk overleefde 1940. Wanneer begon de bouw?",a:"1449",o:["1449","1352","1510","1601"],p:25,df:"medium"}]},
 {id:11,n:"POST Rotterdam",la:51.922067,lo:4.480053,e:"📮",c:"landmark",r:20,ch:[
-  {t:"photo",ti:"Trouwuitnodiging Bezorgd",d:"Captain houdt een denkbeeldige envelop omhoog voor de POST Rotterdam-gevel — vroeger het hoofdpostkantoor van de stad. Team wijst er allemaal naar: 'Trouwuitnodiging voor Jorik — 14 juni, last call.'",p:20,df:"easy"},
   {t:"quiz",ti:"POST Kennis",d:"Wat was dit gebouw oorspronkelijk?",a:"Hoofdpostkantoor",o:["Hoofdpostkantoor","Stadhuis","Bibliotheek","Rechtbank"],p:15,df:"easy"}]},
 {id:12,n:"Stadhuis Rotterdam",la:51.923237,lo:4.478512,e:"🏛️",c:"landmark",r:25,ch:[
-  {t:"photo",ti:"Burgemeester Pose",d:"Eén teamlid op een denkbeeldig podium voor het Stadhuis als burgemeester. Captain in het midden met sjerp-pose, rest van het team eromheen als raadsleden. Allemaal in beeld.",p:25,df:"medium"},
-  {t:"video",ti:"Raadsvergadering",d:"Heel team speelt 15-sec nep-raadsvergadering voor het Stadhuis: captain als voorzitter, rest als raadsleden die heftig debatteren over een belachelijk onderwerp. Allemaal in beeld.",p:30,df:"medium"}]},
+  {t:"photo",ti:"Bruidspaar aan het Stadhuis",d:"Het Stadhuis is dé locatie voor romantische bruidsfoto's. Kies een raamnis of boog op de gevel als decor. Recreëer drie klassieke poses met wisselende 'koppels' uit het team: (1) voorhoofd tegen voorhoofd, ogen dicht; (2) twee handen gevouwen op de buik; (3) één teamlid dat het andere draagt. Rest van het team speelt de fotograaf. Koppel altijd groot in beeld, gevel zichtbaar op de achtergrond.",p:30,df:"medium"},
+  {t:"video",ti:"Ongewenst Huwelijksadvies",d:"Drie teamleden geven elk on-camera één stuk ongewenst, ongewild of volkomen nutteloos huwelijksadvies — recht in de lens, doodserious. Captain houdt de camera. Geen onderbreking, geen lachen. Min. 30 sec totaal. Stadhuis als achtergrond.",p:30,df:"medium"}]},
 {id:13,n:"Koopgoot",la:51.9201,lo:4.4795,e:"🛍️",c:"landmark",r:30,ch:[
-  {t:"creative",ti:"Interview-opdracht",d:"Team interviewt een echte shopper in de Koopgoot: 'Wat is jouw slechtste aankoop ooit?' Captain + minstens 2 teamleden naast de shopper in beeld. Min. 15 sec.",p:35,df:"medium"},
+  {t:"video",ti:"Iemand uit de Goot",d:"De Koopgoot is letterlijk een goot — gebruik hem. Eén teamlid gaat liggen in het laagste deel van de Koopgoot. Rest van het team staat erboven en trekt hem/haar er dramatisch uit — armen gestrekt, gezichten van maximale inspanning. Film de redding van begin tot eind. Spreekwoord: 'iemand uit de goot rapen.' Iedereen in beeld, en het moet glashelder zijn dat diegene écht uit de goot omhoog wordt getrokken.",p:35,df:"medium"},
   {t:"quiz",ti:"Koopgoot Trivia",d:"Hoe heet de Koopgoot officieel?",a:"Beurstraverse",o:["Beurstraverse","Cooltraverse","Winkeltraverse","Lijnbaanpassage"],p:15,df:"easy"}]},
-{id:14,n:"Hofplein",la:51.924788,lo:4.477553,e:"⛲",c:"square",r:35,ch:[{t:"video",ti:"Bachelor's Wishing Fountain",d:"Captain gooit een muntje in de Hofplein-fontein en spreekt 1 huwelijkswens hardop uit (voor Jorik). Heel team eromheen in beeld, handen gevouwen alsof ze meebidden. Film van begin tot wens.",p:30,df:"medium"}]},
+{id:14,n:"Hofplein",la:51.924788,lo:4.477553,e:"⛲",c:"square",r:35,ch:[{t:"video",ti:"Feyenoord bij de Fontein",d:"Minimaal één teamlid zingt een Feyenoord-lied bij de Hofplein-fontein — vol volume, minimaal 10 seconden onafgebroken op film. Rest van het team mag meezingen, aanmoedigen of filmen. Fontein op de achtergrond.",p:30,df:"medium"}]},
 {id:15,n:"Standbeeld Erasmus",la:51.9221,lo:4.4859,e:"📚",c:"art",r:10,ch:[
   {t:"photo",ti:"Erasmus Imitatie",d:"Imiteer de pose van Erasmus. Heel team doet mee.",p:20,df:"easy"},
-  {t:"quiz",ti:"Erasmus Quiz",d:"Waarvoor is Erasmus het meest bekend?",a:"Lof der Zotheid",o:["Lof der Zotheid","Het Achterhuis","Max Havelaar","De Ontdekking van de Hemel"],p:20,df:"easy"}]},
-{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"video",ti:"Erasmus Fluistert",d:"Erasmus staat hier al sinds 1622 — oudste standbeeld van NL. Captain knielt voor het Erasmus-standbeeld en vraagt luidop om één concreet levensadvies. Min. 2 teamleden eromheen als ooggetuigen. Een teamlid off-camera levert Erasmus' antwoord met minstens één Latijns-klinkend woord.",p:35,df:"hard",wp:1}]},
+  {t:"quiz",ti:"Erasmus Quiz",d:"In welk jaar werd Erasmus geboren?",a:"1469",o:["1469","1521","1380","1602"],p:20,df:"easy"}]},
+{id:16,n:"Grotekerkplein",la:51.921868,lo:4.485137,e:"🏛️",c:"square",r:20,ch:[{t:"video",ti:"Expecto Patronum!",d:"Zoek een tak of stok in de buurt als toverstaf. Heel team richt de staf op het Erasmus-standbeeld en spreekt in koor een Harry Potter-spreuk uit — bijv. 'Expecto Patronum!' of 'Alohomora!' Één teamlid leidt de bezwering, rest zweept dramatisch mee. Film de aanloop, de spreuk én de 'reactie' van Erasmus. Iedereen in beeld, standbeeld zichtbaar.",p:35,df:"hard",wp:1}]},
 {id:17,n:"Zadkine Monument",la:51.9180,lo:4.4815,e:"🗿",c:"art",r:15,ch:[
-  {t:"photo",ti:"Verwoeste Stad Pose",d:"Heel team recreëert de Zadkine-pose: armen omhoog, mond open, gezichten van schrik. Captain centraal voor het beeld, allemaal in beeld.",p:25,df:"medium"},
+  {t:"photo",ti:"Verwoeste Stad Pose",d:"Recreëer de Zadkine-pose zo exact mogelijk: armen gespreid omhoog, mond wijd open, gezichten van absolute ontzetting — net als het beeld. Captain centraal, recht voor het monument. Foto van opzij zodat team én beeld in dezelfde pose naast elkaar staan.",p:25,df:"medium"},
   {t:"quiz",ti:"Monument Quiz",d:"Aan welke gebeurtenis herinnert dit beeld?",a:"Bombardement Rotterdam 1940",o:["Bombardement Rotterdam 1940","Watersnoodramp 1953","Bevrijding 1945","Havenarbeidersstaking 1970"],p:25,df:"medium"}]},
-{id:18,n:"Het Schielandshuis",la:51.918933,lo:4.481813,e:"🏰",c:"historic",r:20,ch:[{t:"photo",ti:"Bruidsportret 1665",d:"Stilstaand groepsportret als 17e-eeuwse regenten voor het Schielandshuis — een van de weinige gebouwen die het bombardement van 1940 overleefden. Captain vooraan, hand op het hart, blik plechtig. Niemand mag lachen.",p:20,df:"easy"}]},
-{id:19,n:"Binnenrotte",la:51.921313,lo:4.486875,e:"🎪",c:"square",r:25,ch:[{t:"creative",ti:"Markt Bingo",d:"Markt-bingo op de Binnenrotte: vind iets roods, een buitenlander, een straatmuzikant, iets gratis, een hond. Per vondst foto met heel team in beeld naast het object/persoon. Allemaal erop, elke keer.",p:35,df:"hard"}]},
+{id:18,n:"Het Schielandshuis",la:51.918933,lo:4.481813,e:"🏰",c:"historic",r:20,ch:[{t:"photo",ti:"At Your Service!",d:"Het standbeeld van Pim Fortuyn staat pal voor het Schielandshuis. Recreëer zijn iconische saluut-pose: rechterhand strak tegen het voorhoofd, borst vooruit, blik recht in de lens — 'At your service!' Heel team tegelijk in dezelfde houding. Standbeeld én team in beeld.",p:20,df:"easy"}]},
+{id:19,n:"Binnenrotte",la:51.921313,lo:4.486875,e:"🎪",c:"square",r:25,ch:[{t:"photo",ti:"Lieve Hond Gezocht",d:"Vind iemand met een lieve hond op de Binnenrotte en vraag vriendelijk of je daarmee op de foto mag. Zo veel teamleden als mogelijk in beeld met de hond. De eigenaar mag ook meedoen.",p:25,df:"easy"}]},
 {id:20,n:"Oude Haven",la:51.919257,lo:4.492419,e:"⛵",c:"landmark",r:15,ch:[
-  {t:"video",ti:"Shanty Zingen",d:"Heel team zingt een piraten-lied bij de schepen van de Oude Haven. Captain vooraan als kapitein, rest van team als bemanning. Allemaal in beeld, min. 15 sec.",p:30,df:"medium"},
-  {t:"photo",ti:"Zeeman Pose",d:"Heel team poseert als stoere zeemannen bij de Oude Haven. Captain vooraan met denkbeeldige pijp, team eromheen met zeemansblik. Allemaal in beeld.",p:15,df:"easy"}]},
+  {t:"video",ti:"Steen Papier Schaar",d:"Bestel zo snel mogelijk een glas bier zodra je aankomt bij de Oude Haven. Twee teamleden spelen daarna 3 rondes steen-papier-schaar. De verliezer drinkt het glas zo snel mogelijk leeg op camera. Film het hele spel én de finish. Schepen op de achtergrond.",p:30,df:"medium"},
+  {t:"photo",ti:"Titanic bij de Haven",d:"Titanic-moment bij de historische schepen van de Oude Haven: één teamlid staat op de kade met armen wijd als Jack op de boeg, een ander staat erachter als Rose. Rest van het team mag meedoen als bemanning. Schepen op de achtergrond.",p:20,df:"easy"},
+  {t:"photo",ti:"Iconisch Havenkiekje",d:"Maak de iconische Oude Haven-foto met het hele team erop: historische schepen, Witte Huis én Willemsbrug allemaal in één shot. Zoek het juiste standpunt — hoe meer elementen herkenbaar, hoe beter. Heel team in beeld.",p:30,df:"medium"}]},
 {id:21,n:"Luchtsingel",la:51.925534,lo:4.476293,e:"🌉",c:"landmark",r:15,ch:[
-  {t:"photo",ti:"Gele Brug Groep",d:"Heel team in beeld op de gele Luchtsingel-brug. Captain centraal, team in kleurrijke ketting eromheen. Iedereen erop, gele brug duidelijk zichtbaar.",p:20,df:"easy"},
+  {t:"photo",ti:"Epic Model Shot",d:"De Luchtsingel als catwalk. Heel team poseert in de meest epische modellen-pose die jullie kunnen bedenken: kin omhoog, blik in de verte, wind door het haar — ook als er geen wind is. Eén foto, maximale drama. Gele brug als achtergrond.",p:25,df:"medium"},
   {t:"quiz",ti:"Luchtsingel Feit",d:"Hoe is de Luchtsingel gefinancierd?",a:"Crowdfunding",o:["Crowdfunding","Gemeente Rotterdam","EU subsidie","Loterij"],p:25,df:"medium"}]},
-{id:22,n:"Marten Toonder",la:51.919729,lo:4.488082,e:"🐻",c:"art",r:15,ch:[{t:"video",ti:"Bommel Ode",d:"Jullie verst-van-nuchtere teamlid houdt een toespraak tegen Heer Bommel. Heel team eromheen in beeld, captain knikkend instemmend. Iedereen erop. Min. 15 sec.",p:25,df:"medium"}]},
+{id:22,n:"Marten Toonder",la:51.919729,lo:4.488082,e:"🐻",c:"art",r:15,ch:[{t:"photo",ti:"Bankje bij Bommel",d:"Team gaat samen op het bankje bij het standbeeld van Marten Toonder aan de Oude Haven zitten. Iedereen kijkt in exact dezelfde richting — hoofden gelijkvormig, relaxte houding. Standbeeld op de achtergrond. Eén cool groepsmoment.",p:20,df:"easy"}]},
 {id:23,n:"Kabouter Buttplug",la:51.917066,lo:4.473353,e:"🎅",c:"art",r:15,ch:[
-  {t:"photo",ti:"Kerstman Pose",d:"Heel team creatief met het Paul McCarthy-kunstwerk: captain op zijn knieën in aanbidding, team eromheen kerstman-pose. Allemaal in beeld.",p:25,df:"medium"},
+  {t:"photo",ti:"Uitnodiging voor de Kabouter",d:"Één teamlid buigt voorover met hoofd volledig naar de grond, kont omhoog, en probeert beide enkels vast te pakken — een uitnodigende pose richting Santa Claus. Team staat eromheen als enthousiast publiek. Kunstwerk op de achtergrond. Iedereen in beeld.",p:25,df:"medium"},
   {t:"quiz",ti:"Buttplug Quiz",d:"Hoe heet dit Paul McCarthy-kunstwerk officieel?",a:"Santa Claus",o:["Santa Claus","Sinterklaas","Christmas Gnome","Christmas Tree"],p:20,df:"easy"}]},
-{id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"video",ti:"Fikkie's Vrijgezellenbiecht",d:"Captain knielt naast Fikkie en biecht één huwelijksangst op (mag verzonnen zijn). Heel team eromheen in beeld als jury. Een teamlid spreekt Fikkie's oordeel uit: schuldig of onschuldig. Iedereen erop.",p:30,df:"medium"}]},
-{id:25,n:"L'Homme qui Marche",la:51.917633,lo:4.472299,e:"🚶",c:"art",r:15,ch:[{t:"video",ti:"Volgende Stap",d:"Captain loopt naast Rodin's L'Homme qui Marche aan de Westersingel in dezelfde pose, voice-over: \"mijn volgende stap is het altaar\". Heel team loopt synchroon mee in dezelfde houding. Allemaal in beeld, min. 10 sec.",p:25,df:"medium"}]},
-{id:26,n:"Sylvette (Picasso)",la:51.9149,lo:4.4735,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Picasso Pose",d:"Heel team in kubistische pose voor Sylvette: hoeken, gekantelde hoofden, scherpe houdingen. Captain centraal in de scherpste hoek. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:27,n:"Cascade (Van Lieshout)",la:51.9178,lo:4.4800,e:"🎪",c:"art",r:20,ch:[{t:"photo",ti:"Cascade Climb",d:"Heel team beklimt (waar veilig) of poseert rond Cascade. Captain bovenop als koning, team gedrapeerd eronder als veroverd volk. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:28,n:"Make It Happen Mural",la:51.9149,lo:4.4789,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Make It Happen",d:"Captain staat onder de tekst en wijst ernaar. Team eromheen, duimen omhoog: dit is het teammotto richting 14 juni.",p:20,df:"easy"}]},
-{id:29,n:"ZOHO Letters",la:51.9290,lo:4.4765,e:"🔤",c:"art",r:20,ch:[{t:"photo",ti:"Letter Pose",d:"Heel team spelt 'JORIK' met de lichamen, voor de ZOHO-letters als achtergrond. Iedereen één letter, allemaal in beeld.",p:35,df:"hard"}]},
+{id:24,n:"Fikkie de Hond",la:51.9162,lo:4.4771,e:"🐕",c:"art",r:10,ch:[{t:"photo",ti:"Fikkie's Gezinsfoto",d:"Team knielt in een kring rondom Fikkie de Hond — als een blije gezinsfoto. Iedereen dicht bij Fikkie, brede lach, armen om elkaars schouders. Fikkie centraal in beeld.",p:20,df:"easy"}]},
+{id:25,n:"L'Homme qui Marche",la:51.917633,lo:4.472299,e:"🚶",c:"art",r:15,ch:[{t:"video",ti:"Tijd Staat Stil",d:"Loop met minimaal 2 teamleden synchroon — zelfde stapgrootte, zelfde tempo — links en rechts naast L'Homme qui Marche aan de Westersingel. Op het moment dat jullie het beeld bereiken: bevries in exact dezelfde pose als het beeld, stalen gezicht, minimaal 5 seconden. Film de aanloop én het bevroren moment. Iedereen in beeld.",p:30,df:"medium"}]},
+{id:26,n:"Sylvette (Picasso)",la:51.9149,lo:4.4735,e:"🎨",c:"art",r:10,ch:[{t:"quiz",ti:"Sylvette Quiz",d:"Welke kunstenaar ontwierp het Sylvette-beeld aan de Westersingel?",a:"Pablo Picasso",o:["Pablo Picasso","Henri Matisse","Salvador Dali","Carl Nesjar"],p:20,df:"medium"}]},
+{id:27,n:"Cascade (Van Lieshout)",la:51.9178,lo:4.4800,e:"🎪",c:"art",r:20,ch:[{t:"photo",ti:"Cascade Klimmer",d:"Klim in of op de Cascade van Atelier Van Lieshout aan de Westersingel — de stapel vaten en vormen is groot genoeg. Eén teamlid neemt positie in tussen de sculptuur, leunt er tegenaan of klimt erin, en poseert alsof het de normaalste zaak ter wereld is. Rest van het team staat op de grond en kijkt toe. Kunstwerk én teamlid duidelijk in beeld.",p:25,df:"medium"}]},
+{id:28,n:"Make It Happen Mural",la:51.9149,lo:4.4789,e:"🎨",c:"art",r:10,ch:[{t:"photo",ti:"Make It Happen",d:"De groene Make It Happen-mural van Daan Botlek heeft ijzeren treden die uit de muur steken — gebruik ze. Minstens één teamlid klimt op de treden en matcht de pose van één van de geschilderde figuren zo nauwkeurig mogelijk. Foto van recht vooruit zodat het teamlid opgaat in de mural. Rest van het team fotografeert of kijkt toe.",p:30,df:"medium"}]},
+{id:29,n:"ZOHO Letters",la:51.9290,lo:4.4765,e:"🔤",c:"art",r:20,ch:[{t:"photo",ti:"Rondje bij Reijngoud",d:"Brewpub Reijngoud staat pal tegenover het ZOHO-bord. Loop naar binnen en bestel als team een rondje bier. Foto met heel team met de glazen omhoog — proost op Jorik. Brewpub-interieur of -gevel op de achtergrond.",p:25,df:"easy"}]},
 {id:30,n:"Maritiem Museum",la:51.917627,lo:4.481887,e:"⚓",c:"culture",r:15,ch:[
-  {t:"photo",ti:"Kapitein Pose",d:"Heel team poseert als scheepsbemanning bij het Maritiem Museum. Captain vooraan als kapitein, team in rij erachter, hand-aan-pet. Allemaal in beeld.",p:20,df:"easy"},
+  {t:"video",ti:"Zoek het Paard",d:"Zoek het paard in de buurt van het Maritiem Museum. Sta er met minstens één teamlid naast en neem een video op: geef Jorik één huwelijksadvies in de vorm van een Nederlands spreekwoord met een paard erin — bijv. 'Zet de kar niet voor het paard' of 'Een gegeven paard kijk je niet in de bek.' Hoe dramatischer de levering, hoe beter. Paard zichtbaar in beeld.",p:30,df:"medium"},
   {t:"quiz",ti:"Maritiem Kennis",d:"Rotterdam is de grootste haven van Europa. Welke plek wereldwijd?",a:"Top 10",o:["Top 10","Top 3","Nummer 1","Top 20"],p:25,df:"medium"}]},
-{id:31,n:"Kunsthal",la:51.910803,lo:4.473427,e:"🖼️",c:"culture",r:20,ch:[{t:"creative",ti:"Levend Kunstwerk",d:"Creëer een 'levend kunstwerk' met het hele team voor de OMA-gevel van de Kunsthal — Rotterdams beroemdste Koolhaas. Captain centraal, allemaal in beeld.",p:30,df:"medium"}]},
+{id:31,n:"Kunsthal",la:51.910803,lo:4.473427,e:"🖼️",c:"culture",r:20,ch:[{t:"quiz",ti:"Kunsthal Quiz",d:"Wie ontwierp de Kunsthal Rotterdam?",a:"Rem Koolhaas",o:["Rem Koolhaas","Renzo Piano","Norman Foster","Piet Blom"],p:20,df:"medium"}]},
 {id:32,n:"Depot Boijmans",la:51.913803,lo:4.471221,e:"🪞",c:"culture",r:15,ch:[
-  {t:"photo",ti:"Spiegel Selfie",d:"Heel team in de spiegelende gevel van het Depot. Captain in het midden, team eromheen wijzend naar hun eigen reflectie. Allemaal in beeld, gevel duidelijk zichtbaar.",p:25,df:"medium"},
-  {t:"quiz",ti:"Depot Feit",d:"Hoeveel kunstwerken in het Depot?",a:"151.000",o:["151.000","50.000","200.000","75.000"],p:25,df:"medium"}]},
-{id:33,n:"Wereldmuseum",la:51.9079,lo:4.4804,e:"🌍",c:"culture",r:15,ch:[{t:"video",ti:"Drie Talen Advies",d:"Bij het Wereldmuseum aan de Veerhaven — wereldhavenstad-mix par excellence — vraag drie vreemden (verschillende nationaliteiten zo mogelijk) om huwelijksadvies in hun moedertaal. Captain + minstens 2 teamleden in beeld bij elke clip. Film alle drie.",p:35,df:"hard"}]},
-{id:34,n:"Nieuwe Instituut",la:51.914708,lo:4.471158,e:"📐",c:"culture",r:15,ch:[{t:"photo",ti:"Architectuur Shot",d:"Heel team in artistieke pose voor het Nieuwe Instituut. Captain tegen de gevel, team in geometrische formatie eromheen. Iedereen in beeld, architectuur als achtergrond.",p:25,df:"medium"}]},
-{id:35,n:"Huis Sonneveld",la:51.915611,lo:4.472337,e:"🏠",c:"culture",r:10,ch:[{t:"photo",ti:"Bauhaus Bachelor",d:"Team in strakke lijn voor Huis Sonneveld — Rotterdams pronkstuk van Het Nieuwe Bouwen — armen langs het lichaam, gezichten neutraal. Captain centraal — alsof jullie de meubels zijn.",p:20,df:"easy"}]},
-{id:36,n:"Mariniersmuseum",la:51.918716,lo:4.491564,e:"🎖️",c:"culture",r:15,ch:[{t:"video",ti:"Mariniersbiecht",d:"Bij het Mariniersmuseum aan de Wijnhaven — Korps Mariniers werd in 1665 in Rotterdam opgericht — biecht één teamlid in marinierhouding het 'gevaarlijkste' op wat de captain ooit deed (echt of verzonnen, mag absurd). Rest van het team in beeld als publiek. Iedereen erop, min. 15 sec.",p:30,df:"medium"}]},
+  {t:"photo",ti:"Boyband Depot",d:"Epische boyband-foto voor de spiegelende gevel van het Depot Boijmans. Heel team staat in een rij, armen over elkaar, stalen blik in de lens. Niemand lacht. De reflectie in de gevel telt mee als extra lid. Allemaal in beeld.",p:25,df:"easy"},
+  {t:"quiz",ti:"Depot Feit",d:"In welk jaar opende het Depot Boijmans Van Beuningen?",a:"2021",o:["2021","2018","2015","2023"],p:20,df:"medium"}]},
+{id:33,n:"Wereldmuseum",la:51.9079,lo:4.4804,e:"🌍",c:"culture",r:15,ch:[{t:"video",ti:"Wensen voor Jorik & Katinka",d:"Verzamel 3 huwelijks- of liefdewensen voor Jorik en Katinka van toeristen of locals bij het Wereldmuseum. Vraag altijd eerst toestemming. Film elke wens apart — in de eigen taal van de wenser. Alle drie de clips inleveren.",p:35,df:"hard"}]},
+{id:34,n:"Nieuwe Instituut",la:51.914708,lo:4.471158,e:"📐",c:"culture",r:15,ch:[{t:"quiz",ti:"Nieuwe Instituut Quiz",d:"Wat is de functie van het Nieuwe Instituut in Rotterdam?",a:"Nationaal museum voor architectuur en design",o:["Nationaal museum voor architectuur en design","Gemeentearchief Rotterdam","Museum voor moderne kunst","Filmmuseum"],p:15,df:"easy"}]},
+{id:36,n:"Mariniersmuseum",la:51.918716,lo:4.491564,e:"🎖️",c:"culture",r:15,ch:[{t:"video",ti:"Marinier Selectie",d:"Bewijs dat jullie sterk genoeg zijn voor het Korps Mariniers: twee teamleden doen elk 20 push-ups voor het Mariniersmuseum aan de Wijnhaven. Het team telt luidop mee. Alleen de sterksten worden geselecteerd. Film de hele uitdaging van begin tot finish. Iedereen in beeld.",p:30,df:"medium"}]},
 {id:37,n:"Witte de Withstraat",la:51.915524,lo:4.476784,e:"🎨",c:"street",r:20,ch:[
-  {t:"creative",ti:"Terras Interview",d:"Team interviewt een terrasbezoeker op de Witte de Withstraat — Rotterdams meest opinionerige terrasstraat: 'Advies voor een bruidegom?' Captain + minstens 2 teamleden in beeld naast de bezoeker. Film de reactie.",p:40,df:"hard"},
-  {t:"photo",ti:"Street Art Hunt",d:"Vind street art op de Witte de Withstraat. Heel team poseert ervoor zo dat ze het kunstwerk visueel 'aanvullen' — ledematen of poses die de tekening uitbreiden. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:38,n:"Skatepark Westblaak",la:51.916824,lo:4.476183,e:"🛹",c:"landmark",r:20,ch:[{t:"video",ti:"Skatepark Move",d:"Eén teamlid probeert een skate-trick of pose op Westblaak. Rest van het team in beeld als entourage of jury, duimen omhoog/omlaag. Iedereen erop. Humor > vaardigheid.",p:30,df:"medium"}]},
-{id:39,n:"Walk of Fame",la:51.9158,lo:4.4820,e:"⭐",c:"landmark",r:10,ch:[{t:"video",ti:"Bachelor Handprint",d:"Op de oude locatie van de Walk of Fame Europe aan de Schiedamsedijk drukt de captain de handen op de stoep en spreekt namens Jorik: \"Vrijgezel sinds [jaar]. Trouwt 14 juni. Laatste handafdruk als vrij man.\" Heel team eromheen geknield als fans, allemaal in beeld. Film.",p:25,df:"medium"}]},
-{id:40,n:"Chinatown Poort",la:51.9215,lo:4.4694,e:"🏮",c:"landmark",r:15,ch:[{t:"photo",ti:"Geheim genootschap",d:"Heel team staat als een maffia-plaatje onder de Chinatown-poort. Captain vooraan als capo, serieuze gezichten, één met sigaret (mag fake zijn). Allemaal in beeld.",p:25,df:"medium"}]},
-{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Havenkraan Bruidegom",d:"De vier rode lichtmasten van Adriaan Geuze (1996) zijn een eerbetoon aan de havenkranen. Film de captain die een havenkraan nadoet: stijve benen, arm omhoog, 'tilt' een denkbeeldige bruid symbolisch op. Captain + minstens 2 teamleden in beeld als havenpersoneel met commentaar. Min. 15 sec.",p:35,df:"hard"}]},
-{id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"creative",ti:"Singel Biecht",d:"Twee teamleden op een bankje aan de Westersingel — Rotterdams openluchtbeeldenroute. Eén bekent on-camera het meest gênante moment uit zijn/haar eigen leven, met de eenden als getuigen. Min. 20 sec. Niet stoppen voor er gelachen wordt.",p:40,df:"hard"}]},
-{id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Eilandbewoners",d:"Team poseert voor een typisch Noordereiland-stoepje of voordeur. Captain draagt een teamlid op de rug — bachelor-stijl het eiland op gedragen.",p:25,df:"medium"}]},
-{id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"Manhattan aan de Maas",d:"Captain vooraan, team in V-formatie erachter, skyline in beeld. Allemaal zonnebril op — ook als het regent.",p:20,df:"easy"}]},
-{id:45,n:"KPN Toren",la:51.907179,lo:4.489141,e:"📡",c:"architecture",r:20,ch:[{t:"photo",ti:"Houd 'm Recht",d:"Captain leunt schuin tegen de 6° hellende gevel van de KPN Toren — Renzo Piano's leunende reus op Kop van Zuid — perspectief zo dat hij/zij de toren 'overeind' duwt. Team eromheen in panische pose.",p:25,df:"medium"}]},
-{id:46,n:"Spido Kade",la:51.9098,lo:4.4818,e:"🚤",c:"landmark",r:15,ch:[{t:"quiz",ti:"Spido Kennis",d:"Hoe lang duurt een Spido rondvaart?",a:"75 minuten",o:["75 minuten","45 minuten","60 minuten","90 minuten"],p:15,df:"easy"}]},
-{id:47,n:"Monument De Boeg",la:51.912273,lo:4.484558,e:"🚢",c:"monument",r:10,ch:[{t:"photo",ti:"Titanic Moment",d:"Heel team Titanic-pose bij De Boeg — Rotterdams monument voor de koopvaardij in WO2 met de Maas op de achtergrond. Captain vooraan met armen wijd, team erachter als bemanning. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:48,n:"Nieuwe Luxor",la:51.906782,lo:4.491185,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Theater Scene",d:"Heel team speelt een filmscène na voor de Nieuwe Luxor. Captain in de hoofdrol, team in bijrol. Allemaal in beeld, Oscar-waardig.",p:30,df:"medium"}]},
-{id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[{t:"video",ti:"Blind Bruidegom",d:"Team voert de captain geblinddoekt 1 onbekend hapje uit Fenix. Captain beschrijft de smaak met huwelijks-metaforen (\"zuur als de schoonmoeder\"). Captain + minstens 2 teamleden zichtbaar in beeld. Film.",p:30,df:"medium"}]},
-{id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"photo",ti:"Boom Knuffelen",d:"Captain knuffelt over de reling een drijvende boom in de Rijnhaven — 's werelds eerste drijvende stadspark, made in Rotterdam. Team eromheen met handen op het hart — 'een laatste boom voor de bruiloft'.",p:20,df:"easy"}]},
+  {t:"video",ti:"Aanzoek bij de Ekster",d:"Vind de ekster met de trouwring op de Witte de Withstraat. Reconstrueer het huwelijksaanzoek van Jorik: één teamlid gaat op één knie voor een ander teamlid die Katinka speelt, en doet het aanzoek zo oprecht mogelijk na. De ekster is de stille getuige. Film van aanloop tot antwoord. Iedereen in beeld.",p:35,df:"medium"},
+  {t:"video",ti:"Getrouwd man gezocht",d:"Zoek een getrouwde man op een van de terrassen van de Witte de Withstraat. Vraag toestemming om te filmen. Stel hem één vraag: 'Wat is jouw beste advies voor een bruidegom?' Film zijn volledige antwoord. Teamleden hoeven niet in beeld — maar mag uiteraard wel.",p:35,df:"hard"}]},
+{id:40,n:"West-Kruiskade",la:51.9215,lo:4.4694,e:"🌍",c:"landmark",r:15,ch:[{t:"quiz",ti:"Rotterdam Smeltpot",d:"Rotterdam is een van de meest diverse steden ter wereld. Hoeveel verschillende nationaliteiten telt de stad anno 2025 (circa)?",a:"174",o:["174","92","210","138"],p:20,df:"medium"}]},
+{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Koprol op het Kunstgras",d:"Het Schouwburgplein heeft kunstgras — gebruik het. Minstens één teamlid doet een volledige koprol op het gras en wordt gefilmd. Hoe dramatischer de aanloop en landing, hoe beter. Rest van het team kijkt toe of filmt.",p:25,df:"medium"}]},
+{id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"photo",ti:"Verrassings-vagijn",d:"Ergens langs de kade van de Westersingel zit een verborgen keramieken kunstwerkje in de muur — vlak boven het water. Hints: 'Als het water te hoog komt sluiten de kleppen. Het water staat tot aan mijn lippen.' Vind het. Maak een foto als bewijs dat jullie pussy-radar nog werkt. Het kunstwerk moet duidelijk herkenbaar in beeld zijn.",p:40,df:"hard"}]},
+{id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Zwaan in Zicht",d:"Maak een epische teamfoto op het Noordereiland met de Erasmusbrug — De Zwaan — op de achtergrond. Team in sterke formatie, brug groot en herkenbaar in beeld. Maak er iets moois van: dit is ver reizen waard. Allemaal in beeld.",p:45,df:"medium"}]},
+{id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"De Rotterdam van Onder",d:"Ga voor De Rotterdam op de Wilhelminapier staan — het kolossale gebouw van Rem Koolhaas. Maak een selfie van recht onder naar boven: telefoon omlaag, camera omhoog, heel team in beeld. De gevel rijst massief boven jullie uit. Zorg dat iedereen erop staat.",p:25,df:"medium"}]},
+{id:45,n:"KPN Toren",la:51.907179,lo:4.489141,e:"📡",c:"architecture",r:20,ch:[{t:"quiz",ti:"KPN Toren Quiz",d:"Wie ontwierp de KPN Toren op de Kop van Zuid?",a:"Renzo Piano",o:["Renzo Piano","Rem Koolhaas","Norman Foster","Piet Blom"],p:15,df:"easy"}]},
+{id:46,n:"Spido Kade",la:51.9098,lo:4.4818,e:"🚤",c:"landmark",r:15,ch:[{t:"quiz",ti:"Snelste op het Water",d:"Spido of Watertaxi Rotterdam: wie heeft de hoogste maximumsnelheid op de Maas — en wie wint de race?",a:"Watertaxi Rotterdam",o:["Watertaxi Rotterdam","Spido","Ze zijn even snel","Hangt van de route af"],p:15,df:"easy"}]},
+{id:47,n:"Boompjes",la:51.912273,lo:4.484558,e:"🏃",c:"landmark",r:10,ch:[{t:"video",ti:"Sprintwedstrijd de Boompjes",d:"Op de Boompjes langs de Maas zijn 100 meter sprintmarkeringen op de grond aangebracht. Zoek de startlijn. Twee teamleden gaan naast elkaar staan. De videomaker telt af: 3... 2... 1... GO! Beiden rennen zo hard mogelijk de 100 meter uit. Film de complete sprint van start tot finish. Wie wint?",p:25,df:"medium"}]},
+{id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[{t:"photo",ti:"Proost bij 21 Pinchos",d:"Ga naar het terras van 21 Pinchos bij de Fenix Food Factory op Katendrecht. Bestel een biertje voor het hele team. Foto met iedereen met het glas omhoog — proost op Jorik en Katinka. Terras of Fenix-omgeving zichtbaar op de achtergrond.",p:25,df:"easy"}]},
+{id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"quiz",ti:"Drijvend Bos Quiz",d:"Wat maakt het Drijvend Bos in de Rijnhaven uniek in de wereld?",a:"'s Werelds eerste drijvende stadspark",o:["'s Werelds eerste drijvende stadspark","Grootste park van Rotterdam","Ontworpen door Rem Koolhaas","Geplant op een scheepswrak"],p:20,df:"easy"}]},
 {id:51,n:"Maastunnel",la:51.902719,lo:4.468246,e:"🚇",c:"landmark",r:20,ch:[
-  {t:"video",ti:"1070 Meter Galm",d:"De voetgangerstunnel is 1070m lang en dateert uit 1942. Loop tot ~halverwege (~5 min one-way), niet helemaal door. Captain reciteert daar hardop een plechtige verklaring — echo moet hoorbaar zijn. Rest van team in een rij erachter, roept in koor 'Ja!'. Allemaal in beeld. Daarna terug naar de ingang.",p:40,df:"hard",wp:1},
   {t:"quiz",ti:"Tunnel Quiz",d:"Wanneer werd de Maastunnel geopend?",a:"1942",o:["1942","1935","1950","1960"],p:20,df:"medium"}]},
-{id:52,n:"Het Park",la:51.906157,lo:4.470373,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Picknick Zonder Picknick",d:"Team ligt in het gras van Het Park aan de voet van de Euromast alsof er een picknick is — alleen zonder eten of kleed. Captain in het midden met denkbeeldige champagnefluit omhoog.",p:15,df:"easy"}]},
-{id:53,n:"Veerhaven",la:51.907406,lo:4.478667,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Verloofdenshoot",d:"Twee teamleden flankeren de captain en kijken hem/haar verliefd aan bij de historische zeilschepen van de Veerhaven — Rotterdams chicste oude jachthaven. De captain staart wanhopig in de lens. Eén op de knie.",p:20,df:"easy"}]},
-{id:54,n:"Maastoren",la:51.908768,lo:4.493358,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wolkenkrabber",d:"Heel team in perspectief: Maastoren lijkt klein in jullie hand. Captain 'plet' de toren tussen vingers, team eromheen in panische pose. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:55,n:"Rijnhavenbrug",la:51.903332,lo:4.485836,e:"🌁",c:"bridge",r:15,ch:[{t:"photo",ti:"Katendrecht Crossing",d:"Team op de brug, captain centraal, allemaal wijzend naar Katendrecht alsof jullie een nieuw continent ontdekken. Minstens één in superman-pose.",p:20,df:"easy"}]},
-{id:56,n:"Foodhallen",la:51.906033,lo:4.487959,e:"🍽️",c:"food",r:20,ch:[{t:"video",ti:"Last Single Meal",d:"Captain kiest 1 gerecht in de Foodhallen en vertelt op camera: dit is mijn vrijgezellen-souvenir. Waarom dit gerecht? Captain + minstens 2 teamleden in beeld als publiek. Iedereen erop.",p:25,df:"medium"}]},
-{id:57,n:"Floating Office",la:51.90408,lo:4.488447,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Out of Office",d:"Captain houdt de telefoon omhoog voor het Floating Office in de Rijnhaven — 's werelds grootste drijvende kantoor — en roept: 'Out of office tot na 14 juni.' Team applaudisseert in beeld, water op de achtergrond.",p:20,df:"easy"}]},
-{id:58,n:"Luchtpark Hofbogen",la:51.926834,lo:4.478982,e:"🌿",c:"park",r:15,ch:[{t:"photo",ti:"Rooftop Panorama",d:"Heel team breeduit op het dak van het Luchtpark Hofbogen, panorama als achtergrond. Captain in het midden met armen wijd, team in V-formatie. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:59,n:"DakAkker",la:51.925465,lo:4.476699,e:"🌱",c:"landmark",r:15,ch:[{t:"photo",ti:"Dakboerderij",d:"Heel team poseert op de DakAkker, grootste open-lucht dakboerderij van Nederland op het Schieblock. Captain in boerenpose met denkbeeldige hooivork, team eromheen als knechten. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:60,n:"Het Industriegebouw",la:51.923711,lo:4.492121,e:"🏭",c:"landmark",r:15,ch:[{t:"photo",ti:"Wederopbouw Mannen",d:"Team in werkmanshouding voor het Industriegebouw — symbool van Rotterdams wederopbouw na 1945: armen over elkaar, kin omhoog. Captain vooraan met een denkbeeldige hamer over de schouder.",p:15,df:"easy"}]},
-{id:61,n:"BlueCity",la:51.9198,lo:4.4981,e:"♻️",c:"landmark",r:15,ch:[{t:"quiz",ti:"BlueCity Quiz",d:"BlueCity zit in een voormalig zwembad. Hoe heette het?",a:"Tropicana",o:["Tropicana","Aquarena","De Dolfijn","Waterlinie"],p:25,df:"medium"}]},
-{id:62,n:"Het Slaakhuys",la:51.9255,lo:4.4988,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Gatsby Groet",d:"Team in 1920s pose voor Het Slaakhuys aan de Slaak — voormalig hoofdkantoor van krant Het Vrije Volk, nu boutique hotel: captain tipt aan een denkbeeldige hoed, één teamlid blaast een kushand naar de camera.",p:20,df:"easy"}]},
-{id:63,n:"Gebouw Delftse Poort",la:51.9240,lo:4.4716,e:"🏙️",c:"architecture",r:20,ch:[{t:"photo",ti:"Hoogste Punt",d:"Heel team in beeld met Delftse Poort op de achtergrond. Captain reikt een hand omhoog: 'Onze stand piekt nog één keer voor de bruiloft.' Team eromheen, allemaal armen omhoog.",p:20,df:"easy"}]},
-{id:64,n:"Willemswerf",la:51.916963,lo:4.49011,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Schuine Gevel Quiz",d:"Welke architect ontwierp dit gebouw met de karakteristieke 45°-schuine gevel waar Jackie Chan in 1998 van naar beneden gleed in de film 'Who Am I?'?",a:"Wim Quist",o:["Wim Quist","Rem Koolhaas","Ben van Berkel","Piet Blom"],p:30,df:"hard"}]},
-{id:65,n:"Concertgebouw De Doelen",la:51.9234,lo:4.4740,e:"🎵",c:"culture",r:20,ch:[{t:"video",ti:"Luchtgitaar",d:"Heel team luchtgitaar voor De Doelen. Captain vooraan als frontman, team als bandleden — drums, bas, headbangers. Allemaal in beeld, 10 sec.",p:25,df:"medium"}]},
-{id:66,n:"Oude Luxor Theater",la:51.922997,lo:4.477027,e:"🎭",c:"culture",r:15,ch:[{t:"video",ti:"Broadway Moment",d:"Heel team zingt 10 sec musical voor de ingang van de Oude Luxor. Captain vooraan als hoofdrol, team als koor met choreografie. Allemaal in beeld.",p:30,df:"medium"}]},
-{id:67,n:"Geldersekade Panorama",la:51.9190,lo:4.4915,e:"🌅",c:"viewpoint",r:15,ch:[{t:"photo",ti:"Witte Huis Wijzen",d:"Panorama met Oude Haven en Witte Huis erop. Team wijst naar het Witte Huis, captain wijst naar zichzelf — 'oudste wolkenkrabber, oudste vrijgezel van het team'.",p:20,df:"easy"}]},
-{id:68,n:"Pauluskerk",la:51.919994,lo:4.472557,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Generale Repetitie",d:"Captain staat met de rug naar de Pauluskerk — Rotterdams bekendste daklozen-toevlucht én moderne kerk-icoon — team aan weerszijden. Iemand werpt rijst (of denkbeeldig). Repetitie voor 14 juni.",p:15,df:"easy"}]},
-{id:69,n:"Arminius Kerk",la:51.9155,lo:4.4727,e:"⛪",c:"historic",r:15,ch:[{t:"photo",ti:"Bruidegom in Spe",d:"Captain op de stoep voor de Arminiuskerk aan de Westersingel — Rotterdams remonstrants debat-podium — team in twee rijen erachter. Captain houdt twee duimen op — laatste keer zo zorgeloos voor een kerk.",p:20,df:"easy"}]},
-{id:70,n:"Binnenwegplein",la:51.918234,lo:4.477439,e:"🎡",c:"square",r:20,ch:[{t:"photo",ti:"Synchroon Bewegen",d:"Team imiteert op het Binnenwegplein de beweging van George Rickey's 'Two Turning Vertical Rectangles' (1971): allemaal in dezelfde houding, één arm zwaaiend. Captain in het midden, op één been, midden in Rotterdams winkelhart.",p:20,df:"easy"}]},
-{id:71,n:"THOMS",la:51.921926,lo:4.481385,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Speciaalbier-test",d:"Bestel bij THOMS in de Karel Doormanstraat een speciaalbier dat niemand kent. Het slachtoffer (één teamlid) proeft blind, heel team eromheen in beeld in afwachting van de reactie. Captain + minstens 2 teamleden zichtbaar bij het glas.",p:30,df:"medium"}]},
-{id:72,n:"Bokaal",la:51.92245,lo:4.488359,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Captain's Trouwtoast",d:"In Bokaal aan de Nieuwemarkt — Rotterdams huiskamer-bruine kroeg — staat de captain op (stoel of krukje, mits veilig) en houdt een 20-sec-toast op zichzelf in de derde persoon. Minstens drie keer 'die fantastische captain' zeggen. Captain + minstens 2 teamleden in beeld die meeklinken aan het eind.",p:25,df:"medium"}]},
-{id:73,n:"De Après Skihut",la:51.9223,lo:4.4767,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Schnaps-Toost",d:"In De Après Skihut aan het Stadhuisplein — Rotterdams jaar-rond Tirol-bar sinds 1997 — heft de captain een glas (niet drinken, glas mag leeg zijn) en houdt een 1-zin trouwtoespraak in extreem Duits accent: \"Auf die Liebe und das Leben!\" Captain + minstens 2 teamleden in beeld die meeklinken en meebrullen. Mag overdreven.",p:25,df:"medium"}]},
-{id:74,n:"De Gele Kanarie",la:51.924182,lo:4.489447,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Cheers met vreemden",d:"Klink in De Gele Kanarie — Rotterdams bierbrouwers-café aan de Goudsesingel met eigen brouwerij in de kelder — met twee onbekenden aan de bar. Foto met alle 4 gezichten zichtbaar.",p:30,df:"medium"}]},
-{id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Captain's Blessing",d:"Vraag een crew member / barman aan boord van Vessel 11 om Jorik's huwelijk te zegenen in nautische termen ('Goede wind en kalm water voor Jorik en zijn aanstaande'). Captain + minstens 2 teamleden naast de gezegende in beeld. Film het complete moment.",p:30,df:"medium"}]},
-{id:76,n:"BIRD Rotterdam",la:51.926726,lo:4.478851,e:"🎵",c:"bar",r:20,ch:[{t:"photo",ti:"Debuutalbum",d:"Bandfoto voor BIRD in ZOHO — Rotterdams ruwste jazz/hiphop-podium: captain vooraan met denkbeeldige microfoon, team erachter als ritmesectie. Niemand mag glimlachen — albumcoverregel.",p:20,df:"easy"}]},
-{id:77,n:"De Vrienden Live",la:51.919192,lo:4.494026,e:"🍺",c:"bar",r:15,ch:[{t:"video",ti:"Vriendenbiecht",d:"Heel team voor de camera bij De Vrienden Live (min. 3 leden). Elk teamlid noemt iets opvallends — een gewoonte, een uitspraak, een verhaal — dat de buitenwereld waarschijnlijk nog niet kent. Eén lange take. (Captain weet via de team-brief om wie het écht gaat — film in een rustige hoek.)",p:30,df:"medium",wp:1}]},
-{id:78,n:"Hitz",la:51.9224,lo:4.4780,e:"🍺",c:"bar",r:15,ch:[{t:"creative",ti:"Bruiloftshit voor Jorik",d:"In Hitz aan de Karel Doormanstraat — Rotterdams meezing-bar bij uitstek — kies samen één nummer dat de DJ (of speaker) draait. Binnen 30 sec verzinnen jullie nieuwe tekst op het refrein — moet gaan over Jorik's huwelijk. Hele team zingt mee, captain vooraan. Filmen.",p:30,df:"medium"}]},
-{id:79,n:"Sijf",la:51.917446,lo:4.474287,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Toost op Jorik",d:"Team aan tafel op het terras van Sijf op de Witte de Withstraat, glazen geheven richting de hemel als toost op Jorik. Captain houdt het glas het hoogst. Mag een biertje of cola zijn — gelijk welk.",p:15,df:"easy"}]},
-{id:80,n:"NRC",la:51.915542,lo:4.476326,e:"🍸",c:"bar",r:15,ch:[{t:"photo",ti:"Bachelor's Last Cocktail",d:"Captain bestelt een cocktail aan de bar van NRC op de Witte de Withstraat — Rotterdams cocktail-instituut in een oude krantendrukkerij — team eromheen. Captain houdt het glas voor het gezicht, alleen ogen zichtbaar boven de rand.",p:20,df:"easy"}]},
-{id:81,n:"Biergarten",la:51.925686,lo:4.476209,e:"🍺",c:"bar",r:15,ch:[{t:"photo",ti:"Duits accent Prosit",d:"In de Biergarten naast Rotterdam Centraal — pop-up bier-tuin op een voormalig industrieterrein — roept het hele team 'PROSIT' met zo Duits mogelijk accent tegen de buurtafel. Film de reactie.",p:30,df:"medium"}]},
-{id:82,n:"Poppodium Annabel",la:51.9252,lo:4.4735,e:"🎸",c:"bar",r:20,ch:[{t:"photo",ti:"Headliner Captain",d:"Voor poppodium Annabel — Rotterdams ruige indie-tempel naast Centraal — captain vooraan met luchtgitaar, één been op een denkbeeldige monitor. Team eromheen met handen in de lucht, fans op de eerste rij.",p:20,df:"easy"}]},
-{id:83,n:"Happy Italy",la:51.923054,lo:4.485392,e:"🍕",c:"restaurant",r:15,ch:[
-  {t:"photo",ti:"Maffia Meeting",d:"Heel team in 'maffia vergadering' bij Happy Italy. Captain als Don aan het hoofd van de tafel, team als capi eromheen, Godfather vibes. Allemaal in beeld.",p:25,df:"medium"},
-  {t:"creative",ti:"Pizza Bestelling",d:"Eén teamlid bestelt bij Happy Italy in nep-Italiaans accent. Captain + minstens 2 teamleden in beeld aan tafel. Film de reactie van de bediening.",p:35,df:"hard"}]},
-{id:84,n:"Sugo Pizza",la:51.9214,lo:4.4781,e:"🍕",c:"restaurant",r:15,ch:[{t:"photo",ti:"Sugo Selfie",d:"Heel team in 'Italian kiss' pose bij Sugo Pizza: vingertoppen tegen de mond, hand omhoog. Captain vooraan, team eromheen synchroon. Allemaal in beeld.",p:20,df:"easy"}]},
-{id:85,n:"O'Pazzo",la:51.922147,lo:4.490306,e:"🍝",c:"restaurant",r:15,ch:[{t:"creative",ti:"Pazzo Performance",d:"'O Pazzo' = 'de gek'. Heel team doet iets geks voor de zaak: gekke gezichten, scheve houdingen, captain centraal als grootste pazzo. Allemaal in beeld.",p:30,df:"medium"}]},
-{id:86,n:"Vapiano",la:51.9208,lo:4.4863,e:"🍝",c:"restaurant",r:15,ch:[{t:"quiz",ti:"Vapiano Quiz",d:"Wat betekent 'Vapiano'?",a:"Langzaam",o:["Langzaam","Snel","Lekker","Vers"],p:20,df:"easy"}]},
-{id:87,n:"Old Scuola",la:51.923431,lo:4.49322,e:"🎓",c:"restaurant",r:15,ch:[{t:"photo",ti:"Old School Pose",d:"Heel team in 'old school maffia' pose voor Old Scuola: denkbeeldige sigaren, opgeslagen kragen. Captain als capo vooraan, team als familie. Allemaal in beeld.",p:20,df:"easy"}]},
-{id:88,n:"Historisch Delfshaven",la:51.9068,lo:4.4496,e:"🏚️",c:"historic",r:15,ch:[
-  {t:"photo",ti:"Historisch Portret",d:"Heel team in historische pose bij de havenhuisjes van Delfshaven. Captain vooraan als zeevaarder-kapitein, team als bemanning, hoeden in de hand. Allemaal in beeld.",p:25,df:"medium"},
-  {t:"quiz",ti:"Pilgrim Fathers",d:"De Pilgrim Fathers vertrokken vanuit Delfshaven. Waarheen?",a:"Amerika",o:["Amerika","Indonesië","Suriname","Zuid-Afrika"],p:20,df:"easy"}]},
+{id:52,n:"Het Park",la:51.906157,lo:4.470373,e:"🌿",c:"park",r:20,ch:[{t:"photo",ti:"Euromast Postcard",d:"Maak een epische ansichtkaartfoto van de Euromast vanuit Het Park. Eén teamlid staat op de voorgrond en geeft met één uitgestrekte hand aan hoe hoog de Euromast is — klassiek perspectief-trucje. Euromast groot en scherp op de achtergrond. Zo toeristisch en postcard-waardig mogelijk.",p:20,df:"easy"}]},
+{id:53,n:"Veerhaven",la:51.907406,lo:4.478667,e:"⚓",c:"landmark",r:15,ch:[{t:"photo",ti:"Vrouwennamen",d:"Veel boten in de Veerhaven dragen een vrouwennaam. Vind er minstens 3 en fotografeer het team wijzend naar de naam op de romp — bij elke boot een aparte foto. Drie foto's inleveren. Namen duidelijk leesbaar in beeld.",p:30,df:"medium"}]},
+{id:54,n:"Maastoren",la:51.908768,lo:4.493358,e:"🏢",c:"architecture",r:20,ch:[{t:"quiz",ti:"Maastoren Quiz",d:"Hoe hoog is de Maastoren?",a:"185 meter",o:["185 meter","150 meter","220 meter","95 meter"],p:15,df:"easy"}]},
+{id:55,n:"Rijnhavenbrug",la:51.903332,lo:4.485836,e:"🌁",c:"bridge",r:15,ch:[{t:"video",ti:"Secrid voor Altijd",d:"Eén teamlid doet alsof hij/zij een slotje ophangt aan de liefdesslotjes op de Rijnhavenbrug, gooit de sleutel dramatisch in de Maas — en kijkt dan recht in de camera: 'Jorik, jouw Secrid blijft veilig bewaard.' Slotjes en brug duidelijk zichtbaar. Eén take, geen retakes.",p:30,df:"medium"}]},
+{id:57,n:"Floating Office",la:51.90408,lo:4.488447,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Floating Office Quiz",d:"Wat is het Floating Office in de Rijnhaven?",a:"'s Werelds grootste drijvende kantoor",o:["'s Werelds grootste drijvende kantoor","Hoofdkantoor van Shell","Rotterdams gemeentehuis","Museum voor maritieme architectuur"],p:20,df:"medium"}]},
+{id:59,n:"DakAkker",la:51.925465,lo:4.476699,e:"🌱",c:"landmark",r:15,ch:[{t:"video",ti:"Trappenrace naar de Top",d:"De DakAkker zit op het dak van het Schieblock — bereikbaar via een lange traphelling. Eén teamlid daagt een ander uit: wie is als eerste boven? Zet de race aan bij de onderkant van de trap en film de volledige race — winnaar steekt triomfantelijk de handen in de lucht bij aankomst op het dak.",p:30,df:"medium"}]},
+{id:60,n:"Het Industriegebouw",la:51.923711,lo:4.492121,e:"🏭",c:"landmark",r:15,ch:[{t:"quiz",ti:"Industriegebouw Quiz",d:"Hoeveel bedrijven hebben een kantoor of werkruimte in het Industriegebouw?",a:"Meer dan 200",o:["Meer dan 200","Minder dan 50","Tussen 50 en 100","Precies 150"],p:20,df:"medium"}]},
+{id:61,n:"BlueCity",la:51.9198,lo:4.4981,e:"♻️",c:"landmark",r:15,ch:[{t:"quiz",ti:"BlueCity Quiz",d:"BlueCity is een hub voor circulaire bedrijven in het voormalige Tropicana zwembad. Wat is het raarste product dat hier wordt gemaakt?",a:"Paddenstoelen (Rotterzwam)",o:["Paddenstoelen (Rotterzwam)","Bier van oud brood","Zeep van frituurvet","Papier van koffiedik"],p:25,df:"medium"}]},
+{id:63,n:"Gebouw Delftse Poort",la:51.9240,lo:4.4716,e:"🏙️",c:"architecture",r:20,ch:[{t:"photo",ti:"Epische Teamfoto",d:"Maak de meest epische teamfoto mogelijk met de twee torens van de Delftse Poort als achtergrond. Breed uitgesteld, iedereen in beeld — groot gebaar, groot gebouw.",p:20,df:"easy"}]},
+{id:64,n:"Willemswerf",la:51.916963,lo:4.49011,e:"🏢",c:"architecture",r:15,ch:[{t:"quiz",ti:"Jackie Chan Quiz",d:"Welke acteur glijdt in een film af langs de schuine gevel van dit gebouw?",a:"Jackie Chan",o:["Jackie Chan","Tom Cruise","Bruce Willis","Jason Statham"],p:20,df:"easy"}]},
+{id:65,n:"Concertgebouw De Doelen",la:51.9234,lo:4.4740,e:"🎵",c:"culture",r:20,ch:[{t:"video",ti:"Levensdoelen",d:"De Doelen heeft één doel: wereldklasse muziek. Jullie hebben één doel: Jorik klaarstomen voor het huwelijk. Minstens 3 teamleden spreken voor de camera één serieus of hilarisch doel uit voor een succesvol huwelijk van Jorik & Katinka. Minimaal 10 seconden. 'De Doelen' duidelijk op de achtergrond.",p:30,df:"medium"}]},
+{id:67,n:"Witte Huis",la:51.9190,lo:4.4915,e:"🏛️",c:"architecture",r:15,ch:[{t:"quiz",ti:"Witte Huis: Waar of Niet Waar?",d:"Waar of niet waar: het Witte Huis in de Oude Haven was ooit het hoogste gebouw van Europa.",a:"Waar",o:["Waar","Niet waar"],p:15,df:"easy"}]},
+{id:68,n:"Pauluskerk",la:51.919994,lo:4.472557,e:"⛪",c:"historic",r:15,ch:[{t:"quiz",ti:"Pauluskerk Quiz",d:"Naar wie is de Pauluskerk vernoemd?",a:"De apostel Paulus",o:["De apostel Paulus","Paul Bosvelt","Paus Paulus VI","Paulus de Boskabouter"],p:15,df:"easy"}]},
+{id:69,n:"Eendrachtsweg Drollen",la:51.9155,lo:4.4727,e:"💩",c:"landmark",r:15,ch:[{t:"photo",ti:"Rijden op de Drollen",d:"Aan de Eendrachtsweg liggen grote gekleurde opblaasbare... drollen. Iedereen gaat erop zitten — zo uitbundig en lollig mogelijk. Breed lachen, armen in de lucht, niemand mag er serieus op zitten. Heel team in beeld.",p:20,df:"easy"}]},
+{id:70,n:"Binnenwegplein",la:51.918234,lo:4.477439,e:"🎡",c:"square",r:20,ch:[{t:"video",ti:"Duivenmeester van het Binnenwegplein",d:"Wie kan de meeste duiven om zich heen verzamelen in 30 seconden? Film het hele experiment vanaf het begin. De winnaar wordt plechtig uitgeroepen tot Duivenmeester van het Binnenwegplein.",p:20,df:"easy"}]},
+{id:75,n:"Vessel 11",la:51.9174,lo:4.4891,e:"🚢",c:"landmark",r:15,ch:[{t:"photo",ti:"Vessel 11 Teamfoto",d:"Ga aan de overkant van het water staan en maak een epische teamfoto met de volledige boot van Vessel 11 in beeld. Heel team in één foto, de hele boot op de achtergrond. Breed uitgesteld, iedereen zichtbaar.",p:25,df:"easy"}]},
+{id:83,n:"Happy Italy",la:51.923054,lo:4.485392,e:"🍕",c:"restaurant",r:15,ch:[{t:"video",ti:"Molto Italiano",d:"Minstens 2 teamleden doen het meest typisch Italiaanse handgebaar dat ze kennen en zeggen iets dat klinkt als Italiaans — hoe overtuigender, hoe beter. Heel team mag meedoen. Film het.",p:25,df:"easy"}]},
+{id:88,n:"Historisch Delfshaven",la:51.9068,lo:4.4496,e:"🏚️",c:"historic",r:15,ch:[{t:"photo",ti:"Hollands Kiekje",d:"Maak een lekker Hollands kiekje met de molen van Delfshaven op de achtergrond. Heel team in beeld — brede glimlach, typisch toeristisch, en een knipoog naar de molen van Wateringen.",p:25,df:"easy"}]},
 {id:89,n:"Stadsbrouwerij De Pelgrim",la:51.908763,lo:4.448879,e:"🍺",c:"bar",r:15,ch:[
-  {t:"photo",ti:"Brouwerij Proost",d:"Heel team proost met een Pelgrim-biertje. Captain centraal, glazen geheven, allemaal in beeld voor de brouwerij-gevel. Iedereen erop.",p:20,df:"easy"},
-  {t:"quiz",ti:"Pelgrim Quiz",d:"Naar welke groep is deze brouwerij vernoemd?",a:"Pilgrim Fathers",o:["Pilgrim Fathers","Geuzen","Watergeuzen","VOC"],p:20,df:"medium"}]},
-{id:90,n:"Standbeeld Piet Hein",la:51.9073,lo:4.4491,e:"🗿",c:"art",r:15,ch:[{t:"photo",ti:"Zilvervloot Veroverd",d:"Captain naast Piet Hein, beiden met dezelfde pose. Team knielt aan de voeten met denkbeeldige zilveren staven — buit voor de bruiloft.",p:20,df:"easy"}]},
-{id:91,n:"Historische Tramhalte",la:51.9081,lo:4.4682,e:"🚃",c:"historic",r:15,ch:[{t:"video",ti:"Time-Travel Tram",d:"Bij de historische tramhalte aan de Maashaven — Rotterdam reed al sinds 1879 met paardentram — vertelt de captain de halte hoe het team over de bruiloft van Jorik denkt over 25 jaar. Captain + minstens 2 teamleden in beeld als toekomstige getuigen. Min. 20 sec, één take, ernstig (of probeer).",p:30,df:"medium"}]},
-{id:92,n:"Cruise Terminal",la:51.905972,lo:4.486959,e:"🚢",c:"landmark",r:20,ch:[{t:"photo",ti:"Vrijgezellen Vaarwel",d:"Captain staat op de kade van de Cruise Terminal aan de Wilhelminapier — waar de Holland-Amerika Lijn vroeger vertrok — team zwaait theatraal vanaf afstand. Eén traantje wegvegen verplicht. Vertrek richting 14 juni — geen retour.",p:20,df:"easy"}]},
-{id:93,n:"Poortgebouw",la:51.910386,lo:4.495969,e:"🏚️",c:"landmark",r:15,ch:[{t:"photo",ti:"Anti-Bruidegom",d:"Team poseert voor het Poortgebouw aan de Stieltjesstraat — Rotterdams beroemdste kraakpand sinds 1980 en nog steeds woon-collectief — met gefronste blik en gebalde vuist. Captain vooraan met kapotte stropdas (denkbeeldig of echt), punk-protest tegen het huwelijk in het algemeen.",p:20,df:"easy"}]},
-{id:94,n:"Entrepotgebouw",la:51.910747,lo:4.499283,e:"🏢",c:"architecture",r:15,ch:[{t:"photo",ti:"Vijf Werelddelen",d:"Vijf teamleden voor de gevel van het Entrepotgebouw aan de Stieltjesstraat — vroeger douane-pakhuis met goederen uit alle werelddelen — elk in een andere wereld-pose: Eiffeltoren, sumo, sambadanser, geisha-buiging, cowboy. Captain kiest welk werelddeel.",p:20,df:"easy"}]},
-{id:95,n:"WTC Rotterdam",la:51.921033,lo:4.480344,e:"🏢",c:"architecture",r:20,ch:[{t:"photo",ti:"Wall Street Bachelor",d:"Team in CEO-pose voor het WTC: handen in zakken, blik vooruit, één met telefoon aan oor. Captain centraal — 'vandaag verkoop ik mijn vrijgezellen-aandelen'.",p:15,df:"easy"}]},
-{id:96,n:"Haagsche Veer",la:51.9242,lo:4.4800,e:"🏛️",c:"historic",r:15,ch:[{t:"photo",ti:"Levenslang",d:"Captain onder de poort van het Haagsche Veer — Rotterdams oude politiebureau & cellencomplex achter het Stadhuis — polsen tegen elkaar alsof geboeid. Twee teamleden flankeren als bewakers. 'Veroordeeld tot 14 juni — levenslang.'",p:20,df:"easy"}]},
-{id:97,n:"Villa Thalia",la:51.923002,lo:4.476314,e:"🎭",c:"culture",r:15,ch:[{t:"photo",ti:"Tragedie & Komedie",d:"Voor Villa Thalia aan de Kruiskade — Rotterdams oudste nog actieve theaterpand — trekt halve team huilgezicht (tragedie), andere helft schaterlach (komedie). Captain in het midden — één helft van het gezicht verdrietig, andere blij.",p:20,df:"easy"}]},
-{id:98,n:"Chabot Museum",la:51.914735,lo:4.472336,e:"🎨",c:"culture",r:15,ch:[{t:"photo",ti:"Expressionisme",d:"Heel team in expressionistische pose à la Chabot voor het museum: vervormde gezichten, dramatische gebaren, hoekige houdingen. Captain centraal. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:99,n:"Natuurhistorisch Museum",la:51.91077,lo:4.472479,e:"🦕",c:"culture",r:15,ch:[{t:"photo",ti:"Uitgestorven soort",d:"Op de trap van Villa Dijkzigt — Het Natuurhistorisch Museum in het Museumpark — doet het team alsof het een uitstervende mannensoort is. Dramatische fossiel-pose. Eén dood op de trap.",p:25,df:"medium"}]},
-{id:100,n:"KINO Rotterdam",la:51.917129,lo:4.469393,e:"🎬",c:"culture",r:15,ch:[{t:"video",ti:"Bruiloft Trailer",d:"Film een 30sec \"movie trailer\" voor Jorik's trouwerij bij KINO. Heel team speelt mee in de trailer-scenes — bruiloftsgasten, schurken, dansers. Captain in de hoofdrol als bruidegom-stand-in. Cinematische voice-over, tagline aan het eind. Iedereen in beeld.",p:40,df:"hard"}]},
-{id:101,n:"Belasting & Douane Museum",la:51.907617,lo:4.476414,e:"💰",c:"culture",r:15,ch:[{t:"photo",ti:"Smokkelaar Pose",d:"Heel team doet alsof het smokkelt langs de douane bij het Belasting & Douane Museum: jassen vol denkbeeldige spullen, schichtige blikken. Captain met grootste 'last'. Allemaal in beeld.",p:25,df:"medium"}]},
-{id:102,n:"Historische Tuin Schoonoord",la:51.908937,lo:4.473386,e:"🌷",c:"park",r:15,ch:[{t:"photo",ti:"Bruidsboeket",d:"In de Historische Tuin Schoonoord — Rotterdams verborgen 19e-eeuwse stadstuin — plukt de captain (denkbeeldig — niets echt afbreken!) een boeket en overhandigt het plechtig aan een teamlid dat geknield ja-knikt. Min. 4 mensen in beeld.",p:20,df:"easy"}]},
+  {t:"photo",ti:"Verdiend Biertje",d:"Je hebt het gehaald — ver van het centrum, maar je bent er. Trakteer jezelf op een Pelgrim-biertje en maak een teamfoto met glazen omhoog. Proost!",p:20,df:"easy"},
+  {t:"quiz",ti:"Stadsbrouwerijen Quiz",d:"Hoeveel stadsbrouwerijen telt Rotterdam?",a:"Meer dan 10",o:["Meer dan 10","2","5","Precies 8"],p:20,df:"medium"}]},
+{id:90,n:"Standbeeld Piet Hein",la:51.9073,lo:4.4491,e:"🗿",c:"art",r:15,ch:[{t:"quiz",ti:"Piet Hein Quiz",d:"Piet Hein was een beroemde Rotterdamse zeeheld. Wat was zijn grootste prestatie?",a:"Verovering van de Spaanse Zilvervloot",o:["Verovering van de Spaanse Zilvervloot","Ontdekking van Australië","Eerste rondje om de wereld","Slag bij Waterloo"],p:20,df:"easy"}]},
+{id:92,n:"Cruise Terminal",la:51.905972,lo:4.486959,e:"🚢",c:"landmark",r:20,ch:[{t:"quiz",ti:"Grootste Cruiseschip",d:"Wat is het grootste cruiseschip ter wereld?",a:"Icon of the Seas",o:["Icon of the Seas","Symphony of the Seas","Queen Mary 2","MSC World Europa"],p:20,df:"medium"}]},
+{id:93,n:"Poortgebouw",la:51.910386,lo:4.495969,e:"🏚️",c:"landmark",r:15,ch:[{t:"quiz",ti:"Poortgebouw Quiz",d:"Het Poortgebouw aan de Stieltjesstraat is Rotterdams beroemdste woongroep. Sinds welk jaar wonen er mensen?",a:"1980",o:["1980","1968","1995","2001"],p:20,df:"medium"}]},
+{id:96,n:"Haagsche Veer",la:51.9242,lo:4.4800,e:"🏛️",c:"historic",r:15,ch:[{t:"photo",ti:"Aanhouding",d:"Doe alsof je een teamlid arresteert: handen op de rug, hoofd naar beneden, en loop richting een politieauto. Foto op het moment van de 'aanhouding'. Het Haagsche Veer — voormalig politiebureau en cellencomplex — op de achtergrond.",p:20,df:"easy"}]},
+{id:99,n:"Natuurhistorisch Museum",la:51.91077,lo:4.472479,e:"🦕",c:"culture",r:15,ch:[{t:"photo",ti:"Konijnenportret",d:"Buiten het Natuurhistorisch Museum staan konijnenbeelden. Maak een gezellige teamfoto met één van de konijnen — knuffel het, ga er naast zitten, doe wat je wil. Heel team in beeld.",p:20,df:"easy"}]},
+{id:103,n:"Zalmhaven Toren",la:51.9101,lo:4.4799,e:"🍸",c:"architecture",r:25,ch:[{t:"photo",ti:"Boven de Stad",d:"De Zalmhaven Toren is het hoogste gebouw van Rotterdam — 215 meter. Ga helemaal naar boven naar de cocktailbar en maak een teamfoto op grote hoogte met de skyline van Rotterdam op de achtergrond. Heel team in beeld.",p:40,df:"hard"}]},
+{id:104,n:"Rotterdam Centraal",la:51.9245,lo:4.4690,e:"🚉",c:"landmark",r:20,ch:[{t:"video",ti:"De Vloer is Lava",d:"Bij het zebrapad voor Rotterdam Centraal: de vloer is lava. Iedereen moet binnen 15 seconden van de grond af zijn — op een bank, een muurtje, een brievenbus, een vuilnisbak, wat dan ook. Film het van begin tot eind. Wie staat er nog op de grond na 15 seconden?",p:30,df:"medium"}]},
+{id:105,n:"Arminiuskerk",la:51.9156,lo:4.4739,e:"⛪",c:"historic",r:15,ch:[{t:"video",ti:"Zegeningen voor Jorik & Katinka",d:"Voor de Arminiuskerk aan de Westersingel spreekt het team plechtig zegeningen uit voor het huwelijk van Jorik & Katinka. Minstens 3 teamleden voor de camera, elk een eigen zegening — serieus of grappig, alles mag. De kerk duidelijk in beeld.",p:30,df:"medium"}]},
+{id:106,n:"Het Potlood",la:51.9202,lo:4.4886,e:"✏️",c:"architecture",r:15,ch:[{t:"photo",ti:"Tekenen met het Potlood",d:"Het Potlood (Blaaktoren) tegenover de Markthal. Heel team houdt een denkbeeldige pen vast in de lucht en doet alsof het samen tekent — Het Potlood pal achter ze als de echte tekenaar. Iedereen in beeld, gebouw duidelijk herkenbaar.",p:25,df:"easy"}]},
 ];
 
 // ═══════════════════════════════════════════
@@ -1501,6 +1475,11 @@ function App(){
   // admin doesn't have to hunt through the Beoordelen tab to find them.
   const[adminMenuOpen,setAdminMenuOpen]=useState(false);
   const[activityFeed,setActivityFeed]=useState([]);
+  const questsAwardedRef=React.useRef(new Set());
+  const activityFeedLatestRef=React.useRef([]);
+  activityFeedLatestRef.current=activityFeed;
+  const teamsLatestRef=React.useRef([]);
+  teamsLatestRef.current=teams;
   // V10: admin unlock via ?admin=vriendvanjorik (hardened token).
   // V22 audit fix: dropped the ?admin=true legacy fallback — the app URL is shared in
   // a group chat, and "?admin=true" is the first thing a curious player would try.
@@ -3111,6 +3090,20 @@ function App(){
     if(!isAdmin)return;
     setPhase(5);
     if(!OFFLINE&&sb){
+      // Award most-missions bonus: team with most completed challenges in activity feed
+      const feed=activityFeedLatestRef.current||[];
+      const allTeams=teamsLatestRef.current||[];
+      const byTeam={};
+      feed.forEach(a=>{if(a&&a.team_id>0&&a.points>0)byTeam[a.team_id]=(byTeam[a.team_id]||0)+1;});
+      const teamIds=Object.keys(byTeam).map(Number).filter(id=>id>0);
+      if(teamIds.length>0){
+        const winnerId=teamIds.reduce((a,b)=>byTeam[a]>=byTeam[b]?a:b);
+        const winnerTeam=allTeams.find(t=>t.id===winnerId);
+        if(winnerTeam){
+          sb.rpc('increment_team_score',{p_team_id:winnerId,p_delta:MOST_MISSIONS_BONUS}).then(()=>{},()=>{});
+          sb.from('activity_feed').insert({team_id:winnerId,team_name:winnerTeam.name,team_emoji:winnerTeam.emoji||'🏆',team_color:winnerTeam.color||'#d4a054',message:`🏆 MEESTE OPDRACHTEN: ${byTeam[winnerId]} missies voltooid! +${MOST_MISSIONS_BONUS} bonuspunten!`,points:MOST_MISSIONS_BONUS,created_at:new Date().toISOString()}).then(()=>{},()=>{});
+        }
+      }
       sb.from('game_state').update({phase:5,game_ended:true,bar_break_active:null,bar_break_started_at:null}).eq('id',1).then(()=>{},()=>{});
       sb.from('activity_feed').insert({
         team_id:null, team_name:'Game Master', team_emoji:'🏆', team_color:'#d4a054',
@@ -3119,6 +3112,25 @@ function App(){
       });
     }
   },[isAdmin]);
+
+  // Side quest auto-award: fires when completed state changes
+  useEffect(()=>{
+    if(!myTeam?.id||!sb||OFFLINE||phase<1||phase>=5)return;
+    SIDE_QUESTS.forEach(q=>{
+      if(questsAwardedRef.current.has(q.id))return;
+      // Already awarded in a previous session (marker row persists in completed_challenges)
+      if(completed[q.locKey]&&Object.keys(completed[q.locKey]).length>0){
+        questsAwardedRef.current.add(q.id);
+        return;
+      }
+      const allDone=q.required.every(locId=>completed[locId]&&Object.keys(completed[locId]).length>0);
+      if(!allDone)return;
+      questsAwardedRef.current.add(q.id);
+      applyScoreDelta(myTeam.id,q.bonus);
+      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:`${q.locKey}_0`,location_id:q.locKey,challenge_type:'side_quest',points_earned:q.bonus}).then(()=>{},()=>{});
+      sb.from('activity_feed').insert({team_id:myTeam.id,team_name:myTeam.name,team_emoji:myTeam.emoji||'🏅',team_color:myTeam.color||'#d4a054',message:`🏅 SIDE QUEST: ${q.label} voltooid! +${q.bonus} bonuspunten!`,points:q.bonus,created_at:new Date().toISOString()}).then(()=>{},()=>{});
+    });
+  },[completed,myTeam,phase]);
 
   // V28: admin override — reset the running game back to the lobby without
   // needing to run SQL. Flips phase→0, clears started_at / Jorik / bar-break,
@@ -5010,6 +5022,56 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
           {L_DATA.length>24&&<div className="t-caption t-muted text-center" style={{marginTop:'var(--sp-2)'}}>+{L_DATA.length-24} meer te ontdekken</div>}
         </div>
       )}
+
+      {/* Side Quests progress panel */}
+      <div style={{marginTop:'var(--sp-6)',borderTop:'1px solid rgba(255,255,255,0.07)',paddingTop:'var(--sp-5)'}}>
+        <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>🏅 Side Quests</div>
+        {SIDE_QUESTS.map(q=>{
+          const alreadyAwarded=completed[q.locKey]&&Object.keys(completed[q.locKey]).length>0;
+          const done=q.required.filter(id=>completed[id]&&Object.keys(completed[id]).length>0).length;
+          const total=q.required.length;
+          const complete=alreadyAwarded||done===total;
+          return(
+            <div key={q.id} className="panel animate-in" style={{marginBottom:'var(--sp-2)',borderColor:complete?'rgba(95,216,165,0.4)':'rgba(255,255,255,0.1)',background:complete?'linear-gradient(155deg,rgba(95,216,165,0.08),rgba(95,216,165,0.02))':'rgba(255,255,255,0.02)'}}>
+              <div className="row-3">
+                <div style={{fontSize:24}}>{q.emoji}</div>
+                <div style={{flex:1}}>
+                  <div className="t-body-emph">{q.label} <span className="t-label-sm t-accent">+{q.bonus} pt</span></div>
+                  <div style={{display:'flex',gap:4,marginTop:4,flexWrap:'wrap'}}>
+                    {q.required.map(locId=>{
+                      const loc=L_DATA.find(l=>l.id===locId);
+                      const visited=completed[locId]&&Object.keys(completed[locId]).length>0;
+                      return <span key={locId} style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:visited?'rgba(95,216,165,0.2)':'rgba(255,255,255,0.06)',color:visited?'#5fd8a5':'var(--text-tertiary)',border:`1px solid ${visited?'rgba(95,216,165,0.3)':'rgba(255,255,255,0.08)'}`}}>{loc?loc.n:locId}</span>;
+                    })}
+                  </div>
+                  <div className="t-caption" style={{marginTop:4}}>{complete?'Voltooid! Bonus bijgeschreven.':done+'/'+total+' locaties'}</div>
+                </div>
+                <div style={{fontSize:20}}>{complete?'✅':'🔒'}</div>
+              </div>
+            </div>
+          );
+        })}
+        <div className="panel animate-in" style={{marginBottom:'var(--sp-2)',borderColor:'rgba(255,215,0,0.2)',background:'rgba(255,215,0,0.03)'}}>
+          <div className="row-3">
+            <div style={{fontSize:24}}>🏆</div>
+            <div style={{flex:1}}>
+              <div className="t-body-emph">Meeste Opdrachten <span className="t-label-sm t-accent">+{MOST_MISSIONS_BONUS} pt</span></div>
+              <div className="t-caption">Wordt berekend bij einde spel</div>
+            </div>
+            <div style={{fontSize:20}}>⏳</div>
+          </div>
+        </div>
+        <div className="panel animate-in" style={{borderColor:'rgba(255,100,100,0.2)',background:'rgba(255,100,100,0.03)'}}>
+          <div className="row-3">
+            <div style={{fontSize:24}}>🥃</div>
+            <div style={{flex:1}}>
+              <div className="t-body-emph">Sambuca Straf</div>
+              <div className="t-caption">Team met minste punten bij einde spel: verplicht sambuca-shot</div>
+            </div>
+            <div style={{fontSize:20}}>⏳</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -7238,6 +7300,19 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
                   <div className="t-label-sm t-accent">{a.value}</div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sambuca straf — team met laagste score */}
+        {sorted.length>1&&(
+          <div style={{marginTop:'var(--sp-6)'}}>
+            <div className="t-label" style={{marginBottom:'var(--sp-3)'}}>🥃 Sambuca Straf</div>
+            <div className="panel animate-in" style={{borderColor:'rgba(255,100,100,0.45)',background:'linear-gradient(155deg,rgba(255,100,100,0.1),rgba(255,100,100,0.02))'}}>
+              <div style={{fontSize:40,marginBottom:'var(--sp-2)'}}>😬</div>
+              <div className="t-card-label" style={{color:sorted[sorted.length-1].color}}>{sorted[sorted.length-1].emoji} {sorted[sorted.length-1].name}</div>
+              <div className="t-body" style={{marginTop:'var(--sp-2)',color:'rgba(255,100,100,0.9)'}}>Laagste score: {sorted[sorted.length-1].score} punten</div>
+              <div className="t-caption" style={{marginTop:'var(--sp-1)'}}>Verplicht sambuca-shot voor het hele team. Proost! 🥂</div>
             </div>
           </div>
         )}
