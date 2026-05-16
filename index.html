@@ -380,7 +380,14 @@
     .starter-card{padding:20px 16px;border-radius:var(--r-lg);background:linear-gradient(155deg,rgba(255,255,255,0.045),rgba(255,255,255,0.015));border:2px solid var(--border);cursor:pointer;transition:transform .3s var(--spring),border-color .25s,box-shadow .25s,background .25s;text-align:center;box-shadow:var(--sh-ring);position:relative;overflow:hidden;-webkit-tap-highlight-color:transparent}
     .starter-card:hover{transform:translateY(-3px);background:linear-gradient(155deg,rgba(255,255,255,0.075),rgba(255,255,255,0.025));box-shadow:var(--sh-md),var(--sh-ring)}
     .starter-card:active{transform:scale(0.97)}
-    .starter-card.taken{opacity:0.3;pointer-events:none;filter:grayscale(0.4)}
+    /* V41 P0 fix (Mike's iPhone real-device test): the V34 P0 comment in the JSX says
+       "Bezet card now triggers joinExistingTeam" — but this CSS rule's pointer-events:none
+       made BOTH 'taken' (joinable, another team already grabbed it) AND 'locked' (4/4 cap)
+       cards unclickable. Mike couldn't join an existing team on iPhone for the upload test.
+       Now: .taken stays visually grayed but tappable so onClick fires joinExistingTeam.
+       Only truly-blocked .locked cards get pointer-events:none. */
+    .starter-card.taken{opacity:0.45;filter:grayscale(0.3)}
+    .starter-card.locked{opacity:0.3;pointer-events:none;filter:grayscale(0.4);cursor:default}
     .starter-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     .starter-edit-btn{position:absolute;top:6px;right:6px;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;border-radius:var(--r-pill);border:1px solid var(--border);background:rgba(20,22,32,0.65);color:#fff;font-size:12px;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0.55;transition:opacity .2s,transform .2s var(--spring);-webkit-tap-highlight-color:transparent;z-index:2}
     .starter-edit-btn:hover{opacity:1;transform:scale(1.08)}
@@ -800,7 +807,11 @@ const BROADCAST_BANNER_MS=12000;
 // the admin queue + GPS hysteresis (V22) keep their anti-cheat value. When GPS_GATE_BYPASS
 // (V23) is on AND the device has no GPS fix at all, dist will be null and we fall back
 // to 'pending' — so the admin can spot-check or `mass-approve` via the agent harness.
-const AUTO_APPROVE_RADIUS=200;
+// V40: AUTO_APPROVE_RADIUS tightened 200m → 100m. v39-sim P2 finding flagged that 200m was
+// permissive enough that a team in a nearby park could photograph a backdrop and get free
+// pts. 100m is roughly "you can see the POI from where you're standing" — the right anti-
+// cheat band while still tolerating GPS jitter (typical accuracy 10-30m on phones).
+const AUTO_APPROVE_RADIUS=100;
 
 // V23 TESTING TOGGLES — flip TEST_MODE to false before gameday to restore live behavior.
 // Live restrictions disabled by TEST_MODE:
@@ -1027,14 +1038,30 @@ const L_DATA=[
   {t:"video",ti:"Aanzoek bij de Ekster",d:"Vind de ekster met de trouwring op de Witte de Withstraat. Reconstrueer het huwelijksaanzoek van Jorik: één teamlid gaat op één knie voor een ander teamlid die Katinka speelt, en doet het aanzoek zo oprecht mogelijk na. De ekster is de stille getuige. Film van aanloop tot antwoord. Iedereen in beeld.",p:35,df:"medium"},
   {t:"video",ti:"Getrouwd man gezocht",d:"Zoek een getrouwde man op een van de terrassen van de Witte de Withstraat. Vraag toestemming om te filmen. Stel hem één vraag: 'Wat is jouw beste advies voor een bruidegom?' Film zijn volledige antwoord. Teamleden hoeven niet in beeld — maar mag uiteraard wel.",p:35,df:"hard"}]},
 {id:40,n:"West-Kruiskade",la:51.9215,lo:4.4694,e:"🌍",c:"landmark",r:15,ch:[{t:"quiz",ti:"Rotterdam Smeltpot",d:"Rotterdam is een van de meest diverse steden ter wereld. Hoeveel verschillende nationaliteiten telt de stad anno 2025 (circa)?",a:"174",o:["174","92","210","138"],p:20,df:"medium"}]},
-{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[{t:"video",ti:"Koprol op het Kunstgras",d:"Het Schouwburgplein heeft kunstgras — gebruik het. Minstens één teamlid doet een volledige koprol op het gras en wordt gefilmd. Hoe dramatischer de aanloop en landing, hoe beter. Rest van het team kijkt toe of filmt.",p:25,df:"medium"}]},
+{id:41,n:"Schouwburgplein",la:51.921601,lo:4.473352,e:"🎭",c:"square",r:25,ch:[
+  {t:"video",ti:"Koprol op het Kunstgras",d:"Het Schouwburgplein heeft kunstgras — gebruik het. Minstens één teamlid doet een volledige koprol op het gras en wordt gefilmd. Hoe dramatischer de aanloop en landing, hoe beter. Rest van het team kijkt toe of filmt.",p:25,df:"medium"},
+  // V40 wp:1 wedding-pipeline #3 — Schouwburgplein theatrical proclamation.
+  // V40.1 (security review): chant recoded to "VOOR DE LIEFDE!" — no audible "bruiloft"
+  // so Jorik can stand within earshot without overhearing the surprise word. Meta-instruction
+  // "Voor de bruiloftsedit — Jorik mag dit niet zien" moved to `wpInstruction` field that
+  // the UI hides from Jorik-team/Jorik-device so the L_DATA description itself is innocent.
+  {t:"video",ti:"De Verklaring",d:"Hele team in een rij op de bordes-trappen van de Schouwburg. Captain centraal, theatraal: 'Beste Rotterdammers… wij hebben grote vreugde te delen!' De rest valt in koor in met 'VOOR! DE! LIEFDE!' — elk woord een vuist omhoog. Iedereen in beeld, gefilmd van onderaan, Schouwburg achter het team. Min. 20 sec.",p:35,df:"hard",wp:1,wpInstruction:"📹 Voor de bruiloftsedit — kies je shot zo dat Jorik niet meeluistert. Pak iemand om de hoek, film discreet."}
+]},
 {id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"photo",ti:"Verrassings-vagijn",d:"Ergens langs de kade van de Westersingel zit een verborgen keramieken kunstwerkje in de muur — vlak boven het water. Hints: 'Als het water te hoog komt sluiten de kleppen. Het water staat tot aan mijn lippen.' Vind het. Maak een foto als bewijs dat jullie pussy-radar nog werkt. Het kunstwerk moet duidelijk herkenbaar in beeld zijn.",p:40,df:"hard"}]},
 {id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Zwaan in Zicht",d:"Maak een epische teamfoto op het Noordereiland met de Erasmusbrug — De Zwaan — op de achtergrond. Team in sterke formatie, brug groot en herkenbaar in beeld. Maak er iets moois van: dit is ver reizen waard. Allemaal in beeld.",p:45,df:"medium"}]},
 {id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"De Rotterdam van Onder",d:"Ga voor De Rotterdam op de Wilhelminapier staan — het kolossale gebouw van Rem Koolhaas. Maak een selfie van recht onder naar boven: telefoon omlaag, camera omhoog, heel team in beeld. De gevel rijst massief boven jullie uit. Zorg dat iedereen erop staat.",p:25,df:"medium"}]},
 {id:45,n:"KPN Toren",la:51.907179,lo:4.489141,e:"📡",c:"architecture",r:20,ch:[{t:"quiz",ti:"KPN Toren Quiz",d:"Wie ontwierp de KPN Toren op de Kop van Zuid?",a:"Renzo Piano",o:["Renzo Piano","Rem Koolhaas","Norman Foster","Piet Blom"],p:15,df:"easy"}]},
 {id:46,n:"Spido Kade",la:51.9098,lo:4.4818,e:"🚤",c:"landmark",r:15,ch:[{t:"quiz",ti:"Snelste op het Water",d:"Spido of Watertaxi Rotterdam: wie heeft de hoogste maximumsnelheid op de Maas — en wie wint de race?",a:"Watertaxi Rotterdam",o:["Watertaxi Rotterdam","Spido","Ze zijn even snel","Hangt van de route af"],p:15,df:"easy"}]},
 {id:47,n:"Boompjes",la:51.912273,lo:4.484558,e:"🏃",c:"landmark",r:10,ch:[{t:"video",ti:"Sprintwedstrijd de Boompjes",d:"Op de Boompjes langs de Maas zijn 100 meter sprintmarkeringen op de grond aangebracht. Zoek de startlijn. Twee teamleden gaan naast elkaar staan. De videomaker telt af: 3... 2... 1... GO! Beiden rennen zo hard mogelijk de 100 meter uit. Film de complete sprint van start tot finish. Wie wint?",p:25,df:"medium"}]},
-{id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[{t:"photo",ti:"Proost bij 21 Pinchos",d:"Ga naar het terras van 21 Pinchos bij de Fenix Food Factory op Katendrecht. Bestel een biertje voor het hele team. Foto met iedereen met het glas omhoog — proost op Jorik en Katinka. Terras of Fenix-omgeving zichtbaar op de achtergrond.",p:25,df:"easy"}]},
+{id:49,n:"Fenix Food Factory",la:51.902061,lo:4.486841,e:"🍔",c:"food",r:15,ch:[
+  {t:"photo",ti:"Proost bij 21 Pinchos",d:"Ga naar het terras van 21 Pinchos bij de Fenix Food Factory op Katendrecht. Bestel een biertje voor het hele team. Foto met iedereen met het glas omhoog — proost op Jorik en Katinka. Terras of Fenix-omgeving zichtbaar op de achtergrond.",p:25,df:"easy"},
+  // V40 wp:1 wedding-pipeline #4 — Fenix Food Factory toast video.
+  // V40.1 (security review): description softened — names "Jorik en Katinka" are kept in
+  // the brief because the surprise reveal target IS the couple, but meta-instruction
+  // ("Jorik mag dit niet zien") moved to wpInstruction field hidden from Jorik-side UI.
+  // The L_DATA description now reads as a generic toast brief.
+  {t:"video",ti:"Een Toast aan het Stel",d:"Op het Fenix-terras: drie teamleden geven elk on-camera een korte toast, direct in de lens. Captain begint: 'Aan Jorik en Katinka — Rotterdam houdt van jullie.' Tweede teamlid: een persoonlijke wens (één zin). Derde teamlid: een goed advies of een grap. Spreek tot de camera alsof je het tegen het bruidspaar zegt. Min. 30 sec totaal, Fenix-haven op de achtergrond.",p:40,df:"medium",wp:1,wpInstruction:"📹 Voor de bruiloftsedit — film discreet, ergens uit de buurt van Jorik."}
+]},
 {id:50,n:"Rijnhaven Drijvend Bos",la:51.9030,lo:4.4900,e:"🌳",c:"landmark",r:15,ch:[{t:"quiz",ti:"Drijvend Bos Quiz",d:"Wat maakt het Drijvend Bos in de Rijnhaven uniek in de wereld?",a:"'s Werelds eerste drijvende stadspark",o:["'s Werelds eerste drijvende stadspark","Grootste park van Rotterdam","Ontworpen door Rem Koolhaas","Geplant op een scheepswrak"],p:20,df:"easy"}]},
 {id:51,n:"Maastunnel",la:51.902719,lo:4.468246,e:"🚇",c:"landmark",r:20,ch:[
   {t:"quiz",ti:"Tunnel Quiz",d:"Wanneer werd de Maastunnel geopend?",a:"1942",o:["1942","1935","1950","1960"],p:20,df:"medium"}]},
@@ -2020,6 +2047,10 @@ function App(){
           const minis=defaultBarMinis(gs.bar_break_active,startedMs);
           setBarBreakActive({name:gs.bar_break_active,mini:minis,started:startedMs});
           setBarBreak({name:gs.bar_break_active,time:Date.now()});
+        }else{
+          // V40 P3 fix: parallel branch — initial hydration with no active bar break
+          // must also clear stale barBreak state from any prior session (defensive).
+          setBarBreak(null);
         }
         if(gs.jorik_team_id!=null){
           setJorikTeamId(gs.jorik_team_id);
@@ -2122,8 +2153,13 @@ function App(){
         setBarBreakActive({name:gs.bar_break_active,mini:minis,started:startedMs});
         setBarBreak({name:gs.bar_break_active,time:Date.now()});
       }else{
-        // Admin cleared the bar break
+        // Admin cleared the bar break — V40 P3 fix (sim finding #8): also clear the
+        // captain/spectator-side "🍺 Volgende bar break" banner. V39 only cleared the
+        // active-overlay state (barBreakActive) but left barBreak pointing at the prior
+        // bar break name, leading to "Volgende bar break: Plan C" persisting in spectator
+        // UI even after Plan C ended. Now both states clear together.
         setBarBreakActive(null);
+        setBarBreak(null);
       }
       // V21 P1-fix #35: pick up admin's heartbeat on every game_state UPDATE
       if(gs.gm_heartbeat){
@@ -2577,39 +2613,79 @@ function App(){
   // so the bracelet still pays but at a rate that doesn't overwhelm POI grinding.
   // Keeps narrative weight; reduces structural unfairness; leaves room for V32 redesign.
   const JORIK_SCORE_MULTIPLIER=0.5;
+  // V40 — additional per-hold-window cap. V39 sim showed Haven got 9 Jorik missions in one
+  // window → 340 pts → 15× score gap vs the team that lost Jorik first. Even with the V31
+  // 0.5× multiplier the structural unfairness remained. V40 caps Jorik missions at 3 per
+  // hold-window: missions 1-3 pay full multiplied value, missions 4+ pay 0 pts (still done
+  // for the photo/story but no leaderboard impact). Window resets when jorik_moved_at changes.
+  const JORIK_HOLD_CAP=3;
+  const[jorikMissionsThisHold,setJorikMissionsThisHold]=useState(0);
+  // Reset the per-hold counter whenever Jorik rotates (or when we ourselves gain/lose Jorik).
+  // Reading jorikMovedAt + jorikTeamId — both shift on rotation.
+  React.useEffect(()=>{
+    setJorikMissionsThisHold(0);
+  },[jorikMovedAt,jorikTeamId]);
+
   const completeJorikMission=(id,_unusedPts,photoData=null)=>{
     if(jorikMissionsDone.has(id))return;
     const m=JORIK_MISSIONS.find(x=>x.id===id);
     if(!m)return;
     const phaseMult=phase===4?FINALE_MULTIPLIER:1;
     const finaleSuffix=phaseMult>1?` (×${FINALE_MULTIPLIER} finale)`:'';
+    // V40: hard-cap check. Past 3 missions this hold, points go to 0.
+    // Toast is encouraging, not punitive — frames the cap as "you're crushing it, share the love".
+    const capped=jorikMissionsThisHold>=JORIK_HOLD_CAP;
 
-    // V22: running-mission branch
+    // V22: running-mission branch.
+    // V40.1 (code-review P1): cap accounting fix — a tradeTarget=4 trade mission was
+    // consuming 4 cap slots per step, locking out other Jorik missions after 3 ruils
+    // (75% of one mission). Now we count toward the cap ONLY on the final completion
+    // step (newCount>=tradeTarget). Intermediate steps still pay points but don't
+    // increment the hold counter.
     if(m.running&&m.tradeTarget>0){
       const prevCount=jorikRunningCounts[id]||0;
       const newCount=Math.min(prevCount+1,m.tradeTarget);
-      const stepPts=Math.round((m.pts/m.tradeTarget)*phaseMult*JORIK_SCORE_MULTIPLIER);
+      const isFinalStep=newCount>=m.tradeTarget;
+      // Cap only applies when this step would complete the mission.
+      const stepCapped=capped&&isFinalStep;
+      const stepPts=stepCapped?0:Math.round((m.pts/m.tradeTarget)*phaseMult*JORIK_SCORE_MULTIPLIER);
       setJorikRunningCounts(prev=>({...prev,[id]:newCount}));
-      setScorePopup(`+${stepPts}`);
-      triggerConfetti(stepPts);
-      addActivity(`${m.emoji} Jorik ruil ${newCount}/${m.tradeTarget} · ${m.title} · +${stepPts} pts${finaleSuffix}`,stepPts,photoData);
-      applyScoreDelta(myTeam?.id,stepPts);
-      // Final step: also lock the mission as fully done.
-      if(newCount>=m.tradeTarget){
+      if(stepPts>0){
+        setScorePopup(`+${stepPts}`);
+        triggerConfetti(stepPts);
+        applyScoreDelta(myTeam?.id,stepPts);
+      }
+      const ptsSuffix=stepCapped?' (cap)':'';
+      addActivity(`${m.emoji} Jorik ruil ${newCount}/${m.tradeTarget} · ${m.title} · +${stepPts} pts${finaleSuffix}${ptsSuffix}`,stepPts,photoData);
+      if(isFinalStep){
         setJorikMissionsDone(prev=>new Set([...prev,id]));
         addActivity(`🏁 Jorik voltooide de hele dag-mission: ${m.title}!`,0,null);
+        if(!stepCapped)setJorikMissionsThisHold(prev=>prev+1);
+        if(stepCapped){
+          try{const setToast=window.__ssrSetToast;if(setToast)setToast(`🌟 Top — ${JORIK_HOLD_CAP} Jorik-missies in deze beurt. Extra missies blijven mooi voor de bruiloftsedit, maar punten pauzeren tot de volgende rotatie.`);}catch(_){}
+        }
       }
       return;
     }
 
     // Normal one-shot path
-    const awardedPts=Math.round(m.pts*phaseMult*JORIK_SCORE_MULTIPLIER);
+    const awardedPts=capped?0:Math.round(m.pts*phaseMult*JORIK_SCORE_MULTIPLIER);
     setJorikMissionsDone(prev=>new Set([...prev,id]));
-    setScorePopup(`+${awardedPts}`);
-    triggerConfetti(awardedPts);
-    addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${awardedPts} pts${finaleSuffix}`,awardedPts,photoData);
-    // V20: atomic delta — replaces manual setScores + sb.from('teams').update
-    applyScoreDelta(myTeam?.id,awardedPts);
+    if(awardedPts>0){
+      setScorePopup(`+${awardedPts}`);
+      triggerConfetti(awardedPts);
+      applyScoreDelta(myTeam?.id,awardedPts);
+      setJorikMissionsThisHold(prev=>prev+1);
+    }
+    const ptsSuffix=capped?' (cap — wacht op rotatie)':'';
+    addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${awardedPts} pts${finaleSuffix}${ptsSuffix}`,awardedPts,photoData);
+    if(capped){
+      // V40.1 (UX-review P1): reword. Dropped "Andere teams een kans" (designer voice).
+      // Switched vocab from "ronde" (used nowhere else) to "beurt" (rotation-aligned).
+      // Reframed cap as "missie blijft tellen voor de bruiloftsedit" — gives players a
+      // reason to keep doing missions even though points pause.
+      try{const setToast=window.__ssrSetToast;if(setToast)setToast(`🌟 Top — ${JORIK_HOLD_CAP} Jorik-missies in deze beurt. Extra missies blijven mooi voor de bruiloftsedit, maar punten pauzeren tot de volgende rotatie.`);}catch(_){}
+    }
   };
 
   const completeChallenge=(locId,chIdx,pts,photoData=null)=>{
@@ -2622,6 +2698,19 @@ function App(){
     const isWrongZero=pts===0;
     const loc=L_DATA.find(l=>l.id===locId);
     const isQuiz=loc&&loc.ch[chIdx]?.t==='quiz';
+
+    // V40.1 (security review P0): client-side wp:1 race gate. The UI already hides wp:1 from
+    // Jorik-holder team (V37 secrecy lock), and the V40 Postgres trigger rejects the row, BUT
+    // the optimistic flow below COMMITS the score RPC + activity_feed + photo_reviews BEFORE
+    // the trigger fires. If Jorik rotates onto this team mid-submission (FileReader async +
+    // bar break race), the points + photo + activity row land permanently while only the
+    // audit row is rejected. Gate at the entry to block the entire flow when wp:1 + Jorik
+    // is present. Belt-and-braces; the trigger is still the final defense if this somehow
+    // doesn't catch (e.g. stale React state of jorikInTeam).
+    if(loc&&loc.ch[chIdx]?.wp===1&&(jorikInTeam||isJorikDevice)){
+      try{const setToast=window.__ssrSetToast;if(setToast)setToast('🤫 Deze missie is nu geheim — bewaar \'m voor later.');}catch(_){}
+      return;
+    }
 
     // V30: streak bonuses + Extra-Tijd unlock removed in the Less-is-More pass.
     // Scoring stays simple: base points × phase multiplier, plus first-finder bonus.
@@ -2701,16 +2790,29 @@ function App(){
     // insert (two teammates racing) now fails with 23505 and we treat it as
     // "already done, no-op" rather than double-counting.
     if(!OFFLINE&&sb&&myTeam&&loc&&!isDynamicBonus){
-      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts}).then(
-        ()=>{},
-        (e)=>{
-          // Unique-constraint conflict (v20 migration) = the other teammate got there first. Silent ignore.
-          if(e&&(e.code==='23505'||String(e.message||'').includes('duplicate'))){
-            return;
-          }
-          console.warn('completed_challenges insert failed',e);
+      // V40.1 (code-review P0 fix): Supabase-js v2 RESOLVES with {data,error} — it does NOT
+      // reject. The pre-V40 .then(success, error) pattern was dead code on Postgres errors,
+      // which meant the duplicate-submit toast (existing since V20) AND the new wp:1 secrecy
+      // toast NEVER fired. Now we destructure {data, error} from the resolved value and
+      // branch in the same .then. Real errors are now handled; previously they were silently
+      // swallowed by the unused second callback.
+      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts}).then(({data:_data,error:e})=>{
+        if(!e)return;
+        // 23505 = unique_violation. The teammate-race OR re-submit-after-refresh case.
+        if(e.code==='23505'||String(e.message||'').includes('duplicate')){
+          try{const setToast=window.__ssrSetToast;if(setToast)setToast('✅ Deze missie heb je al gedaan — punten staan al genoteerd');}catch(_){}
+          return;
         }
-      );
+        // 23514 = check_violation, surfaced by the V40 wp:1 secrecy trigger.
+        // Wording softened (no "wp:1" literal in user-facing text) and operational tail
+        // ("wacht op de volgende bar break") removed per UX review — that tail tells the
+        // Jorik-holder that there IS a wedding pipeline, which is itself a spoiler.
+        if(e.code==='23514'||String(e.message||'').toLowerCase().includes('secrecy')){
+          try{const setToast=window.__ssrSetToast;if(setToast)setToast('🤫 Deze missie is nu geheim — bewaar \'m voor later.');}catch(_){}
+          return;
+        }
+        console.warn('completed_challenges insert failed',e);
+      });
 
       // V20: FIRST_BONUS honest race. One winner per challenge, period. If the
       // insert into challenge_first_finder succeeds, this team was first and
@@ -4245,7 +4347,7 @@ function App(){
       {/* V21: pos + barBreakActive passed so the panel can curate by context (loc-tagged + bar-only missions).
           Note: barBreakActive (truthy ONLY during the live overlay window) is used here,
           NOT the sticky barBreak state. Bar set-pieces should only light up while the break is actually running. */}
-      {showJorikMissions&&<JorikMissions onClose={()=>setShowJorikMissions(false)} onComplete={completeJorikMission} done={jorikMissionsDone} runningCounts={jorikRunningCounts} jorikInTeam={jorikInTeam} pos={pos} barBreak={barBreakActive}/>}
+      {showJorikMissions&&<JorikMissions onClose={()=>setShowJorikMissions(false)} onComplete={completeJorikMission} done={jorikMissionsDone} runningCounts={jorikRunningCounts} jorikInTeam={jorikInTeam} pos={pos} barBreak={barBreakActive} holdCount={jorikMissionsThisHold} holdCap={JORIK_HOLD_CAP} isJorikDevice={isJorikDevice}/>}
 
       {/* Tab bar */}
       <div className="tab-bar">
@@ -4652,7 +4754,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
               const handleKey=(e)=>{if(cardTappable&&!busy&&(e.key==='Enter'||e.key===' ')){e.preventDefault();onCardActivate();}};
               return(
                 <div key={i} role="button" tabIndex={!cardTappable||busy?-1:0} aria-label={taken?`${shownName} · sluit aan${headcount>0?` (${headcount} spelers)`:''}`:`${shownName} · kies dit team`} aria-disabled={!cardTappable||busy}
-                  className={`starter-card animate-in animate-in-${(i%4)+1} ${blocked?'taken':''}`}
+                  className={`starter-card animate-in animate-in-${(i%4)+1} ${taken?'taken':''} ${locked?'locked':''}`}
                   onClick={onCardActivate} onKeyDown={handleKey}
                   style={{borderColor:blocked?'var(--border)':p.color,boxShadow:blocked?'none':`0 8px 24px ${p.color}28,${p.color}12 0px 0px 0px 1px inset,var(--sh-ring)`,opacity:locked?0.5:undefined,cursor:cardTappable?'pointer':'default'}}>
                   {!blocked&&(
@@ -5392,12 +5494,20 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
             "GPS uit · tik" with red styling whenever opt-out is active. */}
         {(()=>{
           const isOff=gpsStatus==='denied'||gpsStatus==='unavailable'||gpsOptOut;
+          // V40 P2 fix (sim finding #5): if we have a valid pos fix, treat as 'good' regardless
+          // of gpsStatus. Old code showed "GPS paust · tik om te activeren" even when pos was
+          // set (admin override / programmatic update / late watch callback) and TaskList was
+          // correctly rendering distances. Visual contradiction confused users — they'd think
+          // GPS was broken while distances flowed correctly. Now the pill follows the data
+          // (do we have a fix?) not the watcher state (is the watcher fresh?).
+          const hasFix = pos && typeof pos.lat==='number' && typeof pos.lng==='number';
+          const effectiveStatus = hasFix && !isOff ? 'good' : gpsStatus;
           return(
             <div className="gps-pill" onClick={()=>onWakeGps&&onWakeGps()} style={{cursor:'pointer',background:isOff?'rgba(255,107,107,0.18)':undefined,borderColor:isOff?'rgba(255,107,107,0.4)':undefined,color:isOff?'#ff8a8a':undefined}} title={gpsOptOut?'GPS staat uit (jij koos zonder GPS te spelen) — tik om opnieuw te proberen':gpsStatus==='denied'?'Tik om opnieuw te proberen — eerst zet je locatie aan in Instellingen':'Tik om GPS te activeren'}>
-              <span className={`gps-dot ${isOff?'denied':(gpsStatus||'weak')}`}/>
-              {gpsOptOut?'GPS uit · tik om aan te zetten':gpsStatus==='denied'?'GPS uit · tik':gpsStatus==='unavailable'?'GPS niet bereikbaar':gpsStatus==='good'?'GPS actief':gpsStatus==='sleep'?'GPS paust':'GPS zoekt…'}
+              <span className={`gps-dot ${isOff?'denied':(effectiveStatus||'weak')}`}/>
+              {gpsOptOut?'GPS uit · tik om aan te zetten':gpsStatus==='denied'?'GPS uit · tik':gpsStatus==='unavailable'?'GPS niet bereikbaar':effectiveStatus==='good'?'GPS actief':effectiveStatus==='sleep'?'GPS paust':'GPS zoekt…'}
               {gpsSnap&&<span style={{color:'var(--foto)'}}>· op {gpsSnap}</span>}
-              {gpsStatus==='sleep'&&<span className="snap-btn">tik om te activeren</span>}
+              {!hasFix&&gpsStatus==='sleep'&&<span className="snap-btn">tik om te activeren</span>}
             </div>
           );
         })()}
@@ -6711,7 +6821,9 @@ function FlippercoinGate({loc,teamId,onReveal,children}){
         </button>
       )}
 
-      <div className="flipcoin-tagline">Vang een moment… of creëer het verhaal.</div>
+      {/* V40: tagline word-consistency fix — V39 said "Vang een moment" but mystery card
+          shows "Het moment" (no "een"). Aligned to "Vang het moment" per v39-sim P3 finding. */}
+      <div className="flipcoin-tagline">Vang het moment… of creëer het verhaal.</div>
     </div>
   );
 }
@@ -6890,25 +7002,36 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
             ?`🔒 Loop naar ${loc.n} · foto maken · dan opent de quiz`
             :'🔒 Eerst een foto-opdracht — dan opent de quiz';
           // V30 — secrecy lock takes precedence over the quiz-locked overlay.
-          // V37 — copy branches on isJorikDevice: holding-team teammates already
-          // know the surprise so we keep the explicit "bruiloftsvideo · 14 juni"
-          // wording; Jorik's own phone gets an innocuous "andere teams doen dit"
-          // message that doesn't leak the surprise. Title (ch.ti) is innocent
-          // ("Brug Catwalk" etc.) so it can render either way.
-          if(isSecretWp&&!done){
+          // V37 — copy branches on isJorikDevice (Jorik's own phone gets innocuous).
+          // V40.1 (security review P0): TWO hardening fixes:
+          //   (1) DROP the !done clause. Pre-V40.1 gate was `isSecretWp && !done` so a
+          //       wp:1 challenge a team completed BEFORE Jorik rotated to them would re-render
+          //       with full title + description when Jorik later landed on their team. Real
+          //       6-June scenario: Maffiosi finishes POI 41 wp:1 pre-bar-break #1, Jorik
+          //       rotates to Maffiosi at bar break #2, a teammate scrolls back to "show the
+          //       cool video," Jorik leans in, leak. Fix: lock RENDERS regardless of done
+          //       state when Jorik is in the team or on the device. The completion is still
+          //       in the team's score; just not displayed at card-level.
+          //   (2) STRIP "bruiloftsvideo van Jorik op 14 juni" from the non-Jorik-device copy.
+          //       Pre-V40.1 said the exact words — shoulder-leak if Jorik glanced at a
+          //       teammate's screen while they explained why the card is locked. New copy
+          //       hints at a secret without naming it.
+          if(isSecretWp){
             return(
               <div key={idx} className="ch-card" style={{position:'relative',borderColor:'rgba(228,178,92,0.35)',background:'linear-gradient(155deg,rgba(228,178,92,0.08),rgba(255,107,107,0.04))'}}>
                 <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-2)'}}>
                   <div className="flex-1">
                     <span className="ch-type" style={{background:'rgba(228,178,92,0.18)',color:'var(--accent-2)'}}>{isJorikDevice?'team-only':'geheim'}</span>
-                    <h3 className="t-card-label" style={{marginTop:'var(--sp-2)'}}>{ch.ti}</h3>
+                    {/* V40.1: title is replaced too — wp:1 title may be wedding-themed
+                        (e.g. "De Bruiloft-aankondiging"). Show a neutral placeholder. */}
+                    <h3 className="t-card-label" style={{marginTop:'var(--sp-2)'}}>{done?'Geheime missie · ✓ voltooid':'Geheime missie'}</h3>
                   </div>
                   <div className="points-badge">+{ch.p}</div>
                 </div>
                 <div style={{padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(0,0,0,0.25)',border:'1px dashed rgba(228,178,92,0.45)'}}>
-                  <div style={{fontSize:24,marginBottom:'var(--sp-1)'}}>{isJorikDevice?'🙌':'🤫💍'}</div>
-                  <div className="t-card-label t-accent" style={{marginBottom:'var(--sp-1)'}}>{isJorikDevice?'Niet voor jou vandaag':'Geheime bruiloftsmissie'}</div>
-                  <div className="t-caption" style={{lineHeight:'var(--lh-relaxed)',color:'var(--text-secondary)'}}>{isJorikDevice?'Deze opdracht is gereserveerd voor de andere teams. Jij hebt vandaag andere dingen te doen — kijk op de kaart voor opdrachten waar je wél punten kan halen.':'Deze missie is voor de surprise bruiloftsvideo van Jorik op 14 juni. Jullie team heeft Jorik nu — laat een ander team dit doen. De missie wordt weer beschikbaar zodra Jorik bij de volgende bar break naar een ander team gaat.'}</div>
+                  <div style={{fontSize:24,marginBottom:'var(--sp-1)'}}>{isJorikDevice?'🙌':'🤫'}</div>
+                  <div className="t-card-label t-accent" style={{marginBottom:'var(--sp-1)'}}>{isJorikDevice?'Niet voor jou vandaag':done?'Geheime missie · al gedaan':'Geheime missie'}</div>
+                  <div className="t-caption" style={{lineHeight:'var(--lh-relaxed)',color:'var(--text-secondary)'}}>{isJorikDevice?'Deze opdracht is gereserveerd voor de andere teams. Jij hebt vandaag andere dingen te doen — kijk op de kaart voor opdrachten waar je wél punten kan halen.':done?'Punten staan op jullie totaal. Inhoud blijft geheim zolang Jorik bij jullie team is.':'Bewaar deze voor wanneer Jorik niet bij jullie team is. Wordt weer beschikbaar bij de volgende rotatie.'}</div>
                 </div>
               </div>
             );
@@ -6938,11 +7061,18 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                   "🎬 Voor de bruiloftsedit · Jorik mag dit niet zien" reveal. The
                   isSecretWp gate above already short-circuits before this renders,
                   but the redundant gate keeps the contract explicit. */}
+              {/* V40.1: chip text now reads from ch.wpInstruction (set per-challenge in L_DATA).
+                  Falls back to the V35 default for legacy wp:1 challenges (POI 1, POI 16).
+                  Gates ensure Jorik never sees this string. */}
               {ch.wp===1&&!jorikInTeam&&!isJorikDevice&&!done&&myTeam?.id>0&&!myTeam?.spectator&&(
                 <div className="panel-sm" style={{background:'rgba(228,178,92,0.08)',borderColor:'rgba(228,178,92,0.30)',padding:'var(--sp-2) var(--sp-3)',marginBottom:'var(--sp-2)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
                   <span style={{fontSize:18}}>🎬</span>
                   <div className="t-caption" style={{flex:1,lineHeight:'var(--lh-relaxed)'}}>
-                    <b style={{color:'var(--accent-2)'}}>Voor de bruiloftsedit</b> — Jorik mag dit niet zien. Pak iemand om de hoek, film discreet.
+                    {ch.wpInstruction?<>
+                      <b style={{color:'var(--accent-2)'}}>Voor de bruiloftsedit</b> — {ch.wpInstruction.replace(/^📹\s*Voor de bruiloftsedit\s*[—-]\s*/,'')}
+                    </>:<>
+                      <b style={{color:'var(--accent-2)'}}>Voor de bruiloftsedit</b> — Jorik mag dit niet zien. Pak iemand om de hoek, film discreet.
+                    </>}
                   </div>
                 </div>
               )}
@@ -7131,6 +7261,10 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
       // V29 audio + haptic cue. Correct answer = bright two-tone bell + short tap.
       try{const c=window.__ssrPlayCue;if(c)c('correct');}catch(e){}
       try{if(navigator.vibrate)navigator.vibrate([15,40,15]);}catch(e){}
+      // V40 P3 (sim suggestion): trigger confetti on quiz-correct. Match the photo/video
+      // celebration moment — currently only score-popup fires, but a quiz-right is a tiny
+      // dopamine hit worth amplifying. Scales with the quiz pts via existing tiered burst.
+      try{const tc=window.__ssrTriggerConfetti;if(tc)tc(ch.p);}catch(e){}
       setTimeout(()=>onComplete(locId,chIdx,ch.p,null),700);
     }else{
       setQuizFeedback('wrong');
@@ -7347,7 +7481,7 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam,confirmAsync,isJori
 // Only visible to the team currently holding Jorik (inverse of WeddingMission).
 // Each mission is one-shot; previous done-list is preserved when Jorik rotates away.
 // ═══════════════════════════════════════════
-function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,barBreak}){
+function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,barBreak,holdCount=0,holdCap=3,isJorikDevice=false}){
   const fileRefs=useRef({});
   const totalPts=JORIK_MISSIONS.reduce((s,m)=>s+m.pts,0);
   const doneSet=done instanceof Set?done:new Set(done||[]);
@@ -7451,6 +7585,22 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
           <div className="t-caption" style={{marginTop:'var(--sp-2)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.08)',border:'1px solid rgba(228,178,92,0.25)',color:'var(--accent-2)',lineHeight:'var(--lh-relaxed)'}}>
             ✨ <b>Jorik-missies tellen voor de helft mee</b> — anders ontvoert het Jorik-team de bachelor en wint altijd.
           </div>
+          {/* V40 hold-window cap counter — V40.1: vocab "beurt" (rotation-aligned) replaces
+              the previously-coined "ronde". 3-state tone ramp:
+                0-1 done: neutral status
+                2 done : anticipatory ("nog 1 — pace yourself")
+                3 done : milestone celebration */}
+          {jorikInTeam&&(
+            <div className="t-caption" style={{marginTop:'var(--sp-2)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:holdCount>=holdCap?'rgba(255,235,170,0.12)':holdCount>=holdCap-1?'rgba(228,178,92,0.10)':'rgba(110,163,255,0.10)',border:'1px solid '+(holdCount>=holdCap?'rgba(228,178,92,0.40)':holdCount>=holdCap-1?'rgba(228,178,92,0.28)':'rgba(110,163,255,0.28)'),color:holdCount>=holdCap?'var(--accent-2)':holdCount>=holdCap-1?'var(--accent-2)':'var(--foto-2)',lineHeight:'var(--lh-relaxed)'}}>
+              {holdCount>=holdCap?
+                <>🌟 <b>{holdCap}/{holdCap} Jorik-missies deze beurt — top!</b> Extra missies blijven mooi voor de bruiloftsedit, maar punten pauzeren tot Jorik rouleert.</>
+                :holdCount>=holdCap-1?
+                <>⚡ <b>{holdCount}/{holdCap} deze beurt — nog 1!</b> Daarna pauzeren de punten tot de volgende rotatie.</>
+                :
+                <>💍 <b>{holdCount}/{holdCap} Jorik-missies deze beurt</b> — daarna pauzeren punten tot Jorik rouleert.</>
+              }
+            </div>
+          )}
         </div>
 
         {!jorikInTeam&&(
@@ -7500,8 +7650,25 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
                     <div className="t-card-title" style={{display:'flex',alignItems:'center',gap:'var(--sp-2)',flexWrap:'wrap'}}>
                       <span>{m.title}</span>
                       <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',background:'rgba(255,255,255,0.05)'}}>{m.cat}</span>
-                      <span className="chip" title={`Volledige waarde ${m.pts} × 0.5 multiplier = ${Math.round(m.pts*0.5)} pts`} style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'var(--accent-2)',borderColor:'var(--accent)'}}>+{Math.round(m.pts*0.5)} pts</span>
-                      {m.weddingPipeline&&<span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'#ff6b6b',borderColor:'rgba(255,107,107,0.4)',background:'rgba(255,107,107,0.08)'}}>📹 bruiloft</span>}
+                      {/* V40.1 (UX-review P1b): pre-tap cap warning. When holdCount>=holdCap and
+                          this mission ISN'T already-done, show "+0 (cap)" instead of the +pts.
+                          No more bait-and-switch where the card advertises +25 but pays 0. */}
+                      {(holdCount>=holdCap&&!isDone&&!runComplete)?
+                        <span className="chip" title={`Cap bereikt — telt voor de bruiloftsedit, niet voor de score`} style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'var(--text-tertiary)',borderColor:'rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.04)'}}>+0 (cap)</span>
+                        :
+                        <span className="chip" title={`Volledige waarde ${m.pts} × 0.5 multiplier = ${Math.round(m.pts*0.5)} pts`} style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'var(--accent-2)',borderColor:'var(--accent)'}}>+{Math.round(m.pts*0.5)} pts</span>
+                      }
+                      {/* V40.1 (UX-review P1): hide "📹 bruiloft" chip from Jorik's own device.
+                          Pre-V40.1 leak: when Jorik was in his own team, he saw the chip on
+                          weddingPipeline-tagged Jorik missions — a direct spoiler that there's
+                          a wedding edit being made. Renamed to "📹 lange-vorm" (long-form) for
+                          Jorik's device; original "📹 bruiloft" remains for teammates. */}
+                      {m.weddingPipeline&&(
+                        isJorikDevice?
+                          <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'#ff6b6b',borderColor:'rgba(255,107,107,0.4)',background:'rgba(255,107,107,0.08)'}}>📹 lange-vorm</span>
+                        :
+                          <span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'#ff6b6b',borderColor:'rgba(255,107,107,0.4)',background:'rgba(255,107,107,0.08)'}}>📹 bruiloft</span>
+                      )}
                       {isRunning&&runTarget>0&&<span className="chip" style={{padding:'1px 6px',fontSize:'var(--fs-10)',color:'#5fd8a5',borderColor:'rgba(95,216,165,0.4)',background:'rgba(95,216,165,0.08)'}}>🔁 {runCount}/{runTarget} ruils</span>}
                     </div>
                     {ctxLabel&&<div className="t-caption" style={{marginTop:'var(--sp-1)',display:'inline-block',padding:'2px 8px',borderRadius:'12px',background:ctxColor,fontSize:'var(--fs-10)',letterSpacing:'0.3px'}}>{ctxLabel}</div>}
