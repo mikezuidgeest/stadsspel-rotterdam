@@ -666,6 +666,20 @@
 </head>
 <body>
 <div id="root"></div>
+<script>
+  // V41.6 (F-2 fix, deep-audit 2026-05-16): register a service worker so a hard
+  // reload while offline doesn't produce a blank page. The SW caches index.html
+  // network-first and serves offline.html when both fail. iOS Safari has supported
+  // service workers since 11.3 (2018). Skip on http: scheme (local dev without TLS).
+  if('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch((e) => {
+        // Non-fatal — the app still works without the SW, just no offline fallback.
+        console.warn('SW registration failed:', e.message);
+      });
+    });
+  }
+</script>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -7182,6 +7196,13 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
   const[quizAnswer,setQuizAnswer]=useState(null);
   const[quizFeedback,setQuizFeedback]=useState(null);
   const[processing,setProcessing]=useState(false);
+  // V41.6 (F-1 fix, deep-audit 2026-05-16): inline network-failure surfacer.
+  // Pre-V41.6 the photo_reviews insert used .then(()=>{},()=>{}) — failures were silent
+  // and the UI flipped to "verstuurd" regardless. A player whose 4G dropped mid-upload
+  // saw their local score increment without anything landing in the DB. Now we await
+  // the insert and store the result; on error we surface an inline retry prompt and
+  // DON'T call onComplete (which would corrupt local-only score state).
+  const[uploadError,setUploadError]=useState(null);
   // V37 P1 fix (Sandra audit finding): the cyan upload button used to morph
   // straight from "📸 Foto opnemen" → "📸 Opnieuw proberen" after submit, which
   // low-tech users read as "the upload failed, try again". Now we hold an
@@ -7225,6 +7246,14 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
     const f=e.target.files[0];
     if(!f)return;
     setProcessing(true);
+    setUploadError(null);  // V41.6: clear stale errors on every new attempt
+    // V41.6 (F-1 fix): pre-flight offline check. If the browser already reports offline,
+    // skip the upload entirely so we don't pretend it succeeded.
+    if(typeof navigator!=='undefined'&&navigator.onLine===false){
+      setProcessing(false);
+      setUploadError('Geen verbinding — wacht tot je weer online bent en probeer opnieuw.');
+      return;
+    }
     // V29 — confirm photo capture started with a soft haptic + audio cue.
     try{const c=window.__ssrPlayCue;if(c)c('upload');}catch(e2){}
     try{if(navigator.vibrate)navigator.vibrate(10);}catch(e2){}
@@ -7252,6 +7281,12 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
       // submissions still go to 'pending' so the admin (or agent harness mass-approve)
       // can spot-check. The admin queue UI already filters status='pending', so
       // approved rows just don't appear there — points are awarded the same way.
+      // V41.6 (F-1 fix): we now AWAIT the insert and react to errors. The two error
+      // categories we care about: (1) network failure → show retry prompt + DON'T
+      // mark challenge complete locally (which would corrupt score state); (2) any
+      // other Supabase error → same fallback. The "table missing" silent path is
+      // preserved for legacy environments via the err.code check.
+      let insertError=null;
       if(!OFFLINE&&sb&&myTeam&&isMedia){
         const autoApprove=dist!=null&&dist<=AUTO_APPROVE_RADIUS;
         const reviewRow={
@@ -7270,7 +7305,31 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
           photo_url:shareable||null,
           status:autoApprove?'approved':'pending',
         };
-        sb.from('photo_reviews').insert(reviewRow).then(()=>{},()=>{/* table may not exist yet — silent */});
+        try{
+          const{error}=await sb.from('photo_reviews').insert(reviewRow);
+          if(error){
+            const code=error.code||'';
+            // 42P01 = table doesn't exist (pre-V6 schema). Treat as legacy-silent,
+            // not a user-visible error — the challenge still completes locally.
+            if(code!=='42P01'&&code!=='PGRST205'){
+              insertError=error;
+            }
+          }
+        }catch(netErr){
+          // TypeError: Failed to fetch / NetworkError → 4G dropped mid-POST
+          insertError=netErr;
+        }
+      }
+      if(insertError){
+        // V41.6: surface to user inline. DO NOT call onComplete — that would advance
+        // the local score state without a matching DB row, causing leaderboard drift.
+        const msg=insertError.message||'';
+        const friendly=/fetch|network|failed/i.test(msg)
+          ?'Geen verbinding — foto niet opgeslagen. Probeer opnieuw als je weer online bent.'
+          :'Upload mislukt — probeer opnieuw. ('+(msg||'onbekende fout')+')';
+        setUploadError(friendly);
+        try{if(navigator.vibrate)navigator.vibrate([60,40,60]);}catch(e2){}
+        return;
       }
 
       onComplete(locId,chIdx,ch.p,shareable);
@@ -7280,7 +7339,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
       setJustSubmitted(true);
       setTimeout(()=>setJustSubmitted(false),6000);
     };
-    r.onerror=()=>{setProcessing(false);onComplete(locId,chIdx,ch.p,null)};
+    r.onerror=()=>{setProcessing(false);setUploadError('Bestand kon niet gelezen worden. Probeer opnieuw.');};
     r.readAsDataURL(f);
   };
 
@@ -7395,14 +7454,28 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
       {/* V19+: drop capture="environment" so iOS/Android show the native
           take-photo-or-pick-from-library sheet. Desktop keeps the regular picker. */}
       <input ref={fileRef} type="file" accept={accept} style={{display:'none'}} onChange={handleFile}/>
-      <button className={`btn ${justSubmitted?'btn-success':'btn-cyan'}`} onClick={()=>!justSubmitted&&fileRef.current?.click()} disabled={processing||justSubmitted} style={{width:'100%'}}>
+      {/* V41.6 (F-1 fix): inline upload-error banner. Surfaces network failure or
+          Supabase error so the player KNOWS the upload didn't land. Without this
+          a spotty-4G upload was silently lost behind a "verstuurd" success state. */}
+      {uploadError&&(
+        <div className="t-body-emph t-danger" style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(255,107,107,0.12)',border:'1px solid rgba(255,107,107,0.35)',marginBottom:'var(--sp-2)',display:'flex',alignItems:'flex-start',gap:'var(--sp-2)'}}>
+          <span style={{fontSize:18,flexShrink:0}}>📡</span>
+          <div className="flex-1">
+            <div style={{fontWeight:700,marginBottom:2}}>Upload mislukt</div>
+            <div className="t-body" style={{opacity:0.92}}>{uploadError}</div>
+          </div>
+        </div>
+      )}
+      <button className={`btn ${justSubmitted?'btn-success':uploadError?'btn-danger':'btn-cyan'}`} onClick={()=>!justSubmitted&&fileRef.current?.click()} disabled={processing||justSubmitted} style={{width:'100%'}}>
         {processing
           ?'⏳ Verwerken...'
           :justSubmitted
             ?'✅ Foto verstuurd · wacht op beoordeling'
-            :preview
-              ?(ch.t==='video'?'🎬 Opnieuw opnemen':'📸 Opnieuw proberen')
-              :(ch.t==='video'?'🎬 Video opnemen of kiezen':ch.t==='creative'?'📸 Foto/video opnemen of kiezen':'📸 Foto opnemen of kiezen')
+            :uploadError
+              ?(ch.t==='video'?'🔄 Opnieuw uploaden':'🔄 Opnieuw uploaden')
+              :preview
+                ?(ch.t==='video'?'🎬 Opnieuw opnemen':'📸 Opnieuw proberen')
+                :(ch.t==='video'?'🎬 Video opnemen of kiezen':ch.t==='creative'?'📸 Foto/video opnemen of kiezen':'📸 Foto opnemen of kiezen')
         }
       </button>
       {/* V21 P1-fix #29: hint text explaining the native picker has both camera & library options */}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="nl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stadsspel Rotterdam — even geen verbinding</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;background:#1a1310;color:#f5f1e8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  body{display:flex;align-items:center;justify-content:center;padding:24px;line-height:1.5}
+  .wrap{max-width:380px;text-align:center}
+  .icon{font-size:64px;margin-bottom:18px;filter:drop-shadow(0 4px 12px rgba(228,178,92,0.3))}
+  h1{font-size:22px;font-weight:700;margin:0 0 12px;color:#e4b25c}
+  p{font-size:15px;color:#d8d0c0;margin:0 0 18px}
+  .small{font-size:12px;color:#9a8e80;margin-top:24px}
+  button{font-family:inherit;font-size:15px;font-weight:600;padding:14px 32px;border-radius:28px;border:none;background:linear-gradient(135deg,#e4b25c,#d49a3e);color:#1a1310;cursor:pointer;-webkit-tap-highlight-color:transparent;letter-spacing:0.02em}
+  button:active{transform:scale(0.96)}
+  .tip{margin-top:24px;padding:12px 16px;border-radius:12px;background:rgba(228,178,92,0.08);border:1px solid rgba(228,178,92,0.25);font-size:13px;color:#d8c8a0;text-align:left}
+  .tip b{color:#e4b25c}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="icon">📡</div>
+  <h1>Even geen verbinding</h1>
+  <p>Je telefoon is offline. Het Stadsspel heeft een verbinding nodig om scores, foto's en realtime updates van andere teams te zien.</p>
+  <button onclick="location.reload()">🔄 Probeer opnieuw</button>
+  <div class="tip">
+    <b>Tip:</b> Loop naar een terras met wifi, of wacht tot je weer 4G hebt. Je bent niet uit het spel — zodra je weer online bent, klik je gewoon op "Probeer opnieuw".
+  </div>
+  <div class="small">Stadsspel Rotterdam · 6 juni 2026 · Jorik's Bachelor Party</div>
+</div>
+<script>
+  // Auto-refresh when network returns (saves the player a tap)
+  window.addEventListener('online', () => { setTimeout(() => location.reload(), 800); });
+</script>
+</body></html>
