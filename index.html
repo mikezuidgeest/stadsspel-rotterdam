@@ -1694,7 +1694,12 @@ function App(){
   // V5.1 HOTFIX: expose GPS controls so the status pill can force-wake on tap
   const gpsCtrlRef=useRef({start:null,stop:null});
   const[photoLightbox,setPhotoLightbox]=useState(null); // enlarged photo url
-  const[feedFilter,setFeedFilter]=useState('all'); // 'all' | 'photos' | 'mine'
+  // V41.3 (Mike feedback 2026-05-16): default feed filter to 'photos' — the
+  // 'all' default was too noisy with score adjustments, jorik rotations, broadcasts
+  // and quiz-result rows. 'photos' shows only mission media (photo + video posts)
+  // so the feed reads like a shared photo album of the day. Users can still tap
+  // 'Alles' to see the chronological log if they want it.
+  const[feedFilter,setFeedFilter]=useState('photos'); // 'all' | 'photos' | 'mine'
   // V6: admin review queue
   const[reviewQueue,setReviewQueue]=useState([]); // pending photo_reviews for admin
   const[pendingMine,setPendingMine]=useState(0); // count of my team's pending reviews
@@ -4352,7 +4357,7 @@ function App(){
       {phase===5&&<FinaleScreen teams={teams} scores={scores} myTeam={myTeam} elapsed={elapsed} activityFeed={activityFeed} jorikTeamId={jorikTeamId}/>}
 
       {/* Bottom sheet for challenges */}
-      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam} isJorikDevice={isJorikDevice}/>
+      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam} isJorikDevice={isJorikDevice} confirmAsync={confirmAsync}/>
         /* V30: jorikInTeam already passed to ChallengeSheet — the new wp:1 secrecy lock reads it. No call-site change needed beyond the existing prop. */}
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
@@ -5583,6 +5588,11 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikI
   const REACTIONS=['🔥','👏','💀','😂','🍻'];
   const[reactions,setReactions]=useState({}); // {feedKey: {emoji: count}}
   const[myReactions,setMyReactions]=useState({}); // {feedKey: Set<emoji>}
+  // V41.4 (Mike feedback): the 5 emoji buttons rendered on every row made the feed
+  // visually noisy. Now: existing reactions (count > 0) stay inline as compact pills;
+  // a single "🙂+" trigger reveals the full picker only when the user wants to add one.
+  // Picker auto-collapses after a pick (or when tapping outside / scrolling).
+  const[pickerKey,setPickerKey]=useState(null); // feedKey of the row whose picker is currently open
   const deviceIdRef=useRef(null);
   // V30.1: DELETE events from Supabase Realtime arrive with only {id} in the
   // old-row payload regardless of REPLICA IDENTITY FULL (the realtime service
@@ -5837,17 +5847,47 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikI
                 ?<video src={item.photo} className="activity-photo" controls muted onClick={()=>onPhoto&&onPhoto(item.photo)}/>
                 :<img src={item.photo} className="activity-photo" alt="submission" onClick={()=>onPhoto&&onPhoto(item.photo)}/>
             )}
-            {/* V10/V12: reactions — rendered only when the row is team-generated (systeem rows don't need reactions) */}
+            {/* V10/V12: reactions — rendered only when the row is team-generated (systeem rows don't need reactions)
+                V41.4: collapsed UI. Only emojis that someone HAS used render as inline pills;
+                the full 5-emoji picker is hidden behind a single "🙂+" trigger and revealed
+                on tap (state in pickerKey). Tap an emoji to add/remove → picker auto-closes. */}
             {!isSystem&&(
               <div className="reactions" title="Alleen jij ziet jouw reacties">
                 {REACTIONS.map(e=>{
                   const n=rx[e]||0;
+                  // Only render pre-existing reactions inline OR ones the user has added.
+                  if(n===0&&!mine.has(e))return null;
                   return(
                     <button key={e} className={`reaction-btn ${mine.has(e)?'my':''}`} onClick={()=>toggleReaction(key,e)}>
                       <span>{e}</span>{n>0&&<span className="reaction-count">{n}</span>}
                     </button>
                   );
                 })}
+                {/* Picker trigger — always visible unless picker is open for this row */}
+                {pickerKey!==key&&(
+                  <button className="reaction-btn" aria-label="Reactie toevoegen" onClick={()=>setPickerKey(key)}
+                    style={{opacity:0.6}}>
+                    <span style={{fontSize:13}}>🙂</span><span style={{fontSize:11,marginLeft:2}}>+</span>
+                  </button>
+                )}
+                {/* Expanded picker — only emojis NOT already shown inline render here.
+                    V41.4 buddy review: dedupe so 🔥(2) inline + 🔥 in picker don't show twice.
+                    Tap an emoji to add it (inline pill takes over from this point) + close. */}
+                {pickerKey===key&&(
+                  <>
+                    {REACTIONS.filter(e=>(rx[e]||0)===0&&!mine.has(e)).map(e=>(
+                      <button key={`pick-${e}`} className="reaction-btn"
+                        onClick={()=>{toggleReaction(key,e);setPickerKey(null);}}
+                        style={{animation:'slideUp .15s var(--spring)'}}>
+                        <span>{e}</span>
+                      </button>
+                    ))}
+                    <button className="reaction-btn" aria-label="Sluit reactie-picker" onClick={()=>setPickerKey(null)}
+                      style={{opacity:0.55,padding:'5px 9px'}}>
+                      <span style={{fontSize:12}}>✕</span>
+                    </button>
+                  </>
+                )}
                 <div className="flex-1"/>
                 <div className="t-label-sm">{fmtRelTime(item.created_at)}</div>
               </div>
@@ -6843,7 +6883,7 @@ function FlippercoinGate({loc,teamId,onReveal,children}){
   );
 }
 
-function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam,jorikInTeam,isJorikDevice=false}){
+function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam,jorikInTeam,isJorikDevice=false,confirmAsync}){
   // V29 (§4): Escape-to-close wasn't wired. Backdrop click was, but the ✕
   // button was a dim 26px text glyph on no background — Mike couldn't find
   // it in his screenshots. Below we (a) listen for Escape globally while this
@@ -7103,7 +7143,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                 {done&&!wasWrong&&<div className="t-body-emph t-success">✓ Voltooid {ptsEarned>0&&`(+${ptsEarned} pts)`}</div>}
                 {wasWrong&&<div className="t-body-emph t-danger">✗ Fout gegokt · 0 pts{isQuiz&&ch.a?` · antwoord: ${ch.a}`:''}</div>}
               </div>
-              {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam}/>}
+              {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} confirmAsync={confirmAsync}/>}
             </div>
           );
         })}
@@ -7125,7 +7165,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
             {/* V30 (Phase 8): dynamic bonus quizzes rotate — you can keep doing
                 them until the pool is dry. Make that obvious next to the card. */}
             <div className="t-label-sm t-muted" style={{marginBottom:'var(--sp-2)',letterSpacing:'0.3px'}}>♻️ Zo vaak je wilt · elke keer +{rotatedQuiz.p} pts</div>
-            <ChallengeAction ch={rotatedQuiz} locId={loc.id} chIdx={`dyn_${loc.id}_${Date.now()}`} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} onComplete={(lid,cidx,pts,photo)=>{
+            <ChallengeAction ch={rotatedQuiz} locId={loc.id} chIdx={`dyn_${loc.id}_${Date.now()}`} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} confirmAsync={confirmAsync} onComplete={(lid,cidx,pts,photo)=>{
               // Dynamic-quiz rewards: award points, log activity, but do NOT mark built-in challenge
               onComplete(lid,-99,pts,photo);
             }}/>
@@ -7136,7 +7176,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
   );
 }
 
-function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
+function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,confirmAsync}){
   const fileRef=useRef(null);
   const[preview,setPreview]=useState(null);
   const[quizAnswer,setQuizAnswer]=useState(null);
@@ -7195,13 +7235,14 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
       if(!isVideoData(raw)){
         // V20: adaptive tiered compression (falls back to null only if 3 tiers still fail)
         shareable=await compressPhotoAdaptive(raw);
-      }else if(raw.length>5*1024*1024){
-        // V22: bumped 700kB → 5MB (was silently dropping 95% of phone clips from the feed).
-        // The wedding-edit pipeline relies on these clips, so we want them in the activity feed.
-        // 5MB is the practical cap before Supabase realtime broadcast starts truncating payloads.
-        // Larger clips: shareable=null + UI placeholder ("Video opgenomen, te groot voor preview").
-        shareable=null;
       }
+      // V41.5 (Mike feedback 2026-05-16): videos are NEVER dropped. Pre-V41.5 had a
+      // 5MB cap (line 7238) AND an 800KB cap on photo_reviews insert (line 7268) that
+      // both silently NULL'd the bytes. Rows #465 and #466 from this morning's test
+      // had photo_url=NULL because their iPhone clips exceeded the cap. From now on:
+      // the full FileReader result is what we insert. Postgres text + Supabase TOAST
+      // can hold multi-MB inline. The wedding-edit pipeline must have every clip.
+      // (Long term V42: migrate to Supabase Storage bucket with public URL.)
       setPreview(raw);
       setProcessing(false);
 
@@ -7225,7 +7266,8 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
           challenge_type:ch.t,
           gps_distance:dist!=null?Math.round(dist):null,
           points_awarded:ch.p,
-          photo_url:shareable&&shareable.length<800000?shareable:null,
+          // V41.5: store ALL bytes, no size cap. See V41.5 comment above.
+          photo_url:shareable||null,
           status:autoApprove?'approved':'pending',
         };
         sb.from('photo_reviews').insert(reviewRow).then(()=>{},()=>{/* table may not exist yet — silent */});
@@ -7245,32 +7287,25 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
   // V7: one shot. Correct → full points. Wrong → 0 pts, challenge marked done.
   // V7.1: ref-based lock — state is async, so two fast taps could both pass the
   // `if(quizAnswer)` check before React re-renders the disabled buttons.
-  // V36 P1 fix (Sandra/Bart/Hassan personas): all three personas reported
-  // mistapping the quiz (older fingers, drunk fingers, ungloved-cold fingers).
-  // First tap now stages the answer ("Bevestig: X?") for `medium` and `hard`
-  // quizzes; tapping the same answer again or "Bevestig" commits. `easy` quizzes
-  // stay one-shot — the difficulty curve still bites if you didn't read carefully.
-  // The 600ms grace lets a mistapper visually catch the staged answer + back out.
-  const[stagedAnswer,setStagedAnswer]=React.useState(null); // V36
-  const[graceUntil,setGraceUntil]=React.useState(0); // V36
-  const handleQuiz=opt=>{
+  // V41.3 (Mike live-test 2026-05-16): replaced V36's broken 600ms tap-to-stage
+  // with an explicit confirmation modal. Tap → DialogSheet "Weet je het zeker?
+  // Antwoord X: …" with Ja / Annuleer. No timer, no subtle inline hint, no
+  // mistap-with-no-undo. Cancel just clears the staged answer; the lock isn't
+  // taken until the user confirms.
+  const handleQuiz=async opt=>{
     if(quizLockRef.current)return;
-    // V36: grace window for medium+hard quizzes. Easy quizzes commit immediately.
-    const useGrace=ch.df==='medium'||ch.df==='hard';
-    if(useGrace){
-      const now=Date.now();
-      // First tap on this option, OR same option but past the grace window: stage it.
-      if(stagedAnswer!==opt||now>graceUntil){
-        setStagedAnswer(opt);
-        setGraceUntil(now+600);
-        try{if(navigator.vibrate)navigator.vibrate(8);}catch(e){}
-        return;
-      }
-      // Second tap on same option within the grace window: COMMIT.
-    }
+    // Optimistic visual: provisionally lock so a second tap during the modal
+    // round-trip can't fire a parallel confirmAsync. Released on cancel.
     quizLockRef.current=true;
+    const letter=String.fromCharCode(65+ch.o.indexOf(opt));
+    const ok=confirmAsync
+      ?await confirmAsync(`Antwoord ${letter}: ${opt}\n\nWeet je het zeker? Eén kans — fout = 0 pts.`,{confirmLabel:'Ja, dit is mijn antwoord',cancelLabel:'Annuleer'})
+      :true;
+    if(!ok){
+      quizLockRef.current=false;
+      return;
+    }
     setQuizAnswer(opt);
-    setStagedAnswer(null);
     if(opt===ch.a){
       setQuizFeedback('correct');
       // V29 audio + haptic cue. Correct answer = bright two-tone bell + short tap.
@@ -7293,8 +7328,10 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
 
   if(ch.t==='quiz'){
     // V12: advertise stakes clearly before the tap.
-    // V36: stakes copy mentions the new "tik 2x om te bevestigen" rule on medium+hard.
-    const stakes=ch.df==='hard'?'⚡ Eén kans · hard — 4 opties · tik 2x om te bevestigen':ch.df==='medium'?'⚡ Eén kans · medium — tik 2x om te bevestigen':'⚡ Eén kans · easy — fout = 0 pts, geen herkansing';
+    // V41.2: removed V36 "tik 2x" copy — stakes is now uniform per difficulty,
+    // matches the reverted one-shot behaviour. "Eén kans · fout = 0 pts" makes it
+    // clear the tap commits immediately.
+    const stakes=ch.df==='hard'?'⚡ Eén kans · hard — 4 opties · fout = 0 pts':ch.df==='medium'?'⚡ Eén kans · medium — fout = 0 pts':'⚡ Eén kans · easy — fout = 0 pts';
     return(
       <div style={{marginTop:'var(--sp-3)'}}>
         <div className="t-body-emph t-danger" style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-sm)',background:'rgba(255,107,107,0.1)',border:'1px solid rgba(255,107,107,0.25)',marginBottom:'var(--sp-3)'}}>
@@ -7302,21 +7339,18 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam}){
         </div>
         {ch.o.map((opt,i)=>{
           const isChosen=quizAnswer===opt;
-          const isStaged=stagedAnswer===opt&&!quizAnswer;
           const isRightAnswer=opt===ch.a;
           // During wrong-feedback, highlight the correct answer in green too
           const revealRight=quizFeedback==='wrong'&&isRightAnswer;
           const letter=String.fromCharCode(65+i); // A / B / C / D
           return(
             <button key={i}
-              className={`quiz-option ${isChosen?(quizFeedback==='correct'?'correct':'wrong'):''} ${revealRight?'correct':''} ${isStaged?'staged':''}`}
+              className={`quiz-option ${isChosen?(quizFeedback==='correct'?'correct':'wrong'):''} ${revealRight?'correct':''}`}
               onClick={()=>handleQuiz(opt)}
-              aria-label={isStaged?`Bevestig antwoord ${letter}: ${opt}`:`Antwoord ${letter}: ${opt}`}
-              style={isStaged?{borderColor:'var(--accent-2)',background:'rgba(228,178,92,0.12)',boxShadow:'0 0 0 2px rgba(228,178,92,0.35)'}:undefined}
+              aria-label={`Antwoord ${letter}: ${opt}`}
               disabled={!!quizAnswer}>
               <span aria-hidden="true" style={{display:'inline-block',width:22,height:22,lineHeight:'22px',borderRadius:11,background:'rgba(255,255,255,0.06)',textAlign:'center',fontWeight:800,fontSize:11,marginRight:10,color:'var(--text-secondary)'}}>{letter}</span>
               {opt}
-              {isStaged&&<span style={{marginLeft:8,fontSize:11,fontWeight:700,color:'var(--accent-2)'}}>← tik nogmaals om te bevestigen</span>}
               {revealRight&&<span style={{marginLeft:8,fontSize:11,fontWeight:700}}>← juist</span>}
             </button>
           );
@@ -7565,17 +7599,16 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
     // safety net so re-clicks during the FileReader window can't double-fire.
     if(doneSet.has(m.id))return;
     if(m.running&&m.tradeTarget>0&&(runMap[m.id]||0)>=m.tradeTarget)return;
-    // V22: bumped video cap 700kB → 5MB so most phone clips reach the activity feed
-    // (and therefore the wedding-edit dataset). See parallel comment at the photo-review
-    // path for the same change. Larger clips: shareable=null fallback + placeholder UI.
+    // V41.5: no size cap. All Jorik-mission media (photo + video) reaches the
+    // wedding-edit dataset regardless of file size. Pre-V41.5 the 5MB cap silently
+    // dropped iPhone clips. Photos still get compressed via compressPhotoAdaptive
+    // (smaller payload, same legibility); videos pass through raw.
     const r=new FileReader();
     r.onload=async(ev)=>{
       const raw=ev.target.result;
       let shareable=raw;
-      if(m.media==='video'){
-        if(raw.length>5*1024*1024)shareable=null;
-      }else{
-        // V20: adaptive tiered compression
+      if(m.media!=='video'){
+        // V20: adaptive tiered compression for photos only
         shareable=await compressPhotoAdaptive(raw);
       }
       onComplete&&onComplete(m.id,m.pts,shareable);
@@ -7588,6 +7621,14 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
       <div className="sheet-overlay" onClick={onClose}/>
       <div className="sheet" style={{background:'linear-gradient(180deg,#2a1d0a 0%,var(--bg) 100%)'}} role="dialog" aria-modal="true" aria-labelledby="jorik-missions-title">
         <div className="sheet-handle"/>
+        {/* V41.4 (Mike feedback): sticky top-right close button. The list of Jorik missions
+            is long enough to scroll past several viewport heights, and the only way back was
+            the bottom "Sluiten" button or tapping the dim overlay backdrop. Now: a circular ✕
+            floats at the top-right and stays put during scroll so "back to game" is one tap
+            regardless of scroll position. */}
+        <div style={{position:'sticky',top:0,zIndex:5,display:'flex',justifyContent:'flex-end',marginTop:-8,marginBottom:-32,pointerEvents:'none'}}>
+          <button onClick={onClose} aria-label="Terug naar spel" style={{pointerEvents:'auto',background:'rgba(20,20,20,0.85)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.18)',color:'#fff',fontSize:20,cursor:'pointer',width:40,height:40,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,boxShadow:'0 4px 14px rgba(0,0,0,0.45)'}}>✕</button>
+        </div>
         <div style={{textAlign:'center',marginBottom:'var(--sp-4)'}}>
           <div style={{fontSize:56}}>💍🎭</div>
           <h2 id="jorik-missions-title" className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,#e4b25c,#ff6b6b)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Jorik-missies</h2>
@@ -7724,7 +7765,8 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
           })}
         </div>
 
-        <button className="btn btn-ghost" onClick={onClose} style={{width:'100%'}}>Sluiten</button>
+        {/* V41.4: relabelled "Sluiten" → "← Terug naar spel" to match Mike's mental model */}
+        <button className="btn btn-ghost" onClick={onClose} style={{width:'100%'}}>← Terug naar spel</button>
       </div>
     </>
   );
@@ -7757,9 +7799,8 @@ function BarBreakOverlay({info,onClose,onComplete}){
       const raw=ev.target.result;
       let shareable=raw;
       // V20: adaptive tiered compression for photos
+      // V41.5: no size cap on videos — all bytes stored.
       if(!isVideoData(raw))shareable=await compressPhotoAdaptive(raw);
-      // V22: video cap bumped 700kB → 5MB (parity with JorikMissions handleFile + photo-review path)
-      else if(raw.length>5*1024*1024)shareable=null;
       setDone(prev=>new Set([...prev,i]));
       onComplete&&onComplete(m,m.pts,shareable);
     };
