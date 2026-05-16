@@ -3902,7 +3902,22 @@ function App(){
 
   // ═══════════ TEAM SETUP ═══════════
   if(screen==='setup'){
-    return <TeamSetup teams={teams} setTeams={setTeams} onJoin={(team)=>{setMyTeam(team);setScreen('lobby')}} isAdmin={isAdmin} promptAsync={promptAsync} confirmAsync={confirmAsync} teamMemberCounts={teamMemberCounts} phase={phase} scores={scores} jorikTeamId={jorikTeamId} activityFeed={activityFeed} barBreakActive={barBreakActive}/>;
+    // V41.1 P0 fix (buddy review finding): without this DialogSheet mount, every
+    // confirmAsync() call from TeamSetup (e.g. joinExistingTeam's "Sluit je aan
+    // bij ...?" confirmation) sets `dialog` state but no modal renders — the
+    // Promise hangs forever and the user sees "tap → nothing happens". This is
+    // exactly the symptom Mike's iPhone hit during V41 testing. V33 added the
+    // same mount to the lobby + game screens for the AdminMenu confirm path;
+    // the setup branch was missed because pre-V41 the .taken cards had
+    // pointer-events:none so joinExistingTeam was unreachable from setup.
+    // Removing pointer-events:none in V41 exposed this latent bug.
+    return(
+      <>
+        <TeamSetup teams={teams} setTeams={setTeams} onJoin={(team)=>{setMyTeam(team);setScreen('lobby')}} isAdmin={isAdmin} promptAsync={promptAsync} confirmAsync={confirmAsync} teamMemberCounts={teamMemberCounts} phase={phase} scores={scores} jorikTeamId={jorikTeamId} activityFeed={activityFeed} barBreakActive={barBreakActive}/>
+        {dialog&&<DialogSheet {...dialog} onClose={closeDialog}/>}
+        {toast&&<div className="toast" role="status" aria-live="polite" aria-atomic="true"><div className="toast-inner">{toast}</div></div>}
+      </>
+    );
   }
 
   // ═══════════ LOBBY ═══════════
