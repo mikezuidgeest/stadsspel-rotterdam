@@ -1069,7 +1069,7 @@ const L_DATA=[
   // the UI hides from Jorik-team/Jorik-device so the L_DATA description itself is innocent.
   {t:"video",ti:"De Verklaring",d:"Hele team in een rij op de bordes-trappen van de Schouwburg. Captain centraal, theatraal: 'Beste Rotterdammers… wij hebben grote vreugde te delen!' De rest valt in koor in met 'VOOR! DE! LIEFDE!' — elk woord een vuist omhoog. Iedereen in beeld, gefilmd van onderaan, Schouwburg achter het team. Min. 20 sec.",p:35,df:"hard",wp:1,wpInstruction:"📹 Voor de bruiloftsedit — kies je shot zo dat Jorik niet meeluistert. Pak iemand om de hoek, film discreet."}
 ]},
-{id:42,n:"Westersingel",la:51.919950,lo:4.472100,e:"🦆",c:"park",r:30,ch:[{t:"photo",ti:"Verrassings-vagijn",d:"Op de kade van de Westersingel ter hoogte van de Pauluskerk zit een verborgen keramieken kunstwerkje in de muur — vlak boven het water. Hints: 'Als het water te hoog komt sluiten de kleppen. Het water staat tot aan mijn lippen.' Vind het. Maak een foto als bewijs dat jullie pussy-radar nog werkt. Het kunstwerk moet duidelijk herkenbaar in beeld zijn.",p:40,df:"hard"}]},
+{id:42,n:"Westersingel",la:51.919900,lo:4.471450,e:"🦆",c:"park",r:35,ch:[{t:"photo",ti:"Verrassings-vagijn",d:"Aan de Westersingel-kant van het water (de overkant van de Pauluskerk) zit een verborgen keramieken kunstwerkje in de kademuur — vlak boven het water. Hints: 'Als het water te hoog komt sluiten de kleppen. Het water staat tot aan mijn lippen.' Loop langs de westelijke kade en zoek goed. Maak een foto als bewijs dat jullie pussy-radar nog werkt. Het kunstwerk moet duidelijk herkenbaar in beeld zijn.",p:40,df:"hard"}]},
 {id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Zwaan in Zicht",d:"Maak een epische teamfoto op het Noordereiland met de Erasmusbrug — De Zwaan — op de achtergrond. Team in sterke formatie, brug groot en herkenbaar in beeld. Maak er iets moois van: dit is ver reizen waard. Allemaal in beeld.",p:45,df:"medium"}]},
 {id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"De Rotterdam van Onder",d:"Ga voor De Rotterdam op de Wilhelminapier staan — het kolossale gebouw van Rem Koolhaas. Maak een selfie van recht onder naar boven: telefoon omlaag, camera omhoog, heel team in beeld. De gevel rijst massief boven jullie uit. Zorg dat iedereen erop staat.",p:25,df:"medium"}]},
 {id:45,n:"KPN Toren",la:51.907179,lo:4.489141,e:"📡",c:"architecture",r:20,ch:[{t:"quiz",ti:"KPN Toren Quiz",d:"Wie ontwierp de KPN Toren op de Kop van Zuid?",a:"Renzo Piano",o:["Renzo Piano","Rem Koolhaas","Norman Foster","Piet Blom"],p:15,df:"easy"}]},
@@ -3967,6 +3967,16 @@ function App(){
     return(
       <>
         <TeamSetup teams={teams} setTeams={setTeams} onJoin={(team)=>{setMyTeam(team);setScreen('lobby')}} isAdmin={isAdmin} promptAsync={promptAsync} confirmAsync={confirmAsync} teamMemberCounts={teamMemberCounts} phase={phase} scores={scores} jorikTeamId={jorikTeamId} activityFeed={activityFeed} barBreakActive={barBreakActive}/>
+        {/* V41.7 — floating 🔐 GM trigger on setup. Lets Mike elevate mid-flow
+            without retracing back to splash. Hidden when already admin. */}
+        {!isAdmin&&(
+          <button onClick={()=>setLoginOpen(true)} type="button"
+            aria-label="Inloggen als Game Master"
+            style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'6px 10px',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.35)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:6}}>
+            🔐 <span>Game Master</span>
+          </button>
+        )}
+        {loginOpen&&<AdminLogin onClose={()=>setLoginOpen(false)} onSuccess={()=>{loginAsAdmin();setLoginOpen(false);}}/>}
         {dialog&&<DialogSheet {...dialog} onClose={closeDialog}/>}
         {toast&&<div className="toast" role="status" aria-live="polite" aria-atomic="true"><div className="toast-inner">{toast}</div></div>}
       </>
@@ -3986,6 +3996,16 @@ function App(){
           </button>
         )}
         {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
+        {/* V41.7 — 🔐 GM trigger for non-admins on lobby, same top-right slot
+            as the ⚙ admin pill (mutually exclusive). */}
+        {!isAdmin&&(
+          <button onClick={()=>setLoginOpen(true)} type="button"
+            aria-label="Inloggen als Game Master"
+            style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'6px 10px',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.35)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:6}}>
+            🔐 <span>Game Master</span>
+          </button>
+        )}
+        {loginOpen&&<AdminLogin onClose={()=>setLoginOpen(false)} onSuccess={()=>{loginAsAdmin();setLoginOpen(false);}}/>}
         {/* V33: lobby needs the confirm-dialog mount point too — without this,
             confirmAsync() sets `dialog` state but no DialogSheet renders to show
             it, so admin menu confirmations silently no-op from the lobby. */}
@@ -4118,6 +4138,17 @@ function App(){
         </button>
       )}
       {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
+      {/* V41.7 — 🔐 GM trigger for non-admins in game view, same top-right slot
+          as the ⚙ admin pill (mutually exclusive). Lets a player elevate to
+          admin mid-game without restarting the app. */}
+      {!isAdmin&&(
+        <button onClick={()=>setLoginOpen(true)} type="button"
+          aria-label="Inloggen als Game Master"
+          style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'6px 10px',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.35)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:6}}>
+          🔐 <span>GM</span>
+        </button>
+      )}
+      {loginOpen&&<AdminLogin onClose={()=>setLoginOpen(false)} onSuccess={()=>{loginAsAdmin();setLoginOpen(false);}}/>}
       {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal.
           V34 (Hassan): updated iOS path to iOS 17/18 (in-Safari aA → Website-instellingen);
           added "what still works without GPS" so the modal doesn't oversell failure;
