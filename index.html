@@ -1288,6 +1288,60 @@ function compressPhoto(dataURL,maxWidth=480,quality=0.55){
 // Target = ~220 kB dataURL, which comfortably fits inside a 500kB row ceiling.
 const COMPRESS_TARGET_BYTES=220000;
 const COMPRESS_HARD_CAP_BYTES=500000;
+
+// V41.11 — Supabase Storage migration. Uploads media (photos/videos) to a
+// public bucket and stores the resulting URL in photo_reviews.photo_url and
+// activity_feed.photo instead of inline base64. Requires
+// SUPABASE-V41.11-STORAGE-MEDIA.sql to be applied once. If Storage is
+// unavailable (bucket missing, RLS denied, network error), uploadMediaToStorage
+// returns null and the caller transparently falls back to inline base64
+// (V41.5 behavior). To revert globally: flip STORAGE_ENABLED to false.
+const STORAGE_BUCKET='media';
+const STORAGE_ENABLED=true;
+
+// Convert a data URL ('data:image/jpeg;base64,...') to a Blob for upload.
+function dataUrlToBlob(dataUrl){
+  if(typeof dataUrl!=='string'||!dataUrl.startsWith('data:'))return null;
+  const commaIdx=dataUrl.indexOf(',');
+  if(commaIdx<0)return null;
+  const meta=dataUrl.slice(5,commaIdx);
+  const mime=(meta.split(';')[0])||'application/octet-stream';
+  const isB64=meta.includes('base64');
+  const payload=dataUrl.slice(commaIdx+1);
+  try{
+    if(isB64){
+      const bin=atob(payload);
+      const arr=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+      return new Blob([arr],{type:mime});
+    }
+    return new Blob([decodeURIComponent(payload)],{type:mime});
+  }catch(e){return null;}
+}
+
+// Upload a Blob to the media bucket; return public URL or null on failure.
+// Filename pattern: {pathPrefix}_{timestamp}_{rand}.{ext} — extension derived
+// from contentType so iPhone .mov / .mp4 / .heic / .jpg all sort correctly.
+async function uploadMediaToStorage(sb,blob,pathPrefix,contentType){
+  if(!STORAGE_ENABLED||!sb||!blob)return null;
+  try{
+    const mt=String(contentType||blob.type||'application/octet-stream');
+    const ext=(mt.split('/')[1]||'bin').replace(/\+.*$/,'').replace(/[^a-z0-9]/gi,'').slice(0,8)||'bin';
+    const safePrefix=String(pathPrefix||'media').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,80);
+    const filename=`${safePrefix}_${Date.now()}_${Math.floor(Math.random()*1e6)}.${ext}`;
+    const{data,error}=await sb.storage.from(STORAGE_BUCKET).upload(filename,blob,{contentType:mt,upsert:false,cacheControl:'3600'});
+    if(error){
+      console.warn('[storage] upload failed, falling back to inline base64:',error.message||error);
+      return null;
+    }
+    const{data:pub}=sb.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+    return(pub&&pub.publicUrl)||null;
+  }catch(err){
+    console.warn('[storage] upload exception, falling back:',err);
+    return null;
+  }
+}
+
 async function compressPhotoAdaptive(dataURL){
   if(typeof dataURL!=='string')return dataURL;
   // Try 3 tiers before bailing. Each tier halves-ish the budget.
@@ -1930,6 +1984,45 @@ function App(){
   if(typeof window!=='undefined')window.__ssrSetToast=setToast;
   useEffect(()=>()=>{if(typeof window!=='undefined'&&window.__ssrSetToast===setToast)delete window.__ssrSetToast;},[]);
   useEffect(()=>{if(scorePopup){const t=setTimeout(()=>setScorePopup(null),1200);return()=>clearTimeout(t)}},[scorePopup]);
+
+  // V41.10 — wedding-mission 4/4 bonus award. When all 4 round-ticks land in
+  // completed[-1], INSERT a sentinel bonus row (chIdx=0). UNIQUE constraint on
+  // (team_id, challenge_id='-1_0') guarantees the +50 fires exactly once per
+  // team even if 2 devices race to fire it. Local optimistic flag (weddingDone)
+  // prevents re-fire on the same device while the INSERT round-trip is in
+  // flight. Score delta + activity-feed entry are deferred until the INSERT
+  // resolves successfully (so a 23505 conflict from a racing device doesn't
+  // double-award).
+  useEffect(()=>{
+    if(!myTeam||OFFLINE)return;
+    if(weddingDone||completed[-1]?.[0])return;
+    const all4=[1,2,3,4].every(n=>completed[-1]?.[n]);
+    if(!all4)return;
+    setWeddingDone(true); // optimistic — prevents re-entry while INSERT in flight
+    if(!sb){
+      // Offline fallback: award locally
+      applyScoreDelta(myTeam.id,WEDDING_VIDEO_BONUS);
+      setCompleted(prev=>({...prev,[-1]:{...prev[-1],[0]:true}}));
+      setCompletedPts(prev=>({...prev,[-1]:{...prev[-1],[0]:WEDDING_VIDEO_BONUS}}));
+      return;
+    }
+    sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:'-1_0',location_id:-1,challenge_type:'wedding-bonus',points_earned:WEDDING_VIDEO_BONUS}).then(({error})=>{
+      if(error&&error.code==='23505'){
+        // Another device already won the race — score will arrive via teams
+        // realtime; mark locally complete so we don't keep re-trying.
+        setCompleted(prev=>({...prev,[-1]:{...prev[-1],[0]:true}}));
+        setCompletedPts(prev=>({...prev,[-1]:{...prev[-1],[0]:WEDDING_VIDEO_BONUS}}));
+        return;
+      }
+      if(error){console.warn('wedding bonus insert failed',error);setWeddingDone(false);return;}
+      // Won the race — award the score + celebrate
+      applyScoreDelta(myTeam.id,WEDDING_VIDEO_BONUS);
+      setCompleted(prev=>({...prev,[-1]:{...prev[-1],[0]:true}}));
+      setCompletedPts(prev=>({...prev,[-1]:{...prev[-1],[0]:WEDDING_VIDEO_BONUS}}));
+      try{addActivity('[WP1] 🏆 Bruiloftsmissie compleet! Alle 4 rondes ✓',WEDDING_VIDEO_BONUS,null,-1);}catch(_){}
+      try{triggerConfetti(WEDDING_VIDEO_BONUS);}catch(_){}
+    });
+  },[completed,weddingDone,myTeam,sb]);
 
   // V14: 1-second tick for countdown clocks (HUD + bar break)
   useEffect(()=>{
@@ -4129,8 +4222,12 @@ function App(){
       <ConfettiBurst seed={confettiSeed} intensity={confettiIntensity}/>
       {/* V33: floating ⚙ admin button — only Mike sees it (token-gated isAdmin).
           Position is fixed top-right just under the safe-area inset so it never
-          clashes with the HUD avatar block. Tap opens the AdminMenu drawer. */}
-      {isAdmin&&(
+          clashes with the HUD avatar block. Tap opens the AdminMenu drawer.
+          V41.9: hidden while a ChallengeSheet is open (selLoc!=null) — both
+          buttons live in the same top-right corner and would otherwise overlap
+          the sheet's ✕ close pill. The drawer is reachable again the moment
+          the sheet closes; nothing important is gated to mission-open. */}
+      {isAdmin&&selLoc==null&&(
         <button onClick={()=>setAdminMenuOpen(true)} aria-label="Open admin menu"
           style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-pill)',background:'linear-gradient(135deg,rgba(228,178,92,0.95),rgba(212,160,84,0.95))',color:'#0a0b10',border:'1px solid rgba(255,255,255,0.4)',boxShadow:'0 4px 14px rgba(228,178,92,0.45)',cursor:'pointer',fontSize:'var(--fs-13)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
           <span style={{fontSize:16}}>⚙</span><span>Admin</span>
@@ -4139,9 +4236,9 @@ function App(){
       )}
       {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
       {/* V41.7 — 🔐 GM trigger for non-admins in game view, same top-right slot
-          as the ⚙ admin pill (mutually exclusive). Lets a player elevate to
-          admin mid-game without restarting the app. */}
-      {!isAdmin&&(
+          as the ⚙ admin pill (mutually exclusive). V41.9: also hidden while a
+          ChallengeSheet is open, same reason — would overlap the sheet's ✕. */}
+      {!isAdmin&&selLoc==null&&(
         <button onClick={()=>setLoginOpen(true)} type="button"
           aria-label="Inloggen als Game Master"
           style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'6px 10px',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.35)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:6}}>
@@ -4440,7 +4537,83 @@ function App(){
         /* V30: jorikInTeam already passed to ChallengeSheet — the new wp:1 secrecy lock reads it. No call-site change needed beyond the existing prop. */}
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
-      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
+      {showWedding&&(()=>{
+        const roundsDone=[1,2,3,4].filter(n=>completed[-1]?.[n]);
+        const bonusAwarded=!!completed[-1]?.[0];
+        // V41.10 — shared per-round tick logic (used by both the bare
+        // tick-only path AND the upload path, since uploading auto-ticks).
+        const tickRoundOnce=(n,viaUpload=false)=>{
+          if(completed[-1]?.[n])return false;
+          setCompleted(prev=>({...prev,[-1]:{...prev[-1],[n]:true}}));
+          setCompletedPts(prev=>({...prev,[-1]:{...prev[-1],[n]:0}}));
+          if(!OFFLINE&&sb&&myTeam){
+            sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:`-1_${n}`,location_id:-1,challenge_type:'wedding-tick',points_earned:0}).then(({error})=>{
+              if(error&&error.code!=='23505')console.warn('wedding round tick insert failed',error);
+            });
+          }
+          addActivity(`[WP1] ${viaUpload?'📹':'📝'} Bruiloftsmissie ronde ${n} ${viaUpload?'video geüpload':'afgevinkt'}`,0,null,-1);
+          return true;
+        };
+        return <WeddingMission onClose={()=>setShowWedding(false)} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync} isJorikDevice={isJorikDevice} roundsDone={roundsDone} bonusAwarded={bonusAwarded}
+          onTickRound={(n)=>tickRoundOnce(n,false)}
+          onUploadTake={async(n,file)=>{
+            // V41.10 — upload-take handler. Reuses the standard photo_reviews
+            // insert pattern from ChallengeAction (line 7407) so wedding videos
+            // land in the same table Mike already queries for the editing pool.
+            // Differences from regular mission upload:
+            //  - location_id=-1 (sentinel; never matches real POI)
+            //  - challenge_idx=round number (1..4)
+            //  - status='approved' (no admin review queue — straight in)
+            //  - gps_distance=null (no GPS gate)
+            // Multiple takes per round are allowed (no UNIQUE on photo_reviews
+            // by team+location+challenge_idx). After successful upload, also
+            // auto-tick the round so the 4/4 bonus counter advances.
+            if(!myTeam)throw new Error('Geen team gevonden');
+            if(typeof navigator!=='undefined'&&navigator.onLine===false)throw new Error('Geen verbinding — wacht tot je weer online bent.');
+            // V41.11 — try Storage bucket first (avoids multi-MB inline base64
+            // bloat in Postgres). On any Storage failure, fall back to inline.
+            // We try Storage with the raw File blob first (cheaper than data URL
+            // round-trip), and only read as data URL if Storage failed.
+            const tryStorageUrl=await uploadMediaToStorage(sb,file,`t${myTeam.id}_wed${n}`,file.type||'video/mp4');
+            const buildRow=(photo_url)=>({
+              team_id:myTeam.id,team_name:myTeam.name,team_emoji:myTeam.emoji,team_color:myTeam.color,
+              location_id:-1,location_name:`Bruiloftsmissie · Ronde ${n}`,
+              challenge_idx:n,challenge_title:`Wedding take ronde ${n}`,
+              challenge_type:'video',gps_distance:null,points_awarded:0,
+              photo_url,status:'approved'
+            });
+            const doInsert=async(row)=>{
+              if(OFFLINE||!sb)return;
+              const{error}=await sb.from('photo_reviews').insert(row);
+              if(error){
+                const friendly=/fetch|network|failed/i.test(String(error.message||''))
+                  ?'Geen verbinding — video niet opgeslagen. Probeer opnieuw.'
+                  :('Upload mislukt: '+(error.message||'onbekende fout'));
+                throw new Error(friendly);
+              }
+            };
+            if(tryStorageUrl){
+              try{await doInsert(buildRow(tryStorageUrl));}
+              catch(err){throw err;}
+              tickRoundOnce(n,true);
+              return;
+            }
+            // Storage failed — fall back to inline base64 via FileReader.
+            return new Promise((resolve,reject)=>{
+              const reader=new FileReader();
+              reader.onload=async(ev)=>{
+                const dataUrl=ev.target.result;
+                if(!dataUrl){reject(new Error('Bestand kon niet gelezen worden.'));return;}
+                try{await doInsert(buildRow(dataUrl));}
+                catch(err){reject(err);return;}
+                tickRoundOnce(n,true);
+                resolve();
+              };
+              reader.onerror=()=>reject(new Error('Bestand kon niet gelezen worden.'));
+              reader.readAsDataURL(file);
+            });
+          }}/>;
+      })()}
 
       {/* V19+: Jorik-specific missions — mirror of wedding, visible only when Jorik IS in team */}
       {/* V21: pos + barBreakActive passed so the panel can curate by context (loc-tagged + bar-only missions).
@@ -6135,12 +6308,35 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
   if(!open)return null;
   const phaseLabel=phase===0?'Lobby (wachten)':phase===1?'Fase 1 — Zoektocht':phase===2?'Fase 2 — Geruchten':phase===3?'Fase 3 — Cirkel':phase===4?'Fase 4 — Finale (×1.5)':phase>=5?'Eindceremonie / klaar':'';
   const jorikHolder=jorikTeamId!=null?teams.find(t=>t.id===jorikTeamId):null;
-  const Section=({title,children})=>(
-    <div style={{marginBottom:'var(--sp-5)'}}>
-      <div className="t-label" style={{marginBottom:'var(--sp-3)',color:'var(--text-secondary)',letterSpacing:'var(--ls-wider)'}}>{title}</div>
-      <div className="stack-2">{children}</div>
+  const Section=({title,hint,children})=>(
+    <div style={{marginBottom:'var(--sp-4)'}}>
+      <div className="t-label" style={{marginBottom:hint?2:'var(--sp-2)',color:'var(--text-secondary)',letterSpacing:'var(--ls-wider)'}}>{title}</div>
+      {hint&&<div className="t-caption t-muted" style={{marginBottom:'var(--sp-2)',lineHeight:'var(--lh-relaxed)'}}>{hint}</div>}
+      <div className="stack-1">{children}</div>
     </div>
   );
+  // V41.8 — unified compact menu-button. One line, 44px hit target (WCAG 2.5.5),
+  // icon + label only by default. Variants set border/bg accent. Optional `badge`
+  // (e.g. queue count). `hint` goes to title+aria-label for accessibility — not
+  // rendered visually so the menu stays scan-friendly on a 5" iPhone screen.
+  const MenuButton=({icon,label,onClick,disabled,variant='default',badge,hint,title:_t})=>{
+    const variantStyle={
+      'default':{borderColor:'var(--border)',background:'rgba(255,255,255,0.03)',color:'#fff'},
+      'danger':{borderColor:'rgba(255,107,107,0.40)',background:'rgba(255,107,107,0.06)',color:'#fff'},
+      'primary':{borderColor:'rgba(110,163,255,0.45)',background:'rgba(110,163,255,0.10)',color:'#fff'},
+      'accent':{borderColor:'rgba(228,178,92,0.45)',background:'rgba(228,178,92,0.10)',color:'#fff'},
+    }[variant]||{};
+    const ttl=_t||hint||label;
+    return(
+      <button onClick={onClick} disabled={disabled} type="button"
+        title={ttl} aria-label={ttl}
+        style={{width:'100%',display:'flex',alignItems:'center',gap:'var(--sp-3)',padding:'10px 12px',minHeight:44,borderRadius:'var(--r-md)',border:'1px solid',cursor:disabled?'default':'pointer',opacity:disabled?0.4:1,fontSize:'var(--fs-14)',fontWeight:'var(--fw-medium)',textAlign:'left',...variantStyle}}>
+        <span style={{fontSize:18,flexShrink:0,width:22,textAlign:'center'}}>{icon}</span>
+        <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{label}</span>
+        {badge!=null&&<span style={{background:'rgba(255,68,68,0.95)',color:'#fff',fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:9,flexShrink:0}}>{badge}</span>}
+      </button>
+    );
+  };
   return(
     <div className="sheet-overlay" style={{zIndex:11500}} onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{position:'fixed',top:0,right:0,bottom:0,width:'min(420px,92vw)',background:'linear-gradient(180deg,#161821 0%,var(--bg) 100%)',borderLeft:'1px solid rgba(228,178,92,0.35)',boxShadow:'-12px 0 40px rgba(0,0,0,0.5)',overflowY:'auto',animation:'slideInRight 0.28s var(--ease-out)'}}>
@@ -6165,158 +6361,86 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
           </div>
 
           <Section title="Spel besturen">
-            <button onClick={async()=>{if(await ask('Pauze-bericht naar alle teams sturen? Scoring loopt door — dit is alleen een signaal naar de spelers.',{confirmLabel:'Stuur pauze-bericht'}))onPause&&onPause()}}
-              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
-              <span style={{fontSize:20}}>⏸</span>
-              <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">Pauzeer spel</div>
-                <div className="t-caption t-muted">Stuur "PAUZE" naar alle teams</div>
-              </div>
-            </button>
-            <button onClick={async()=>{if(await ask('Hervat-bericht naar alle teams sturen? Scoring loopt sowieso door — dit is alleen een signaal naar de spelers dat ze weer mogen.',{confirmLabel:'Stuur GO'}))onResume&&onResume()}}
-              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
-              <span style={{fontSize:20}}>▶</span>
-              <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">Hervat spel</div>
-                <div className="t-caption t-muted">Stuur "GO — verder spelen"</div>
-              </div>
-            </button>
-            <button onClick={async()=>{if(await ask('Spel resetten naar de lobby? Phase gaat naar 0, alle phones keren terug naar het wachtscherm. Teams, scores en voltooide opdrachten blijven bewaard.',{danger:true,confirmLabel:'Reset naar lobby'}))onResetToLobby&&onResetToLobby()}}
-              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',borderColor:'rgba(255,107,107,0.25)',background:'rgba(255,107,107,0.04)'}}>
-              <span style={{fontSize:20}}>↺</span>
-              <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">Reset naar lobby</div>
-                <div className="t-caption t-muted">Phase → 0 · teams + scores blijven</div>
-              </div>
-            </button>
-            <button onClick={async()=>{
-              // V34 P0 fix (Lisa persona): the admin URL is forwarded freely (Mike
-              // texted it to Lisa to let her observe). Any spectator with the URL
-              // could accidentally tap "Hernieuw spel" and end the day. Two-stage
-              // confirm: standard confirm first, then a typed-confirm requiring
-              // the literal word "WIS" before the wipe fires. Mike types it once;
-              // Lisa-who-meant-to-tap-Pauze backs out at the prompt.
-              if(!await ask('LET OP — alles wissen? Dit verwijdert élk team, élke score, élke voltooide opdracht en de hele activity feed uit de database. Iedereen wordt teruggestuurd naar het startscherm. Dit kan NIET ongedaan worden gemaakt.',{danger:true,confirmLabel:'Volgende stap'}))return;
-              const typed=await askInput('Typ exact "WIS" om te bevestigen dat je écht alles wilt wissen.','');
-              if(typed==null)return;
-              if(String(typed).trim().toUpperCase()!=='WIS'){
-                await ask('Je tekst kwam niet overeen met "WIS". Geen wijzigingen — het spel blijft staan.',{confirmLabel:'OK'});
-                return;
-              }
-              onWipeAndRestart&&onWipeAndRestart();
-            }}
-              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',borderColor:'rgba(255,107,107,0.45)',background:'rgba(255,107,107,0.10)',color:'#fff'}}>
-              <span style={{fontSize:20}}>🏠</span>
-              <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph" style={{color:'var(--danger)'}}>Hernieuw spel</div>
-                <div className="t-caption t-muted">Wis alles · iedereen terug naar startscherm · typ "WIS" om te bevestigen</div>
-              </div>
-            </button>
+            <MenuButton icon="⏸" label="Pauzeer spel" hint="Stuur PAUZE-bericht naar alle teams (scoring loopt door)"
+              onClick={async()=>{if(await ask('Pauze-bericht naar alle teams sturen? Scoring loopt door — dit is alleen een signaal naar de spelers.',{confirmLabel:'Stuur pauze-bericht'}))onPause&&onPause()}}/>
+            <MenuButton icon="▶" label="Hervat spel" hint="Stuur GO-bericht naar alle teams"
+              onClick={async()=>{if(await ask('Hervat-bericht naar alle teams sturen? Scoring loopt sowieso door — dit is alleen een signaal naar de spelers dat ze weer mogen.',{confirmLabel:'Stuur GO'}))onResume&&onResume()}}/>
+            <MenuButton icon="↺" label="Reset naar lobby" variant="danger" hint="Phase → 0, alle phones terug naar wachtscherm (teams + scores blijven)"
+              onClick={async()=>{if(await ask('Spel resetten naar de lobby? Phase gaat naar 0, alle phones keren terug naar het wachtscherm. Teams, scores en voltooide opdrachten blijven bewaard.',{danger:true,confirmLabel:'Reset naar lobby'}))onResetToLobby&&onResetToLobby()}}/>
+            <MenuButton icon="🧨" label="Wis alles + herstart" variant="danger" hint="Verwijdert élk team, élke score, élke opdracht (typ WIS om te bevestigen)"
+              onClick={async()=>{
+                // V34 P0 fix (Lisa persona): two-stage typed confirm prevents
+                // accidental wipe by a spectator who got handed the admin URL.
+                if(!await ask('LET OP — alles wissen? Dit verwijdert élk team, élke score, élke voltooide opdracht en de hele activity feed uit de database. Iedereen wordt teruggestuurd naar het startscherm. Dit kan NIET ongedaan worden gemaakt.',{danger:true,confirmLabel:'Volgende stap'}))return;
+                const typed=await askInput('Typ exact "WIS" om te bevestigen dat je écht alles wilt wissen.','');
+                if(typed==null)return;
+                if(String(typed).trim().toUpperCase()!=='WIS'){
+                  await ask('Je tekst kwam niet overeen met "WIS". Geen wijzigingen — het spel blijft staan.',{confirmLabel:'OK'});
+                  return;
+                }
+                onWipeAndRestart&&onWipeAndRestart();
+              }}/>
           </Section>
 
-          <Section title="Finale">
-            {/* V34 P0 fix (Mike audit): finale buttons were tappable from phase 0 — one
-                confirm-tap from the lobby would skip straight to the ceremony.
-                Now gated on phase>=1 (game must be running) to start finale-fase,
-                and phase>=4 (must already be in finale-fase) to start eindceremonie.
-                Also requires teams.length>0 so we don't fire a finale on an empty lobby. */}
-            <button onClick={async()=>{if(phase<1||phase>=4||teamCount===0){return;}if(await ask('Start de finale-fase? Alle scoring krijgt ×1.5 voor de laatste 20 minuten.',{confirmLabel:'Start finale-fase'}))onStartFinalePhase&&onStartFinalePhase()}}
+          {/* V34 P0 fix (Mike audit): finale buttons gated by phase so they
+              can't fire from phase 0. V41.8: disabled state instead of awkward
+              label-swapping; the section hint explains the order. */}
+          <Section title="Finale" hint={phase<1?'Start het spel eerst.':phase<4?'Stap 1 actief — daarna eindceremonie.':phase<5?'Klaar voor de eindceremonie.':'Eindceremonie loopt.'}>
+            <MenuButton icon="🏁" label={phase===4?'Finale-fase loopt (×1.5)':'Start finale-fase (×1.5)'} variant="primary"
               disabled={phase<1||phase>=4||teamCount===0}
-              className="btn btn-cyan" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',opacity:(phase<1||phase>=4||teamCount===0)?0.4:1}}>
-              <span style={{fontSize:20}}>🏁</span>
-              <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">{phase===4?'Finale-fase loopt · ×1.5':phase<1?'Start spel eerst':'Start finale-fase (×1.5)'}</div>
-                <div className="t-caption" style={{opacity:0.85}}>{phase<1?'Beschikbaar zodra het spel loopt':'Punten ×1.5 in de laatste 20 min'}</div>
-              </div>
-            </button>
-            <button onClick={async()=>{if(phase<4||phase>=5||teamCount===0){return;}if(await ask('Spel beëindigen en naar de eindceremonie? Dit kan niet ongedaan worden gemaakt.',{danger:true,confirmLabel:'Start eindceremonie'}))onStartFinale&&onStartFinale()}}
+              hint="Punten ×1.5 in de laatste 20 minuten"
+              onClick={async()=>{if(phase<1||phase>=4||teamCount===0){return;}if(await ask('Start de finale-fase? Alle scoring krijgt ×1.5 voor de laatste 20 minuten.',{confirmLabel:'Start finale-fase'}))onStartFinalePhase&&onStartFinalePhase()}}/>
+            <MenuButton icon="🏆" label={phase>=5?'Eindceremonie loopt':'Start eindceremonie'} variant="accent"
               disabled={phase<4||phase>=5||teamCount===0}
-              className="btn btn-gold" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)',opacity:(phase<4||phase>=5||teamCount===0)?0.4:1}}>
-              <span style={{fontSize:20}}>🏆</span>
-              <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">{phase>=5?'Finale loopt':phase<4?'Start finale-fase eerst':'Start eindceremonie'}</div>
-                <div className="t-caption" style={{opacity:0.85}}>{phase<4?'Beschikbaar na de ×1.5 fase':'Onthul winnaar · Mike\'s prijs'}</div>
-              </div>
-            </button>
+              hint="Onthul de winnaar"
+              onClick={async()=>{if(phase<4||phase>=5||teamCount===0){return;}if(await ask('Spel beëindigen en naar de eindceremonie? Dit kan niet ongedaan worden gemaakt.',{danger:true,confirmLabel:'Start eindceremonie'}))onStartFinale&&onStartFinale()}}/>
           </Section>
 
           <Section title="Direct beheer">
-            <button onClick={()=>{onClose();onGoReview&&onGoReview();}}
-              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
-              <span style={{fontSize:20}}>✅</span>
-              <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">Open Beoordelen-tab</div>
-                <div className="t-caption t-muted">Wachtrij, Jorik-rotatie, bar break, team beheer</div>
-              </div>
-            </button>
+            <MenuButton icon="✅" label="Open Beoordelen" badge={queueCount>0?queueCount:null}
+              hint="Wachtrij, Jorik-rotatie, bar break, team beheer"
+              onClick={()=>{onClose();onGoReview&&onGoReview();}}/>
           </Section>
 
           {/* V37 P0 — Jorik device marker. Mike opens this menu on Jorik's actual
               phone at game start and taps the button. The local deviceId is written
               to game_state.jorik_device_id; every other client picks it up via the
-              realtime sub and hides wp:1 wedding-pipeline content from that device.
-              This is the structural fix for the V36-audit Jorik P0 (the team-based
-              jorikInTeam filter misfires when the rotating Jorik token sits with a
-              team that doesn't contain Jorik). */}
-          <Section title="🤵 Bruiloftsedit-bescherming">
-            {jorikDeviceId&&isJorikDevice&&(
-              <div className="panel-sm" style={{background:'rgba(95,216,165,0.08)',borderColor:'rgba(95,216,165,0.3)',padding:'var(--sp-2) var(--sp-3)',marginBottom:'var(--sp-2)'}}>
-                <div className="t-caption" style={{color:'var(--success)',lineHeight:'var(--lh-relaxed)'}}>✅ Dit toestel is gemarkeerd als Jorik's telefoon. Wedding-pipeline inhoud is hier verborgen.</div>
-              </div>
-            )}
-            {jorikDeviceId&&!isJorikDevice&&(
-              <div className="panel-sm" style={{background:'rgba(110,163,255,0.06)',borderColor:'rgba(110,163,255,0.25)',padding:'var(--sp-2) var(--sp-3)',marginBottom:'var(--sp-2)'}}>
-                <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>📱 Jorik's telefoon is gemarkeerd op een ander toestel. Hier zie je alle wedding-pipeline inhoud (admin / captain view).</div>
-              </div>
-            )}
-            <button onClick={async()=>{
-              if(jorikDeviceId&&!isJorikDevice){
-                // Different phone is already marked — confirm before overriding.
-                const ok=await (confirmAsync?confirmAsync('Een ander toestel is al gemarkeerd als Jorik\'s telefoon. Wil je dit toestel als Jorik markeren? (Het oude markeertoestel ziet vanaf nu wel weer wedding-pipeline inhoud.)',{confirmLabel:'Ja, markeer dit toestel'}):Promise.resolve(window.confirm('Override?')));
-                if(!ok)return;
-              }
-              onMarkJorikDevice&&onMarkJorikDevice(false);
-              onClose();
-            }}
-              className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
-              <span style={{fontSize:20}}>📱</span>
-              <div style={{textAlign:'left',flex:1}}>
-                <div className="t-body-emph">{isJorikDevice?'Hermarkeer dit toestel als Jorik':'Markeer dit toestel als Jorik\'s telefoon'}</div>
-                <div className="t-caption t-muted">Wedding-pipeline inhoud wordt verborgen voor dit specifieke toestel · doe dit aan het begin van de dag op Jorik's telefoon</div>
-              </div>
-            </button>
-            {jorikDeviceId&&(
-              <button onClick={async()=>{
-                const ok=await (confirmAsync?confirmAsync('Jorik-telefoon markering wissen? Vanaf nu valt de wp:1 filter terug op de team-gebaseerde gate (minder veilig — alleen aanbevolen als je Jorik\'s telefoon kwijt bent of een nieuwe gaat markeren).',{confirmLabel:'Wis markering',danger:true}):Promise.resolve(window.confirm('Clear?')));
-                if(!ok)return;
-                onMarkJorikDevice&&onMarkJorikDevice(true);
+              realtime sub and hides wp:1 wedding-pipeline content from that device. */}
+          <Section title="🤵 Bruiloftsedit"
+            hint={isJorikDevice?'✅ Dit toestel is Jorik\'s telefoon — wedding-inhoud verborgen.':jorikDeviceId?'📱 Jorik\'s telefoon is op een ander toestel gemarkeerd.':'Doe dit aan het begin van de dag op Jorik\'s telefoon.'}>
+            <MenuButton icon="📱" label={isJorikDevice?'Hermarkeer als Jorik':'Markeer als Jorik\'s telefoon'} variant="primary"
+              hint="Verberg wedding-pipeline inhoud op dit toestel"
+              onClick={async()=>{
+                if(jorikDeviceId&&!isJorikDevice){
+                  const ok=await (confirmAsync?confirmAsync('Een ander toestel is al gemarkeerd als Jorik\'s telefoon. Wil je dit toestel als Jorik markeren? (Het oude markeertoestel ziet vanaf nu wel weer wedding-pipeline inhoud.)',{confirmLabel:'Ja, markeer dit toestel'}):Promise.resolve(window.confirm('Override?')));
+                  if(!ok)return;
+                }
+                onMarkJorikDevice&&onMarkJorikDevice(false);
                 onClose();
-              }}
-                className="btn btn-ghost btn-sm" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-2)',color:'var(--text-tertiary)',marginTop:'var(--sp-1)'}}>
-                <span style={{fontSize:14}}>🧹</span>
-                <span className="t-caption">Wis Jorik-telefoon markering</span>
-              </button>
+              }}/>
+            {jorikDeviceId&&(
+              <MenuButton icon="🧹" label="Wis markering" variant="danger"
+                hint="Valt terug op team-gebaseerde gate (minder veilig)"
+                onClick={async()=>{
+                  const ok=await (confirmAsync?confirmAsync('Jorik-telefoon markering wissen? Vanaf nu valt de wp:1 filter terug op de team-gebaseerde gate (minder veilig — alleen aanbevolen als je Jorik\'s telefoon kwijt bent of een nieuwe gaat markeren).',{confirmLabel:'Wis markering',danger:true}):Promise.resolve(window.confirm('Clear?')));
+                  if(!ok)return;
+                  onMarkJorikDevice&&onMarkJorikDevice(true);
+                  onClose();
+                }}/>
             )}
           </Section>
 
-          {/* V41.7 — admin uitloggen. Clear ssr_admin localStorage flag + flip
-              isAdmin back to false. Doesn't sign out from URL-token sessions
-              (page reload with the token would re-elevate). */}
+          {/* V41.7 — admin uitloggen. Clears ssr_admin localStorage flag. */}
           {onLogout&&(
             <Section title="Sessie">
-              <button onClick={async()=>{
-                const ok=await ask('Uitloggen als Game Master? Je telefoon valt terug naar speler-modus. Je kunt opnieuw inloggen via 🔐 op de splash.',{confirmLabel:'Uitloggen'});
-                if(!ok)return;
-                onLogout();
-                onClose();
-              }}
-                className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
-                <span style={{fontSize:20}}>🚪</span>
-                <div style={{textAlign:'left',flex:1}}>
-                  <div className="t-body-emph">Uitloggen</div>
-                  <div className="t-caption t-muted">Terug naar speler-modus op deze telefoon</div>
-                </div>
-              </button>
+              <MenuButton icon="🚪" label="Uitloggen als Game Master"
+                hint="Terug naar speler-modus op deze telefoon"
+                onClick={async()=>{
+                  const ok=await ask('Uitloggen als Game Master? Je telefoon valt terug naar speler-modus. Je kunt opnieuw inloggen via 🔐 op de splash.',{confirmLabel:'Uitloggen'});
+                  if(!ok)return;
+                  onLogout();
+                  onClose();
+                }}/>
             </Section>
           )}
 
@@ -7412,13 +7536,20 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
         // V20: adaptive tiered compression (falls back to null only if 3 tiers still fail)
         shareable=await compressPhotoAdaptive(raw);
       }
-      // V41.5 (Mike feedback 2026-05-16): videos are NEVER dropped. Pre-V41.5 had a
-      // 5MB cap (line 7238) AND an 800KB cap on photo_reviews insert (line 7268) that
-      // both silently NULL'd the bytes. Rows #465 and #466 from this morning's test
-      // had photo_url=NULL because their iPhone clips exceeded the cap. From now on:
-      // the full FileReader result is what we insert. Postgres text + Supabase TOAST
-      // can hold multi-MB inline. The wedding-edit pipeline must have every clip.
-      // (Long term V42: migrate to Supabase Storage bucket with public URL.)
+      // V41.11 — try Storage bucket upload first; on any failure fall back to
+      // inline base64 (V41.5 behavior). The `shareable` value gets the URL
+      // when Storage works, else stays as the original/compressed data URL.
+      // Storage upload skipped when shareable is null (compress failed) — the
+      // null is propagated to photo_url and handled downstream.
+      if(shareable){
+        const blob=dataUrlToBlob(shareable);
+        if(blob){
+          const ct=blob.type||(isVideoData(raw)?'video/mp4':'image/jpeg');
+          const prefix=`t${myTeam?.id||0}_l${locId}_c${typeof chIdx==='number'?chIdx:'x'}`;
+          const url=await uploadMediaToStorage(sb,blob,prefix,ct);
+          if(url)shareable=url;
+        }
+      }
       setPreview(raw);
       setProcessing(false);
 
@@ -7647,13 +7778,88 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
 // ═══════════════════════════════════════════
 // WEDDING VIDEO MISSION
 // ═══════════════════════════════════════════
-function WeddingMission({onClose,onComplete,done,jorikInTeam,confirmAsync,isJorikDevice=false}){
+// V41.10 — WeddingMission is a per-round captain-tracked checklist with
+// optional video upload. Mike confirmed Supabase Pro plan has 100 GB Storage
+// headroom, so videos CAN upload — but the captain-checklist UX is still the
+// right primitive (better than the original upload-with-retake flow):
+//
+//   - Primary action per round: 📹 Upload (uploads bytes to photo_reviews,
+//     auto-marks the round as ticked).
+//   - Escape hatch: ✓ Alleen afvinken — for if team recorded on iPhone and
+//     prefers to share later via WhatsApp/AirDrop.
+//   - Multiple takes per round allowed (no UNIQUE on photo_reviews) — Mike
+//     gets a fuller editing pool.
+//   - 4/4 ticked → +50 pts bonus (via separate sentinel INSERT, UNIQUE-guarded
+//     against cross-device races).
+//   - All wedding inserts use location_id=-1, status='approved' (no GPS gate,
+//     skips the admin review queue — straight into Mike's collection).
+//   - [WP1] prefix on activity_feed entries so they never leak to Jorik.
+function RoundRow({r,ticked,jorikInTeam,onUploadTake,onTickRound,ask}){
+  const[uploading,setUploading]=useState(false);
+  const[uploadError,setUploadError]=useState(null);
+  const[uploadCount,setUploadCount]=useState(0);
+  const inputRef=useRef(null);
+  const handleFile=async(e)=>{
+    const f=e.target.files&&e.target.files[0];
+    e.target.value='';
+    if(!f)return;
+    setUploading(true);setUploadError(null);
+    try{
+      await onUploadTake(r.n,f);
+      setUploadCount(c=>c+1);
+    }catch(err){
+      setUploadError(err&&err.message?err.message:'Upload mislukt — probeer opnieuw.');
+    }finally{
+      setUploading(false);
+    }
+  };
+  return(
+    <div style={{padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid',borderColor:ticked?'rgba(95,216,165,0.45)':'var(--border)',background:ticked?'rgba(95,216,165,0.06)':'rgba(255,255,255,0.03)'}}>
+      <input ref={inputRef} type="file" accept="video/*" style={{display:'none'}} onChange={handleFile}/>
+      <div className="row-between" style={{marginBottom:'var(--sp-2)',gap:'var(--sp-3)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'var(--sp-3)',flex:1,minWidth:0}}>
+          <span style={{fontSize:22,width:26,textAlign:'center',flexShrink:0}}>{ticked?'✅':'⬜'}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div className="t-body-emph" style={{color:'#fff'}}>{r.label}</div>
+            <div className="t-caption t-muted">{r.time}</div>
+          </div>
+        </div>
+        {(ticked||uploadCount>0)&&(
+          <span className="t-label-sm" style={{color:'var(--success)',flexShrink:0,whiteSpace:'nowrap'}}>
+            {uploadCount>0?`✓ ${uploadCount} take${uploadCount>1?'s':''}`:'Afgevinkt'}
+          </span>
+        )}
+      </div>
+      <div style={{display:'flex',gap:'var(--sp-2)'}}>
+        <button onClick={()=>{if(jorikInTeam||uploading)return;inputRef.current&&inputRef.current.click();}}
+          disabled={jorikInTeam||uploading} type="button"
+          className="btn btn-cyan btn-sm" style={{flex:1,minHeight:40}}>
+          {uploading?'⏳ Uploaden…':ticked?'📹 Nog een take':'📹 Upload video'}
+        </button>
+        {!ticked&&!uploading&&(
+          <button onClick={async()=>{
+            if(jorikInTeam)return;
+            if(await ask(`Ronde ${r.n} alleen afvinken (zonder video upload)? Bevestig dat het team de take op telefoon heeft en deze later met Mike deelt via WhatsApp.`,{confirmLabel:'Alleen afvinken'})){
+              onTickRound(r.n);
+            }
+          }}
+          disabled={jorikInTeam} type="button"
+          className="btn btn-ghost btn-sm" style={{minHeight:40,whiteSpace:'nowrap'}}>
+            ✓ Alleen afvinken
+          </button>
+        )}
+      </div>
+      {uploadError&&(
+        <div role="alert" className="t-caption" style={{color:'var(--video-2)',marginTop:'var(--sp-2)',lineHeight:'var(--lh-relaxed)'}}>
+          ❌ {uploadError}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WeddingMission({onClose,jorikInTeam,confirmAsync,isJorikDevice=false,roundsDone=[],onTickRound,onUploadTake,bonusAwarded=false}){
   const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
-  const fileRef=useRef(null);
-  const retakeRef=useRef(null);
-  const[uploaded,setUploaded]=useState(false);
-  const[retakeCount,setRetakeCount]=useState(0); // V18: show confirmation when retaking
-  const[retakeAck,setRetakeAck]=useState(false); // V20: transient success after retake
 
   // V21 a11y: escape to close + dialog role
   React.useEffect(()=>{
@@ -7699,43 +7905,70 @@ function WeddingMission({onClose,onComplete,done,jorikInTeam,confirmAsync,isJori
         )}
 
         <div className="panel" style={{marginBottom:'var(--sp-4)'}}>
-          <div className="t-label" style={{color:'var(--quiz-2)',marginBottom:'var(--sp-2)'}}>Instructies</div>
+          <div className="t-label" style={{color:'var(--quiz-2)',marginBottom:'var(--sp-2)'}}>Hoe het werkt</div>
           <div className="stack-3">
-            <p className="t-body">Neem een video op met jullie team. Dit wordt onderdeel van een verrassingsvideo die op Jorik's bruiloft wordt vertoond.</p>
+            <p className="t-body">Neem het script hieronder samen op. Elk teamlid spreekt één of meerdere regels — verdeel ze onderling. Mike monteert later alle stukken aan elkaar tot één bruiloftsvideo.</p>
+            <p className="t-body" style={{color:'var(--quiz-2)'}}><b>Doel:</b> minstens 1 take per ronde op een nieuwe locatie — meerdere takes per ronde mag (geeft Mike meer keuze). Upload de video direct via de knop, of vink alleen af en deel later via WhatsApp.</p>
             <p className="t-body-emph" style={{color:'var(--video-2)'}}>⚠️ Doe dit ALLEEN wanneer Jorik NIET bij jullie team is.</p>
-            <p className="t-body" style={{fontStyle:'italic'}}>Het script wordt later nog toegevoegd door de organisatie.</p>
           </div>
         </div>
 
-        {!done&&!uploaded&&(
-          <>
-            {/* V19+: drop capture so users can pick from their photo library too */}
-            <input ref={fileRef} type="file" accept="video/*" style={{display:'none'}}
-              onChange={e=>{if(e.target.files[0]){setUploaded(true);onComplete&&onComplete()}}}/>
-            <button className="btn btn-cyan btn-lg" onClick={()=>!jorikInTeam&&fileRef.current?.click()} disabled={jorikInTeam} style={{width:'100%'}}>
-              {jorikInTeam?'🚫 Wacht tot Jorik weg is':`🎬 Video opnemen of kiezen (+${WEDDING_VIDEO_BONUS} pts)`}
-            </button>
-          </>
-        )}
-        {(done||uploaded)&&(
+        {/* V41.10 — wedding video script. 11 chunks sized for a 4-5 person team
+            (~2-3 lines each). Numbered so team members can easily call out
+            "ik doe regel 5". Italic + serif feel suggests "this is the text to
+            speak", not UI chrome. */}
+        <div className="panel" style={{marginBottom:'var(--sp-4)',background:'linear-gradient(155deg,rgba(228,178,92,0.08),rgba(228,178,92,0.02))',borderColor:'rgba(228,178,92,0.30)'}}>
+          <div className="t-label" style={{color:'var(--accent-2)',marginBottom:'var(--sp-2)'}}>📝 Het script</div>
+          <ol style={{margin:0,paddingLeft:'var(--sp-5)',color:'#fff',fontSize:'var(--fs-14)',lineHeight:'1.65',fontStyle:'italic'}}>
+            <li style={{marginBottom:'var(--sp-2)'}}>"Lieve Jorik en Katinka,"</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"Vandaag is dé dag — de dag waarop jullie elkaar het ja-woord geven."</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"Wij willen jullie onwijs veel liefde, geluk en vooral heel veel gezonde jaren samen wensen, zodat jullie samen oud mogen worden."</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"En Jorik, laten we eerlijk zijn — die wilde haren ben je inmiddels wel kwijt."</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"Maar hé, wat je ervoor terug hebt gekregen is minstens zo indrukwekkend: een prachtige, glimmende bol, rechtstreeks uit de familiecollectie."</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"En gelukkig sta je er niet alleen voor."</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"Met Katinka heb je een prachtige, lieve en sterke vrouw aan je zijde."</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"We hopen dat deze dag alles wordt wat jullie ervan dromen — een dag vol liefde, plezier en herinneringen waar jullie nog heel vaak met een grote glimlach op terugkijken."</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"Namens ons allemaal: van harte gefeliciteerd met deze prachtige stap, en met het bezegelen van jullie liefde."</li>
+            <li style={{marginBottom:'var(--sp-2)'}}>"Laten we proosten op jullie — op een mooie toekomst samen."</li>
+            <li>"Cheers!" 🥂</li>
+          </ol>
+        </div>
+
+        {/* V41.10 — voortgang per ronde. 4 tickbare rounds matching Mike's
+            schedule (50min play + 30min bar). Each tick: irreversible (MVP —
+            DELETE on completed_challenges is RLS-blocked anyway). When the
+            4th tick lands, App-level useEffect fires the +50 pts bonus row. */}
+        <div className="panel" style={{marginBottom:'var(--sp-4)'}}>
+          <div className="row-between" style={{marginBottom:'var(--sp-3)'}}>
+            <div className="t-label" style={{color:'var(--accent-2)'}}>📍 Voortgang per ronde</div>
+            <div className="chip chip-gold" style={{fontWeight:'var(--fw-bold)'}}>{roundsDone.length}/4 ✓</div>
+          </div>
           <div className="stack-2">
-            <div className="panel-sm text-center t-success t-body-emph" style={{background:'rgba(95,216,165,0.1)',borderColor:'rgba(95,216,165,0.3)'}}>
-              ✅ Video opgenomen! Dankjewel!{retakeCount>0&&<div className="t-label-sm" style={{marginTop:4,opacity:0.8}}>· {retakeCount}× opnieuw gedaan</div>}
+            {[{n:1,label:'Ronde 1',time:'14:30 – 15:20'},{n:2,label:'Ronde 2',time:'15:50 – 16:40'},{n:3,label:'Ronde 3',time:'17:10 – 18:00'},{n:4,label:'Ronde 4',time:'18:30 – 19:20'}].map(r=>(
+              <RoundRow key={r.n} r={r} ticked={roundsDone.includes(r.n)}
+                jorikInTeam={jorikInTeam} ask={ask}
+                onUploadTake={onUploadTake} onTickRound={onTickRound}/>
+            ))}
+          </div>
+        </div>
+
+        {/* Bonus award celebration banner */}
+        {bonusAwarded&&(
+          <div className="panel" style={{marginBottom:'var(--sp-4)',background:'linear-gradient(155deg,rgba(228,178,92,0.18),rgba(228,178,92,0.05))',borderColor:'rgba(228,178,92,0.55)'}}>
+            <div className="text-center" style={{padding:'var(--sp-2)'}}>
+              <div style={{fontSize:36,marginBottom:'var(--sp-2)'}}>🏆</div>
+              <div className="t-body-emph" style={{color:'var(--accent-2)'}}>Bruiloftsmissie compleet!</div>
+              <div className="t-caption t-muted" style={{marginTop:4}}>+{WEDDING_VIDEO_BONUS} pts toegevoegd aan jullie team-score</div>
             </div>
-            {/* V18: retake button — new take replaces the previous; no extra points */}
-            <input ref={retakeRef} type="file" accept="video/*" style={{display:'none'}}
-              onChange={e=>{if(e.target.files[0]){setRetakeCount(c=>c+1);setRetakeAck(true);setTimeout(()=>setRetakeAck(false),2500)}}}/>
-            {retakeAck&&(
-              <div className="panel-sm text-center t-success t-label" style={{background:'rgba(95,216,165,0.12)',borderColor:'rgba(95,216,165,0.4)',animation:'pulseGlow 0.4s ease-out'}}>
-                ✨ Nieuwe opname vervangen!
-              </div>
-            )}
-            <button className="btn btn-ghost btn-sm"
-              onClick={async()=>{if(jorikInTeam)return;if(await ask('Nieuwe opname vervangt de vorige (geen extra punten). Doorgaan?',{confirmLabel:'Opnieuw opnemen'}))retakeRef.current?.click()}}
-              disabled={jorikInTeam} style={{width:'100%'}}>
-              {jorikInTeam?'🚫 Wacht tot Jorik weg is':'🔁 Nieuwe opname maken'}
-            </button>
-            <div className="t-caption t-muted text-center">Je hebt de punten al verdiend · opnieuw opnemen geeft geen bonus</div>
+          </div>
+        )}
+
+        {/* Sharing reminder — only when team has ticked but not uploaded */}
+        {roundsDone.length>0&&(
+          <div className="panel-sm" style={{marginBottom:'var(--sp-4)',background:'rgba(110,163,255,0.06)',borderColor:'rgba(110,163,255,0.25)',padding:'var(--sp-3)'}}>
+            <div className="t-caption" style={{color:'var(--text-secondary)',lineHeight:'var(--lh-relaxed)'}}>
+              📤 <b>Geüploade takes</b> komen automatisch bij Mike terecht. Heb je alleen afgevinkt zonder upload? Deel die video's na het spel met Mike via WhatsApp of AirDrop.
+            </div>
           </div>
         )}
 
