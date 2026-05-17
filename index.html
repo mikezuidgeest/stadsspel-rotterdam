@@ -845,6 +845,14 @@ const GPS_GATE_BYPASS=TEST_MODE;
 const TASKLIST_NEARBY_ONLY=true;
 const TASKLIST_NEARBY_N=3;
 
+// V41.7 — admin login whitelist (Mike-only by his choice). Email match is
+// case-insensitive; password is the shared secret reused from the ?admin= URL
+// token. NOT real auth — view-source exposes the password; same security model
+// as the URL token. Adding a second admin = append an object here.
+const ADMIN_USERS=[
+  {email:'m.h.zuidgeest@gmail.com',pw:'vriendvanjorik'},
+];
+
 // V25 (#71): Two-radius task discovery UX.
 // PREVIEW_RADIUS — "getting warm" band. Task is close enough to plan a path to.
 // UNLOCK_RADIUS  — "you're here" band. Challenge copy + CTAs communicate actionable state.
@@ -1061,7 +1069,7 @@ const L_DATA=[
   // the UI hides from Jorik-team/Jorik-device so the L_DATA description itself is innocent.
   {t:"video",ti:"De Verklaring",d:"Hele team in een rij op de bordes-trappen van de Schouwburg. Captain centraal, theatraal: 'Beste Rotterdammers… wij hebben grote vreugde te delen!' De rest valt in koor in met 'VOOR! DE! LIEFDE!' — elk woord een vuist omhoog. Iedereen in beeld, gefilmd van onderaan, Schouwburg achter het team. Min. 20 sec.",p:35,df:"hard",wp:1,wpInstruction:"📹 Voor de bruiloftsedit — kies je shot zo dat Jorik niet meeluistert. Pak iemand om de hoek, film discreet."}
 ]},
-{id:42,n:"Westersingel",la:51.915413,lo:4.474159,e:"🦆",c:"park",r:20,ch:[{t:"photo",ti:"Verrassings-vagijn",d:"Ergens langs de kade van de Westersingel zit een verborgen keramieken kunstwerkje in de muur — vlak boven het water. Hints: 'Als het water te hoog komt sluiten de kleppen. Het water staat tot aan mijn lippen.' Vind het. Maak een foto als bewijs dat jullie pussy-radar nog werkt. Het kunstwerk moet duidelijk herkenbaar in beeld zijn.",p:40,df:"hard"}]},
+{id:42,n:"Westersingel",la:51.919950,lo:4.472100,e:"🦆",c:"park",r:30,ch:[{t:"photo",ti:"Verrassings-vagijn",d:"Op de kade van de Westersingel ter hoogte van de Pauluskerk zit een verborgen keramieken kunstwerkje in de muur — vlak boven het water. Hints: 'Als het water te hoog komt sluiten de kleppen. Het water staat tot aan mijn lippen.' Vind het. Maak een foto als bewijs dat jullie pussy-radar nog werkt. Het kunstwerk moet duidelijk herkenbaar in beeld zijn.",p:40,df:"hard"}]},
 {id:43,n:"Noordereiland",la:51.913124,lo:4.494546,e:"🏘️",c:"neighborhood",r:20,ch:[{t:"photo",ti:"Zwaan in Zicht",d:"Maak een epische teamfoto op het Noordereiland met de Erasmusbrug — De Zwaan — op de achtergrond. Team in sterke formatie, brug groot en herkenbaar in beeld. Maak er iets moois van: dit is ver reizen waard. Allemaal in beeld.",p:45,df:"medium"}]},
 {id:44,n:"Wilhelminapier",la:51.905742,lo:4.487774,e:"🏙️",c:"landmark",r:20,ch:[{t:"photo",ti:"De Rotterdam van Onder",d:"Ga voor De Rotterdam op de Wilhelminapier staan — het kolossale gebouw van Rem Koolhaas. Maak een selfie van recht onder naar boven: telefoon omlaag, camera omhoog, heel team in beeld. De gevel rijst massief boven jullie uit. Zorg dat iedereen erop staat.",p:25,df:"medium"}]},
 {id:45,n:"KPN Toren",la:51.907179,lo:4.489141,e:"📡",c:"architecture",r:20,ch:[{t:"quiz",ti:"KPN Toren Quiz",d:"Wie ontwierp de KPN Toren op de Kop van Zuid?",a:"Renzo Piano",o:["Renzo Piano","Rem Koolhaas","Norman Foster","Piet Blom"],p:15,df:"easy"}]},
@@ -1684,10 +1692,25 @@ function App(){
   // V22 audit fix: dropped the ?admin=true legacy fallback — the app URL is shared in
   // a group chat, and "?admin=true" is the first thing a curious player would try.
   // With only the Dutch-phrase token, accidental admin escalation by a player is ~0.
-  const[isAdmin]=useState(()=>{
+  // V41.7: persisted email login. Mike asked for an admin login on splash so he
+  // doesn't have to remember the URL-token. ADMIN_USERS holds the whitelist
+  // (email + shared password). Successful login writes ssr_admin='1' to
+  // localStorage so admin survives reload. The URL token still works as a
+  // noodingang. Security ceiling unchanged: shared secret in view-source JS.
+  const[isAdmin,setIsAdmin]=useState(()=>{
     const v=new URLSearchParams(window.location.search).get('admin');
-    return v==='vriendvanjorik';
+    if(v==='vriendvanjorik')return true;
+    try{return localStorage.getItem('ssr_admin')==='1';}catch(e){return false;}
   });
+  const[loginOpen,setLoginOpen]=useState(false);
+  const loginAsAdmin=React.useCallback(()=>{
+    try{localStorage.setItem('ssr_admin','1');}catch(e){}
+    setIsAdmin(true);
+  },[]);
+  const logoutAdmin=React.useCallback(()=>{
+    try{localStorage.removeItem('ssr_admin');}catch(e){}
+    setIsAdmin(false);
+  },[]);
   // V30 (Less-is-More): storyShown / storySeen / nextStory state removed along with
   // the NARRATIVE chapter-modal system. Nothing queues or shows story chapters any more.
   // V5 FEATURE 3: seen quiz tracking
@@ -3915,6 +3938,17 @@ function App(){
             )}
           </div>
         )}
+        {/* V41.7 — discreet admin login. Hidden when already admin (button
+            becomes redundant — chip in top-left + ⚙ on lobby/game already
+            signal admin state). Tap opens the login modal. */}
+        {!isAdmin&&(
+          <button onClick={()=>setLoginOpen(true)} type="button"
+            className="t-caption animate-in animate-in-6"
+            style={{position:'absolute',bottom:'calc(env(safe-area-inset-bottom, 0px) + var(--sp-4))',right:'var(--sp-5)',padding:'6px 10px',borderRadius:'var(--r-md)',background:'transparent',border:'1px solid rgba(228,178,92,0.25)',color:'var(--text-tertiary)',cursor:'pointer',fontSize:'var(--fs-11)',display:'flex',alignItems:'center',gap:6}}>
+            🔐 <span>Game Master</span>
+          </button>
+        )}
+        {loginOpen&&<AdminLogin onClose={()=>setLoginOpen(false)} onSuccess={()=>{loginAsAdmin();setLoginOpen(false);}}/>}
       </div>
     );
   }
@@ -3951,7 +3985,7 @@ function App(){
             <span style={{fontSize:16}}>⚙</span><span>Admin</span>
           </button>
         )}
-        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice}/>}
+        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
         {/* V33: lobby needs the confirm-dialog mount point too — without this,
             confirmAsync() sets `dialog` state but no DialogSheet renders to show
             it, so admin menu confirmations silently no-op from the lobby. */}
@@ -4083,7 +4117,7 @@ function App(){
           {reviewQueue.length>0&&<span style={{background:'#ff4444',color:'#fff',fontSize:10,fontWeight:800,padding:'2px 6px',borderRadius:9}}>{reviewQueue.length}</span>}
         </button>
       )}
-      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice}/>}
+      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
       {/* V20 P0: GPS denied / unavailable — was silent before; now a full-screen actionable modal.
           V34 (Hassan): updated iOS path to iOS 17/18 (in-Safari aA → Website-instellingen);
           added "what still works without GPS" so the modal doesn't oversell failure;
@@ -4375,7 +4409,7 @@ function App(){
         /* V30: jorikInTeam already passed to ChallengeSheet — the new wp:1 secrecy lock reads it. No call-site change needed beyond the existing prop. */}
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
-      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice}/>}
+      {showWedding&&<WeddingMission onClose={()=>setShowWedding(false)} onComplete={()=>{setWeddingDone(true);setShowWedding(false);completeChallenge(-1,0,WEDDING_VIDEO_BONUS);addActivity('Geheime bruiloftsvideo opgenomen! 🎬',WEDDING_VIDEO_BONUS)}} done={weddingDone} jorikInTeam={jorikInTeam} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
 
       {/* V19+: Jorik-specific missions — mirror of wedding, visible only when Jorik IS in team */}
       {/* V21: pos + barBreakActive passed so the panel can curate by context (loc-tagged + bar-only missions).
@@ -6003,7 +6037,68 @@ function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClos
 // and Resume are broadcast-only (signal to teams, no scoring halt). Reset goes
 // to the lobby (DB intact). Hernieuw spel runs the full wipe + splash flow.
 // ═══════════════════════════════════════════
-function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync,promptAsync,jorikDeviceId=null,isJorikDevice=false,onMarkJorikDevice}){
+// V41.7 — AdminLogin modal. Splash-only entry point for Mike (and any future
+// co-host added to ADMIN_USERS). On success the caller writes ssr_admin='1' to
+// localStorage and flips the App's isAdmin state. Closing without submitting
+// is a no-op. Matches DialogSheet visual style (sheet-overlay + centered card).
+function AdminLogin({onClose,onSuccess}){
+  const[email,setEmail]=useState('');
+  const[pw,setPw]=useState('');
+  const[err,setErr]=useState('');
+  const emailRef=React.useRef(null);
+  React.useEffect(()=>{const t=setTimeout(()=>emailRef.current&&emailRef.current.focus(),60);return()=>clearTimeout(t);},[]);
+  const tryLogin=()=>{
+    const e=(email||'').trim().toLowerCase();
+    const match=ADMIN_USERS.find(u=>u.email.toLowerCase()===e&&u.pw===pw);
+    if(match){onSuccess&&onSuccess();}
+    else{setErr('E-mail of wachtwoord klopt niet.');setPw('');}
+  };
+  return(
+    <>
+      <div className="sheet-overlay" onClick={onClose} role="presentation" style={{zIndex:12000}}/>
+      <div role="dialog" aria-modal="true" aria-label="Inloggen als Game Master"
+        style={{position:'fixed',inset:0,display:'flex',alignItems:'center',justifyContent:'center',padding:'var(--sp-5)',zIndex:12001,pointerEvents:'none'}}>
+        <div onClick={e=>e.stopPropagation()}
+          style={{pointerEvents:'auto',width:'min(420px,100%)',background:'linear-gradient(180deg,#161821 0%,var(--bg) 100%)',border:'1px solid rgba(228,178,92,0.35)',borderRadius:'var(--r-lg)',padding:'var(--sp-5)',boxShadow:'0 24px 60px rgba(0,0,0,0.6)',animation:'fadeInUp 0.22s var(--ease-out)'}}>
+          <div className="row-between" style={{marginBottom:'var(--sp-4)'}}>
+            <div>
+              <div className="t-label t-accent">🔐 Game Master</div>
+              <div className="t-section" style={{marginTop:'var(--sp-1)'}}>Inloggen</div>
+            </div>
+            <button onClick={onClose} aria-label="Sluit"
+              style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',fontSize:18}}>×</button>
+          </div>
+          <div className="stack-3">
+            <label className="t-label-sm" style={{color:'var(--text-secondary)'}}>E-mail</label>
+            <input ref={emailRef} type="email" autoComplete="email" inputMode="email" value={email}
+              onChange={e=>{setEmail(e.target.value);if(err)setErr('');}}
+              onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();tryLogin();}}}
+              placeholder="bijv. m.h.zuidgeest@gmail.com"
+              style={{width:'100%',padding:'10px 12px',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:'var(--fs-14)'}}/>
+            <label className="t-label-sm" style={{color:'var(--text-secondary)',marginTop:'var(--sp-2)'}}>Wachtwoord</label>
+            <input type="password" autoComplete="current-password" value={pw}
+              onChange={e=>{setPw(e.target.value);if(err)setErr('');}}
+              onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();tryLogin();}}}
+              placeholder="••••••••"
+              style={{width:'100%',padding:'10px 12px',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:'var(--fs-14)'}}/>
+            {err&&<div role="alert" className="t-caption" style={{color:'var(--video-2)',marginTop:'var(--sp-1)'}}>{err}</div>}
+          </div>
+          <div className="row-between" style={{marginTop:'var(--sp-5)',gap:'var(--sp-3)'}}>
+            <button onClick={onClose} type="button"
+              className="btn btn-ghost" style={{flex:1}}>Annuleer</button>
+            <button onClick={tryLogin} type="button"
+              className="btn btn-gold" style={{flex:1}} disabled={!email||!pw}>Inloggen</button>
+          </div>
+          <div className="t-caption t-muted" style={{textAlign:'center',marginTop:'var(--sp-3)',lineHeight:'var(--lh-relaxed)'}}>
+            Alleen voor de Game Master. Spelers tikken op "Speel mee" hierboven.
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync,promptAsync,jorikDeviceId=null,isJorikDevice=false,onMarkJorikDevice,onLogout}){
   const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
   const askInput=promptAsync||((msg,def)=>Promise.resolve(window.prompt(msg,def)));
   if(!open)return null;
@@ -6172,6 +6267,27 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
               </button>
             )}
           </Section>
+
+          {/* V41.7 — admin uitloggen. Clear ssr_admin localStorage flag + flip
+              isAdmin back to false. Doesn't sign out from URL-token sessions
+              (page reload with the token would re-elevate). */}
+          {onLogout&&(
+            <Section title="Sessie">
+              <button onClick={async()=>{
+                const ok=await ask('Uitloggen als Game Master? Je telefoon valt terug naar speler-modus. Je kunt opnieuw inloggen via 🔐 op de splash.',{confirmLabel:'Uitloggen'});
+                if(!ok)return;
+                onLogout();
+                onClose();
+              }}
+                className="btn btn-ghost" style={{width:'100%',justifyContent:'flex-start',gap:'var(--sp-3)'}}>
+                <span style={{fontSize:20}}>🚪</span>
+                <div style={{textAlign:'left',flex:1}}>
+                  <div className="t-body-emph">Uitloggen</div>
+                  <div className="t-caption t-muted">Terug naar speler-modus op deze telefoon</div>
+                </div>
+              </button>
+            </Section>
+          )}
 
           <div className="t-caption t-muted" style={{textAlign:'center',padding:'var(--sp-3)',lineHeight:'var(--lh-relaxed)'}}>
             Voor een schema-wipe (incl. tabellen die de UI niet kent): draai <code>SUPABASE-V23-RESET.sql</code> in de Supabase SQL editor.<br/>
