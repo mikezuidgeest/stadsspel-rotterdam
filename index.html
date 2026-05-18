@@ -853,6 +853,19 @@ const ADMIN_USERS=[
   {email:'m.h.zuidgeest@gmail.com',pw:'vriendvanjorik'},
 ];
 
+// V41.12 — bar break locations for 6 juni 2026 gameday. DECOUPLED from L_DATA:
+// these bars are NOT playable POIs (no map markers, no challenges), they only
+// populate the admin's bar-break dropdown so Mike can trigger the right break
+// with one tap. Schema mirrors L_DATA POI shape so the dropdown render code
+// reads them uniformly. Coordinates cross-checked via PDOK BAG + OSM + each
+// venue's own website (see ./tests/ agent reports). Order matches Mike's
+// schedule: Bar 1 at 15:20-15:50, Bar 2 at 16:40-17:10, Bar 3 at 18:00-18:30.
+const BAR_BREAKS=[
+  {id:'bar1',n:'Proeflokaal Reijngoud',la:51.91646,lo:4.48039,e:'🍺',address:'Schiedamse Vest 148'},
+  {id:'bar2',n:'Thoms Stadsbrouwerij',  la:51.922624,lo:4.480989,e:'🍻',address:'Halvemaanpassage 1'},
+  {id:'bar3',n:'Biergarten',           la:51.925423,lo:4.476304,e:'🥂',address:'Schiestraat 18'},
+];
+
 // V25 (#71): Two-radius task discovery UX.
 // PREVIEW_RADIUS — "getting warm" band. Task is close enough to plan a path to.
 // UNLOCK_RADIUS  — "you're here" band. Challenge copy + CTAs communicate actionable state.
@@ -1407,7 +1420,11 @@ function defaultBarMinis(_barName,_startedAt){
 
 // V12: bar POIs for the admin dropdown (derived from L_DATA at runtime; fallback list here)
 function getBarOptions(){
-  return L_DATA.filter(l=>l.c==='bar').map(l=>({name:l.n,emoji:l.e,id:l.id}));
+  // V41.12 — sourced from BAR_BREAKS const (the 3 gameday bars), not L_DATA.
+  // Decoupled so the bars don't render as playable POIs on the map. POI 89
+  // De Pelgrim still exists as a regular L_DATA bar-category POI (it has a
+  // real quiz challenge); but the 3 scheduled break bars are admin-only.
+  return BAR_BREAKS.map(b=>({name:b.n,emoji:b.e,id:b.id,address:b.address}));
 }
 
 // ═══════════════════════════════════════════
@@ -3356,9 +3373,15 @@ function App(){
     setBarBreak({name:barName,time:startedAt});
     if(!OFFLINE&&sb){
       sb.from('game_state').update({bar_break_active:barName,bar_break_started_at:new Date(startedAt).toISOString()}).eq('id',1).then(()=>{},()=>{});
+      // V41.12 — append address to the broadcast so teams know WHERE to walk.
+      // Lookup is name-based (the dropdown sends the bar's name string). Falls
+      // back gracefully for the "✏️ Eigen naam typen…" custom path (no match
+      // in BAR_BREAKS → empty addr suffix, original message preserved).
+      const barMeta=BAR_BREAKS.find(b=>b.n===barName);
+      const addr=barMeta&&barMeta.address?` (${barMeta.address})`:'';
       sb.from('activity_feed').insert({
         team_id:null, team_name:'Game Master', team_emoji:'🍻', team_color:'#d4a054',
-        message:`🍺 BAR BREAK → ${barName}! Alle teams naar deze locatie.`,
+        message:`🍺 BAR BREAK → ${barName}${addr}! Alle teams naar deze locatie.`,
         points:0, created_at:new Date().toISOString(),
       });
 
@@ -6664,7 +6687,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
                   className="t-body-emph"
                   style={{flex:1,padding:'var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:'var(--fs-13)',outline:'none'}}>
                   <option value="">— kies een bar —</option>
-                  {barOptions.map(b=><option key={b.id} value={b.name}>{b.emoji} {b.name}</option>)}
+                  {barOptions.map(b=><option key={b.id} value={b.name}>{b.emoji} {b.name}{b.address?` · ${b.address}`:''}</option>)}
                   <option value="__custom">✏️ Eigen naam typen…</option>
                 </select>
                 <button disabled={!barChoice||(barChoice==='__custom'&&!barCustom.trim())} onClick={()=>{const n=barChoice==='__custom'?barCustom.trim():barChoice;if(n){onTriggerBarBreak&&onTriggerBarBreak(n);setBarChoice('');setBarCustom('')}}}
