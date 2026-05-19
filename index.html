@@ -154,7 +154,7 @@
     .btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;pointer-events:none}
     /* V18 (§2.7): 44px min tap target (WCAG 2.5.5 AAA baseline) */
     .btn-sm{padding:var(--sp-2) var(--sp-4);min-height:44px;font-size:var(--fs-13)}
-    .btn-lg{padding:var(--sp-5) var(--sp-7);min-height:60px;font-size:var(--fs-17);font-weight:var(--fw-bold)}
+    .btn-lg{padding:var(--sp-4) var(--sp-5);min-height:60px;font-size:var(--fs-17);font-weight:var(--fw-bold);white-space:normal;line-height:1.25;text-align:center}
     /* V18 (§2.7): keyboard focus ring — visible on Tab but not on mouse click */
     .btn:focus-visible,.chip:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;box-shadow:0 0 0 4px rgba(228,178,92,0.18)}
 
@@ -4361,8 +4361,10 @@ function App(){
           added "what still works without GPS" so the modal doesn't oversell failure;
           the "Doorgaan zonder GPS" button now sets gpsOptOut+stops watchPosition so the
           modal doesn't re-fire in a flicker loop; renamed "Probeer opnieuw" to be honest
-          about what the user must do first on iOS (re-prompt only fires after Settings change). */}
-      {(gpsStatus==='denied'||gpsStatus==='unavailable')&&!gpsOptOut&&(
+          about what the user must do first on iOS (re-prompt only fires after Settings change).
+          V41.14: skipped entirely when effectiveTestMode is on — in test mode GPS gates
+          are bypassed so blocking the whole screen for OS-level GPS denial is just noise. */}
+      {(gpsStatus==='denied'||gpsStatus==='unavailable')&&!gpsOptOut&&!effectiveTestMode&&(
         <div className="sheet-overlay" style={{zIndex:10000}}>
           <div className="sheet" style={{background:'linear-gradient(180deg,#3a0e0e 0%,var(--bg) 100%)',position:'fixed',left:'50%',top:'50%',transform:'translate(-50%,-50%)',maxWidth:440,width:'92%',maxHeight:'88vh',overflowY:'auto'}} role="alertdialog" aria-live="assertive" aria-labelledby="gps-error-title">
             <div style={{textAlign:'center',marginBottom:'var(--sp-4)'}}>
@@ -4409,9 +4411,15 @@ function App(){
               </div>
             )}
 
+            {/* V41.14 — shortened button labels (the original descriptive copy
+                overflowed the button on iPhone 13 width). Caption explains the
+                "probeer opnieuw na Instellingen-aanpassing" requirement above. */}
+            <div className="t-caption t-muted" style={{textAlign:'center',marginBottom:'var(--sp-3)',lineHeight:'var(--lh-relaxed)'}}>
+              Pas eerst de instellingen aan (zie hierboven) — dan opnieuw proberen.
+            </div>
             <div className="stack-2">
               <button className="btn btn-cyan btn-lg" onClick={()=>{setGpsStatus('weak');setGpsErrorSeen(null);setGpsOptOut(false);wakeGps()}} style={{width:'100%'}}>
-                🔁 Ik heb het in Instellingen aangezet — probeer opnieuw
+                🔁 Opnieuw proberen
               </button>
               <button className="btn btn-ghost" onClick={()=>{
                 // V34 P0 fix: stop the geolocation watcher AND set opt-out so the
@@ -4422,7 +4430,7 @@ function App(){
                 setGpsStatus('weak');
                 setGpsErrorSeen(null);
               }} style={{width:'100%'}}>
-                Doorgaan zonder GPS — quizzes & feed werken nog
+                Doorgaan zonder GPS
               </button>
             </div>
           </div>
