@@ -19,7 +19,7 @@
       --border:rgba(255,255,255,0.08);
       --border-strong:rgba(255,255,255,0.14);
       --text-primary:rgba(255,255,255,0.96);
-      --text-secondary:rgba(255,255,255,0.62);
+      --text-secondary:rgba(255,255,255,0.72);
       --text-tertiary:rgba(255,255,255,0.55);
       /* V13: richer accent — warmer gold + complementary hues */
       --accent:#e4b25c;
@@ -46,6 +46,11 @@
       --ls-tight:-0.035em;--ls-snug:-0.02em;--ls-normal:-0.01em;--ls-wide:0.04em;--ls-wider:0.08em;--ls-widest:0.14em;
       /* V15: line height */
       --lh-tight:1.1;--lh-snug:1.25;--lh-normal:1.5;--lh-relaxed:1.65;
+
+      /* V41.14 — decorative emoji icon scale. Use these for all "icon"-style
+         emoji so vertical rhythm stays consistent. Body emoji (inside sentence)
+         stays at inherited fs-N; these are for emoji-as-affordance. */
+      --icon-xs:20px;--icon-sm:28px;--icon-md:40px;--icon-lg:56px;--icon-hero:96px;
 
       /* V13: radius scale */
       --r-xs:8px;--r-sm:12px;--r-md:16px;--r-lg:22px;--r-xl:28px;--r-2xl:36px;--r-pill:999px;
@@ -165,6 +170,23 @@
     @keyframes chipPulse{0%{box-shadow:0 0 0 0 rgba(95,216,165,0.55)}70%{box-shadow:0 0 0 8px rgba(95,216,165,0)}100%{box-shadow:0 0 0 0 rgba(95,216,165,0)}}
     .chip-role{background:linear-gradient(135deg,rgba(155,123,234,0.18),rgba(110,163,255,0.08));border:1px solid rgba(155,123,234,0.4);color:#cdb6ff;font-weight:700}
     .chip-count{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text-primary);font-variant-numeric:tabular-nums;font-weight:800;padding:5px 10px}
+    /* V41.14 — micro-chip for inline labels (SYSTEEM / JIJ / team member names).
+       Replaces five near-identical inline padding recipes (2px 7-8px) across the app. */
+    .chip-xs{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);font-size:10px;font-weight:700;color:var(--text-secondary);letter-spacing:0.02em;line-height:1.5}
+    /* V41.14 — canonical danger badge for queue depths (Beoordeel review count etc.).
+       Replaces four near-identical recipes (#ff4444 vs rgba(255,68,68,0.95) etc.).
+       Pure red, tabular-nums, fixed 9px radius matching the existing in-the-wild pattern. */
+    .badge-count{background:#ff4444;color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:9px;line-height:1.4;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center;min-width:18px}
+    /* V41.14 — canonical modal close button. 44×44 WCAG, circular, high-contrast.
+       Replaces 3 different recipes in ChallengeSheet/AdminMenu/AdminLogin/PhotoLightbox. */
+    .btn-close{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s ease,transform .12s ease}
+    .btn-close:hover{background:rgba(255,255,255,0.14)}
+    .btn-close:active{transform:scale(0.94)}
+    /* V41.14 — canonical Game Master entry-point button. Used on splash/setup/lobby/game
+       (when user is NOT yet admin). Replaces 4 inline-styled variants. */
+    .btn-gm{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:var(--r-md);background:rgba(228,178,92,0.10);border:1px solid rgba(228,178,92,0.35);color:var(--accent-2);cursor:pointer;font-size:var(--fs-11);font-weight:var(--fw-bold);letter-spacing:0.02em;transition:background .15s ease}
+    .btn-gm:hover{background:rgba(228,178,92,0.16)}
+    .btn-gm:active{transform:scale(0.97)}
     /* V30 — accessibility: respect prefers-reduced-motion. Keeps state correctness;
        only kills decorative motion (pulses, confetti, shimmer) so users with
        motion-sickness settings aren't punished. WCAG 2.1 SC 2.3.3. */
@@ -426,7 +448,7 @@
     /* === V6 ADDITIONS === */
 
     /* V13: Photo gate */
-    .gate-blocked{margin-top:14px;padding:16px;border-radius:var(--r-lg);background:linear-gradient(155deg,rgba(255,107,107,0.1),rgba(255,107,107,0.03));border:1px solid rgba(255,107,107,0.25);display:flex;align-items:center;gap:12px;box-shadow:var(--sh-ring)}
+    .gate-blocked{margin-top:14px;padding:16px;border-radius:var(--r-md);background:linear-gradient(155deg,rgba(255,107,107,0.1),rgba(255,107,107,0.03));border:1px solid rgba(255,107,107,0.25);display:flex;align-items:center;gap:12px;box-shadow:var(--sh-ring)}
     .gate-icon{font-size:26px;filter:drop-shadow(0 2px 8px rgba(255,107,107,0.4))}
     .gate-text{flex:1;font-size:13px;color:var(--danger);font-weight:700}
     .gate-distance{font-family:var(--font-display);font-size:20px;font-weight:900;color:var(--danger);font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
@@ -4065,13 +4087,13 @@ function App(){
               aria-label so screen readers + hover-tooltip still get the verb. */}
           {muted?'🔇 Geluid uit':'🔊 Geluid aan'}
         </button>
-        <div style={{fontSize:96,animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
+        <div style={{fontSize:'var(--icon-hero)',animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
         <div style={{height:'var(--sp-6)'}}/>
         <h1 className="t-hero animate-in animate-in-1 text-center" style={{background:'linear-gradient(135deg,#ffffff 0%,var(--accent-2) 50%,var(--foto-2) 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Stadsspel</h1>
         <div className="t-label animate-in animate-in-2" style={{marginTop:'var(--sp-2)',letterSpacing:'0.5em'}}>Rotterdam</div>
         <div style={{height:'var(--sp-5)'}}/>
         <div className="t-caption animate-in animate-in-3 text-center">Jorik's Bachelor Party · 6 juni 2026 · 14:00 — 19:30</div>
-        <div className="t-body animate-in animate-in-4 text-center" style={{marginTop:'var(--sp-2)',color:'var(--quiz-2)',fontStyle:'italic'}}>"Laten we samen memorabele herinneringen maken — met een vleugje Italië en heel veel Jorik."</div>
+        <div className="t-body animate-in animate-in-4 text-center" style={{marginTop:'var(--sp-2)',color:'var(--quiz-2)',fontStyle:'italic'}}>"Laten we er samen een memorabele dag van maken — en Jorik is af en toe het haasje! 🐰"</div>
         <div style={{height:'var(--sp-8)'}}/>
         <button className="btn btn-gold btn-lg animate-in animate-in-5" onClick={()=>{
           const now=Date.now();if(now-tapGuardRef.current<250)return;tapGuardRef.current=now;
@@ -4117,8 +4139,9 @@ function App(){
             signal admin state). Tap opens the login modal. */}
         {!isAdmin&&(
           <button onClick={()=>setLoginOpen(true)} type="button"
-            className="t-caption animate-in animate-in-6"
-            style={{position:'absolute',bottom:'calc(env(safe-area-inset-bottom, 0px) + var(--sp-4))',right:'var(--sp-5)',padding:'6px 10px',borderRadius:'var(--r-md)',background:'transparent',border:'1px solid rgba(228,178,92,0.25)',color:'var(--text-tertiary)',cursor:'pointer',fontSize:'var(--fs-11)',display:'flex',alignItems:'center',gap:6}}>
+            aria-label="Inloggen als Game Master"
+            className="btn-gm animate-in animate-in-6"
+            style={{position:'absolute',bottom:'calc(env(safe-area-inset-bottom, 0px) + var(--sp-4))',right:'var(--sp-5)'}}>
             🔐 <span>Game Master</span>
           </button>
         )}
@@ -4145,8 +4168,8 @@ function App(){
             without retracing back to splash. Hidden when already admin. */}
         {!isAdmin&&(
           <button onClick={()=>setLoginOpen(true)} type="button"
-            aria-label="Inloggen als Game Master"
-            style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'6px 10px',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.35)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:6}}>
+            aria-label="Inloggen als Game Master" className="btn-gm"
+            style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500}}>
             🔐 <span>Game Master</span>
           </button>
         )}
@@ -4174,8 +4197,8 @@ function App(){
             as the ⚙ admin pill (mutually exclusive). */}
         {!isAdmin&&(
           <button onClick={()=>setLoginOpen(true)} type="button"
-            aria-label="Inloggen als Game Master"
-            style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'6px 10px',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.35)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:6}}>
+            aria-label="Inloggen als Game Master" className="btn-gm"
+            style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500}}>
             🔐 <span>Game Master</span>
           </button>
         )}
@@ -4199,19 +4222,19 @@ function App(){
         </div>
         {teamCount===0?(
           <div className="panel text-center" style={{borderStyle:'dashed'}}>
-            <div style={{fontSize:32,opacity:0.5}}>👥</div>
+            <div style={{fontSize:'var(--icon-sm)',opacity:0.5}}>👥</div>
             <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Nog geen teams — wacht tot iedereen joint</div>
           </div>
         ):(
           <div style={{display:'grid',gridTemplateColumns:teamCount>=3?'1fr 1fr':'1fr',gap:'var(--sp-3)'}}>
             {teams.map((t,i)=>(
               <div key={t.id||i} className="panel animate-in text-center" style={{animationDelay:`${i*0.08}s`,borderTop:`4px solid ${t.color}`,background:t.id===myTeam?.id?`linear-gradient(155deg,${t.color}22,${t.color}08)`:undefined,minHeight:148,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-start'}}>
-                <div style={{fontSize:40,filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.35))'}}>{t.emoji}</div>
+                <div style={{fontSize:'var(--icon-md)',filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.35))'}}>{t.emoji}</div>
                 <div className="t-card-title" style={{marginTop:'var(--sp-2)'}}>{t.name}</div>
                 {Array.isArray(t.members)&&t.members.length>0&&(
                   <div style={{display:'flex',flexWrap:'wrap',gap:'var(--sp-1)',justifyContent:'center',marginTop:'var(--sp-2)'}}>
                     {t.members.slice(0,4).map((m,idx)=>(
-                      <span key={idx} className="t-caption" style={{background:'rgba(255,255,255,0.06)',padding:'2px 8px',borderRadius:'var(--r-pill)',color:'var(--text-secondary)',fontWeight:'var(--fw-medium)'}}>{m}</span>
+                      <span key={idx} className="chip-xs">{m}</span>
                     ))}
                     {t.members.length>4&&<span className="t-caption" style={{padding:'2px 4px'}}>+{t.members.length-4}</span>}
                   </div>
@@ -4312,7 +4335,7 @@ function App(){
         <button onClick={()=>setAdminMenuOpen(true)} aria-label="Open admin menu"
           style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-pill)',background:'linear-gradient(135deg,rgba(228,178,92,0.95),rgba(212,160,84,0.95))',color:'#0a0b10',border:'1px solid rgba(255,255,255,0.4)',boxShadow:'0 4px 14px rgba(228,178,92,0.45)',cursor:'pointer',fontSize:'var(--fs-13)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
           <span style={{fontSize:16}}>⚙</span><span>Admin</span>
-          {reviewQueue.length>0&&<span style={{background:'#ff4444',color:'#fff',fontSize:10,fontWeight:800,padding:'2px 6px',borderRadius:9}}>{reviewQueue.length}</span>}
+          {reviewQueue.length>0&&<span className="badge-count">{reviewQueue.length}</span>}
         </button>
       )}
       {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin} testModeRuntime={testModeRuntime} buildTestMode={TEST_MODE} onSetTestMode={setTestModeFromAdmin}/>}
@@ -4321,8 +4344,8 @@ function App(){
           ChallengeSheet is open, same reason — would overlap the sheet's ✕. */}
       {!isAdmin&&selLoc==null&&(
         <button onClick={()=>setLoginOpen(true)} type="button"
-          aria-label="Inloggen als Game Master"
-          style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500,padding:'6px 10px',borderRadius:'var(--r-md)',background:'rgba(228,178,92,0.10)',border:'1px solid rgba(228,178,92,0.35)',color:'var(--accent-2)',cursor:'pointer',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',display:'flex',alignItems:'center',gap:6}}>
+          aria-label="Inloggen als Game Master" className="btn-gm"
+          style={{position:'fixed',top:'calc(env(safe-area-inset-top, 0px) + var(--sp-3))',right:'var(--sp-3)',zIndex:10500}}>
           🔐 <span>GM</span>
         </button>
       )}
@@ -4337,7 +4360,7 @@ function App(){
         <div className="sheet-overlay" style={{zIndex:10000}}>
           <div className="sheet" style={{background:'linear-gradient(180deg,#3a0e0e 0%,var(--bg) 100%)',position:'fixed',left:'50%',top:'50%',transform:'translate(-50%,-50%)',maxWidth:440,width:'92%',maxHeight:'88vh',overflowY:'auto'}} role="alertdialog" aria-live="assertive" aria-labelledby="gps-error-title">
             <div style={{textAlign:'center',marginBottom:'var(--sp-4)'}}>
-              <div style={{fontSize:56}}>📍🚫</div>
+              <div style={{fontSize:'var(--icon-lg)'}}>📍🚫</div>
               <h2 id="gps-error-title" className="t-title" style={{marginTop:'var(--sp-3)',color:'var(--video-2)'}}>
                 {gpsStatus==='denied'?'Locatie-toegang geweigerd':'GPS niet beschikbaar'}
               </h2>
@@ -4447,7 +4470,7 @@ function App(){
           onMouseDown={avatarLP.start} onMouseUp={avatarLP.cancel} onMouseLeave={avatarLP.cancel}
           onTouchStart={avatarLP.start} onTouchEnd={avatarLP.cancel} onTouchMove={avatarLP.cancel} onTouchCancel={avatarLP.cancel}
           style={{cursor:'pointer',display:'flex',alignItems:'center',gap:'var(--sp-3)',flex:1,minWidth:0,userSelect:'none',WebkitUserSelect:'none'}} title="Houd ingedrukt om team te verlaten">
-          <div style={{fontSize:28,filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.4))'}}>{myTeam?.emoji}</div>
+          <div style={{fontSize:'var(--icon-sm)',filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.4))'}}>{myTeam?.emoji}</div>
           <div style={{minWidth:0}}>
             <div className="t-card-label truncate">{myTeam?.name}</div>
             <div className="row-2" style={{marginTop:2,flexWrap:'wrap'}}>
@@ -4542,7 +4565,7 @@ function App(){
 
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
-        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} isJorikDevice={isJorikDevice}/>}
+        {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} isJorikDevice={isJorikDevice} confirmAsync={confirmAsync}/>}
         {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} gpsOptOut={gpsOptOut} gameStart={gameStart}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter} jorikTeamId={jorikTeamId} jorikInTeam={jorikInTeam} isJorikDevice={isJorikDevice}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} onRenameTeam={renameTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync} jorikVisitedTeamIds={jorikVisitedTeamIds} teamMemberCounts={teamMemberCounts} nowTs={nowTs}/>}
@@ -4712,7 +4735,7 @@ function App(){
         ].map(t=>(
           <button key={t.id} className={`tab-btn ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)} style={{position:'relative'}}>
             <span className="tab-icon">{t.icon}</span>{t.label}
-            {t.badge>0&&<span style={{position:'absolute',top:2,right:'25%',background:'#ff4444',color:'#fff',fontSize:9,fontWeight:800,padding:'2px 5px',borderRadius:9,minWidth:14,textAlign:'center',
+            {t.badge>0&&<span className="badge-count" style={{position:'absolute',top:2,right:'25%',
               // V23 (#50): pulse the Beoordeel badge for 3 s after a new photo_review INSERT.
               animation:(t.id==='review'&&(nowTs-reviewFlashTs)<3000&&reviewFlashTs>0)?'reviewPulse 0.8s ease-out 3':'none'
             }}>{t.badge}</span>}
@@ -5006,7 +5029,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
         </div>
       )}
       <div className="text-center">
-        <div style={{fontSize:64,filter:'drop-shadow(0 6px 16px rgba(228,178,92,0.35))'}}>💍</div>
+        <div style={{fontSize:'var(--icon-lg)',filter:'drop-shadow(0 6px 16px rgba(228,178,92,0.35))'}}>💍</div>
         <h1 className="t-title animate-in" style={{marginTop:'var(--sp-3)'}}>Kies je team</h1>
         <p className="t-body animate-in animate-in-1" style={{marginTop:'var(--sp-2)'}}>Tik op een starterpakket of maak je eigen · {activeTeamCount}/{MAX_TEAMS} teams</p>
       </div>
@@ -5136,7 +5159,7 @@ function TeamSetup({teams,setTeams,onJoin,isAdmin,promptAsync,confirmAsync,teamM
           understands their options. */}
       {mode==='custom'&&teamSlotsFull&&(
         <div className="panel text-center" style={{borderStyle:'dashed',borderColor:'rgba(228,178,92,0.3)',background:'rgba(228,178,92,0.04)'}}>
-          <div style={{fontSize:32}}>🔒</div>
+          <div style={{fontSize:'var(--icon-sm)'}}>🔒</div>
           <div className="t-card-label" style={{marginTop:'var(--sp-2)',color:'var(--accent-2)'}}>Geen ruimte voor een nieuw team</div>
           <div className="t-body" style={{marginTop:'var(--sp-2)',color:'var(--text-secondary)'}}>{MAX_TEAMS}/{MAX_TEAMS} teams zijn gevuld. Tik op een team hierboven om je aan te sluiten, of bekijk het spel als toeschouwer.</div>
           <button className="btn btn-ghost btn-sm" style={{marginTop:'var(--sp-3)'}} onClick={()=>setMode('quick')}>← Terug naar starterpakketten</button>
@@ -5320,7 +5343,7 @@ function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus,gpsOptOut=false}
     const headerSuffix=denied?'GPS uit':loadingGps?'…':rows.length;
     return(
       <section style={{marginTop:'var(--sp-5)'}}>
-        <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Dichtstbij je nu ({headerSuffix})</h3>
+        <h3 className="t-card-label" style={{margin:'0 0 var(--sp-3) 0'}}>🎯 Dichtstbij je nu ({headerSuffix})</h3>
         {denied&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,107,107,0.4)',borderRadius:'var(--r-md)',fontSize:13,color:'var(--video-2)',marginBottom:'var(--sp-3)'}}>{gpsOptOut?'📍 GPS staat uit (jij koos zonder GPS te spelen). Tik op de rode GPS-pil hierboven om opnieuw te proberen.':'📍🚫 Locatie geweigerd — schakel GPS in via je telefooninstellingen om de dichtstbijzijnde missies te zien.'}</div>}
         {loadingGps&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS-fix — zoekt nu je locatie. Een paar seconden geduld.</div>}
         {loadingGps&&[0,1,2].map(i=><SkeletonRow key={i}/>)}
@@ -5386,7 +5409,7 @@ function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus,gpsOptOut=false}
   };
   return(
     <section style={{marginTop:'var(--sp-5)'}}>
-      <h3 style={{margin:'0 0 var(--sp-3) 0',fontSize:15,letterSpacing:0.3,opacity:0.9}}>🎯 Alle missies</h3>
+      <h3 className="t-card-label" style={{margin:'0 0 var(--sp-3) 0'}}>🎯 Alle missies</h3>
       {!pos&&<div style={{padding:'var(--sp-3)',border:'1px dashed rgba(255,255,255,0.15)',borderRadius:'var(--r-md)',fontSize:13,opacity:0.7,marginBottom:'var(--sp-3)'}}>Nog geen GPS — zet locatie aan om afstanden te zien. Je kunt wel alvast door de lijst scrollen.</div>}
       {renderGroup('🎯 Nu te doen',groups.unlock,'unlock')}
       {renderGroup('🔥 In de buurt',groups.preview,'preview')}
@@ -5399,7 +5422,15 @@ function TaskList({pos,onSelect,completed,visitedLocs,gpsStatus,gpsOptOut=false}
 // ═══════════════════════════════════════════
 // LEADERBOARD VIEW (Primary tab)
 // ═══════════════════════════════════════════
-function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,pendingMine,completed,completedPts,visitedLocs,jorikMissionsDone,onShowJorikMissions,isJorikDevice=false}){
+function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam,jorikTeamId,jorikMovedAt,nowTs,weddingDone,onShowWedding,pendingMine,completed,completedPts,visitedLocs,jorikMissionsDone,onShowJorikMissions,isJorikDevice=false,confirmAsync}){
+  // V41.14 — info dialog helper. Reuses confirmAsync (the DialogSheet) with
+  // an OK-only flavour to replace native alert() (which broke dark-mode
+  // immersion with system chrome). Falls back to alert() if confirmAsync
+  // isn't wired (defensive — shouldn't happen post-V41 mount).
+  const showInfo=(msg)=>{
+    if(confirmAsync){confirmAsync(msg,{confirmLabel:'OK',cancelLabel:null});}
+    else{try{alert(msg);}catch(_){}}
+  };
   const sorted=[...teams].map(t=>({...t,score:scores[t.id]||0})).sort((a,b)=>b.score-a.score);
   // V9: own progress info — challenges done by my team (rough proxy for tier; we only have local 'completed' state)
   const myChallengesDone=completed?Object.values(completed).reduce((s,o)=>s+Object.keys(o).length,0):0;
@@ -5442,7 +5473,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 
       {/* V18 (§1.5.4): pending-review chip — one line, tap for detail */}
       {pendingMine>0&&(
-        <button type="button" onClick={()=>alert('Deze foto\'s zijn nog niet goedgekeurd door de game master. Je punten tellen voorlopig mee. Als een foto wordt afgekeurd, worden de punten afgetrokken.')}
+        <button type="button" onClick={()=>showInfo('Deze foto\'s zijn nog niet goedgekeurd door de game master. Je punten tellen voorlopig mee. Als een foto wordt afgekeurd, worden de punten afgetrokken.')}
           className="row-2"
           style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',border:'1px solid rgba(228,178,92,0.3)',borderRadius:'var(--r-pill)',background:'rgba(228,178,92,0.08)',width:'100%',cursor:'pointer',color:'#fff'}}>
           <span style={{fontSize:14}}>⏳</span>
@@ -5500,8 +5531,8 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
             const pts=completedPts&&completedPts[loc.id]?completedPts[loc.id][idx]:undefined;
             return pts!==undefined&&pts<=0;
           });
-          if(remaining.length===0){alert('🎬 Alle 4 wedding-video shots gefilmd! Op naar de bruiloft.');return;}
-          alert('🎬 Wedding-video missie — nog te doen:\n\n'+remaining.map(({loc,ch})=>`• ${loc.e} ${loc.n} · ${ch.ti}`).join('\n'));
+          if(remaining.length===0){showInfo('🎬 Alle 4 wedding-video shots gefilmd! Op naar de bruiloft.');return;}
+          showInfo('🎬 Wedding-video missie — nog te doen:\n\n'+remaining.map(({loc,ch})=>`• ${loc.e} ${loc.n} · ${ch.ti}`).join('\n'));
         };
         return(
           <button type="button" onClick={showRemaining}
@@ -5588,7 +5619,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
               <div className="lb-name" style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:'var(--sp-2)'}}>
                 <span>{t.name}</span>
                 {/* V18 (§1.5.6): "JIJ" chip with strong contrast (was dim "(jij)" suffix) */}
-                {isMine&&<span className="chip" style={{padding:'1px 7px',fontSize:'var(--fs-10)',fontWeight:'var(--fw-bold)',background:'var(--accent-glow)',borderColor:'var(--accent)',color:'var(--accent-2)'}}>JIJ</span>}
+                {isMine&&<span className="chip-xs" style={{background:'var(--accent-glow)',borderColor:'var(--accent)',color:'var(--accent-2)',fontWeight:'var(--fw-bold)'}}>JIJ</span>}
                 {teamTier&&(
                   <span className="tier-badge" style={{color:teamTier.color,borderColor:teamTier.color+'66'}}>
                     <span className="tier-emoji">{teamTier.badge}</span>{teamTier.name}
@@ -5607,9 +5638,10 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       })}
 
       {sorted.length===0&&(
-        <div style={{textAlign:'center',padding:40,color:'var(--text-tertiary)'}}>
-          <div style={{fontSize:48,marginBottom:16}}>🏆</div>
-          <div>Nog geen scores</div>
+        <div className="panel text-center" style={{padding:'var(--sp-7)',color:'var(--text-tertiary)'}}>
+          <div style={{fontSize:'var(--icon-md)',marginBottom:'var(--sp-3)'}}>🏆</div>
+          <div className="t-body">Nog geen scores</div>
+          <div className="t-caption t-muted" style={{marginTop:'var(--sp-1)'}}>De ranking vult zich vanzelf zodra teams missies voltooien.</div>
         </div>
       )}
 
@@ -6156,7 +6188,7 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikI
 
       {filtered.length===0&&(
         <div className="panel text-center" style={{padding:'var(--sp-7)'}}>
-          <div style={{fontSize:40}}>📢</div>
+          <div style={{fontSize:'var(--icon-md)'}}>📢</div>
           <div className="t-card-label" style={{marginTop:'var(--sp-3)'}}>Nog geen activiteit</div>
           {filter!=='all'&&<button className="btn btn-ghost btn-sm" onClick={()=>setFilter('all')} style={{marginTop:'var(--sp-4)'}}>Laat alles zien</button>}
         </div>
@@ -6179,8 +6211,8 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikI
               <div className="flex-1">
                 <div className="t-body-emph row-2" style={{flexWrap:'wrap'}}>
                   {item.team_name||'Systeem'}
-                  {isSystem&&<span className="chip chip-gold" style={{padding:'2px 8px',fontSize:'var(--fs-10)'}}>SYSTEEM</span>}
-                  {isMe&&!isSystem&&<span className="chip chip-blue" style={{padding:'2px 8px',fontSize:'var(--fs-10)'}}>JIJ</span>}
+                  {isSystem&&<span className="chip-xs" style={{background:'var(--accent-glow)',borderColor:'rgba(228,178,92,0.3)',color:'var(--accent)'}}>SYSTEEM</span>}
+                  {isMe&&!isSystem&&<span className="chip-xs" style={{background:'rgba(110,163,255,0.12)',borderColor:'rgba(110,163,255,0.3)',color:'var(--foto-2)'}}>JIJ</span>}
                 </div>
                 {/* V31 — opaque "[Geheime missie]" label for non-holders (synthesizer Fix #3).
                     The Jorik narrative depends on asymmetric info: holders see the missions,
@@ -6333,9 +6365,11 @@ function DialogSheet({type,msg,defaultVal,confirmLabel,cancelLabel,danger,onClos
             style={{width:'100%',padding:'12px 14px',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',fontFamily:'inherit',fontSize:'var(--fs-15)',marginBottom:'var(--sp-5)'}}/>
         )}
         <div style={{display:'flex',gap:'var(--sp-2)',justifyContent:'flex-end'}}>
-          <button type="button" onClick={onCancel}
-            className="btn btn-sm"
-            style={{background:'rgba(255,255,255,0.06)',color:'#fff',border:'1px solid var(--border)'}}>{cancelLabel||'Annuleer'}</button>
+          {/* V41.14 — cancelLabel:null = info dialog (no cancel button). Used
+              by showInfo() helper for OK-only acknowledgements. */}
+          {cancelLabel!==null&&(
+            <button type="button" onClick={onCancel} className="btn btn-ghost btn-sm">{cancelLabel||'Annuleer'}</button>
+          )}
           <button type="button" onClick={onOk}
             className={`btn btn-sm ${danger?'btn-danger':'btn-gold'}`}
             disabled={type==='prompt'&&!val.trim()}>{confirmLabel||'OK'}</button>
@@ -6380,8 +6414,7 @@ function AdminLogin({onClose,onSuccess}){
               <div className="t-label t-accent">🔐 Game Master</div>
               <div className="t-section" style={{marginTop:'var(--sp-1)'}}>Inloggen</div>
             </div>
-            <button onClick={onClose} aria-label="Sluit"
-              style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',fontSize:18}}>×</button>
+            <button onClick={onClose} aria-label="Sluit" className="btn-close" type="button">×</button>
           </div>
           <div className="stack-3">
             <label className="t-label-sm" style={{color:'var(--text-secondary)'}}>E-mail</label>
@@ -6444,7 +6477,7 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
         style={{width:'100%',display:'flex',alignItems:'center',gap:'var(--sp-3)',padding:'10px 12px',minHeight:44,borderRadius:'var(--r-md)',border:'1px solid',cursor:disabled?'default':'pointer',opacity:disabled?0.4:1,fontSize:'var(--fs-14)',fontWeight:'var(--fw-medium)',textAlign:'left',...variantStyle}}>
         <span style={{fontSize:18,flexShrink:0,width:22,textAlign:'center'}}>{icon}</span>
         <span style={{flex:1,minWidth:0,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{label}</span>
-        {badge!=null&&<span style={{background:'rgba(255,68,68,0.95)',color:'#fff',fontSize:10,fontWeight:800,padding:'2px 7px',borderRadius:9,flexShrink:0}}>{badge}</span>}
+        {badge!=null&&<span className="badge-count" style={{flexShrink:0}}>{badge}</span>}
       </button>
     );
   };
@@ -6457,8 +6490,7 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
               <div className="t-label t-accent">👑 Game Master</div>
               <div className="t-section" style={{marginTop:'var(--sp-1)'}}>Admin menu</div>
             </div>
-            <button onClick={onClose} aria-label="Sluit menu"
-              style={{padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',fontSize:18}}>×</button>
+            <button onClick={onClose} aria-label="Sluit menu" className="btn-close" type="button">×</button>
           </div>
 
           {/* Status snapshot */}
@@ -7002,7 +7034,7 @@ function AdminReviewView({queue,onApprove,onReject,onPhoto,teams=[],jorikTeamId=
 
       {queue.length===0&&(
         <div className="panel text-center" style={{padding:'var(--sp-7)'}}>
-          <div style={{fontSize:48}}>✅</div>
+          <div style={{fontSize:'var(--icon-md)'}}>✅</div>
           <div className="t-card-label" style={{marginTop:'var(--sp-3)'}}>Niets te beoordelen</div>
           <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Foto's verschijnen hier zodra teams ze indienen</div>
         </div>
@@ -7388,7 +7420,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
         <div className="sheet-handle"/>
         <div className="row-between" style={{alignItems:'flex-start',marginBottom:'var(--sp-3)'}}>
           <div>
-            <div style={{fontSize:32,marginBottom:'var(--sp-2)',filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.35))'}}>{loc.e}</div>
+            <div style={{fontSize:'var(--icon-sm)',marginBottom:'var(--sp-2)',filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.35))'}}>{loc.e}</div>
             <h2 className="t-section">{loc.n}</h2>
             <div className="row-2" style={{marginTop:'var(--sp-2)',flexWrap:'wrap'}}>
               <span className="chip chip-blue">{loc.c}</span>
@@ -7399,7 +7431,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
           </div>
           {/* V29 (§4): bigger, higher-contrast close button — circular pill
               so it reads as a button, not a dim glyph. Sits flush in corner. */}
-          <button onClick={onClose} aria-label="Sluiten" style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.14)',color:'#fff',fontSize:20,cursor:'pointer',width:40,height:40,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,flexShrink:0,marginLeft:'var(--sp-3)'}}>✕</button>
+          <button onClick={onClose} aria-label="Sluiten" className="btn-close" type="button" style={{marginLeft:'var(--sp-3)'}}>✕</button>
         </div>
         {/* V25 (#71): band-aware proximity panel — mini two-ring map + pill + copy */}
         <div style={{display:'flex',alignItems:'center',gap:'var(--sp-3)',padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.06)',marginBottom:'var(--sp-5)'}}>
@@ -7808,7 +7840,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
     const stakes=ch.df==='hard'?'⚡ Eén kans · hard — 4 opties · fout = 0 pts':ch.df==='medium'?'⚡ Eén kans · medium — fout = 0 pts':'⚡ Eén kans · easy — fout = 0 pts';
     return(
       <div style={{marginTop:'var(--sp-3)'}}>
-        <div className="t-body-emph t-danger" style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-sm)',background:'rgba(255,107,107,0.1)',border:'1px solid rgba(255,107,107,0.25)',marginBottom:'var(--sp-3)'}}>
+        <div className="t-body-emph t-danger" style={{padding:`var(--sp-2) var(--sp-3)`,borderRadius:'var(--r-md)',background:'rgba(255,107,107,0.1)',border:'1px solid rgba(255,107,107,0.25)',marginBottom:'var(--sp-3)'}}>
           {stakes}
         </div>
         {ch.o.map((opt,i)=>{
@@ -7970,7 +8002,7 @@ function RoundRow({r,ticked,jorikInTeam,onUploadTake,onTickRound,ask}){
       <div style={{display:'flex',gap:'var(--sp-2)'}}>
         <button onClick={()=>{if(jorikInTeam||uploading)return;inputRef.current&&inputRef.current.click();}}
           disabled={jorikInTeam||uploading} type="button"
-          className="btn btn-cyan btn-sm" style={{flex:1,minHeight:40}}>
+          className="btn btn-cyan btn-sm" style={{flex:1,minHeight:44}}>
           {uploading?'⏳ Uploaden…':ticked?'📹 Nog een take':'📹 Upload video'}
         </button>
         {!ticked&&!uploading&&(
@@ -7981,7 +8013,7 @@ function RoundRow({r,ticked,jorikInTeam,onUploadTake,onTickRound,ask}){
             }
           }}
           disabled={jorikInTeam} type="button"
-          className="btn btn-ghost btn-sm" style={{minHeight:40,whiteSpace:'nowrap'}}>
+          className="btn btn-ghost btn-sm" style={{minHeight:44,whiteSpace:'nowrap'}}>
             ✓ Alleen afvinken
           </button>
         )}
@@ -8023,7 +8055,7 @@ function WeddingMission({onClose,jorikInTeam,confirmAsync,isJorikDevice=false,ro
       <div className="sheet" style={{background:'linear-gradient(180deg,#1a0e30 0%,var(--bg) 100%)'}} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="sheet-handle"/>
         <div style={{textAlign:'center',marginBottom:'var(--sp-5)'}}>
-          <div style={{fontSize:56}}>🤫🎬</div>
+          <div style={{fontSize:'var(--icon-lg)'}}>🤫🎬</div>
           <h2 id="wedding-title" className="t-title" style={{marginTop:'var(--sp-3)',background:'linear-gradient(135deg,var(--quiz-2),var(--video-2))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Geheime missie</h2>
           <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Bruiloftsvideo voor Jorik</div>
         </div>
@@ -8032,7 +8064,7 @@ function WeddingMission({onClose,jorikInTeam,confirmAsync,isJorikDevice=false,ro
         {jorikInTeam&&(
           <div className="panel" style={{marginBottom:'var(--sp-4)',background:'linear-gradient(155deg,rgba(255,107,107,0.12),rgba(255,107,107,0.03))',borderColor:'rgba(255,107,107,0.35)'}}>
             <div className="row-3">
-              <div style={{fontSize:28}}>🚫</div>
+              <div style={{fontSize:'var(--icon-sm)'}}>🚫</div>
               <div className="flex-1">
                 <div className="t-card-label t-danger">Jorik is NU bij jullie team</div>
                 <div className="t-body" style={{marginTop:'var(--sp-1)'}}>Geen opnames tot hij weg is — anders verklap je de verrassing.</div>
@@ -8252,7 +8284,7 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
         {!jorikInTeam&&(
           <div className="panel" style={{marginBottom:'var(--sp-4)',background:'linear-gradient(155deg,rgba(255,107,107,0.12),rgba(255,107,107,0.03))',borderColor:'rgba(255,107,107,0.35)'}}>
             <div className="row-3">
-              <div style={{fontSize:28}}>🚫</div>
+              <div style={{fontSize:'var(--icon-sm)'}}>🚫</div>
               <div className="flex-1">
                 <div className="t-card-label t-danger">Jorik is nu bij een ander team</div>
                 <div className="t-body" style={{marginTop:'var(--sp-1)'}}>Wacht tot hij terug rouleert — reeds gescoorde punten blijven staan.</div>
