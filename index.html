@@ -201,6 +201,14 @@
     .skeleton-line.long{width:62%}
     .skeleton-line.short{width:38%;margin-top:6px}
     @keyframes breathing{0%,100%{opacity:0.6}50%{opacity:1}}
+    /* V41.13 — bar break map marker. Beer emoji in a gold disc with a
+       continuously expanding pulse ring so it draws eyes from across the map.
+       Active for the 30min window before each break + during the 30min break. */
+    .bar-break-marker{position:relative;width:48px;height:48px;pointer-events:auto;cursor:pointer}
+    .bar-break-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#e4b25c,#d4a054);border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 14px rgba(228,178,92,0.6);z-index:5}
+    .bar-break-pulse{position:absolute;top:50%;left:50%;width:48px;height:48px;border-radius:50%;border:3px solid rgba(228,178,92,0.85);transform:translate(-50%,-50%);animation:barBreakPulse 1.8s ease-out infinite}
+    .bar-break-pulse-2{position:absolute;top:50%;left:50%;width:48px;height:48px;border-radius:50%;border:3px solid rgba(228,178,92,0.55);transform:translate(-50%,-50%);animation:barBreakPulse 1.8s ease-out infinite;animation-delay:.9s}
+    @keyframes barBreakPulse{0%{transform:translate(-50%,-50%) scale(0.6);opacity:1}100%{transform:translate(-50%,-50%) scale(2.4);opacity:0}}
     /* V14: celebration animations */
     @keyframes confettiFall{0%{transform:translateY(-20vh) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
     @keyframes celebPop{0%{opacity:0;transform:translate(-50%,-50%) scale(0.4)}40%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
@@ -861,10 +869,14 @@ const ADMIN_USERS=[
 // venue's own website (see ./tests/ agent reports). Order matches Mike's
 // schedule: Bar 1 at 15:20-15:50, Bar 2 at 16:40-17:10, Bar 3 at 18:00-18:30.
 const BAR_BREAKS=[
-  {id:'bar1',n:'Proeflokaal Reijngoud',la:51.91646,lo:4.48039,e:'🍺',address:'Schiedamse Vest 148'},
-  {id:'bar2',n:'Thoms Stadsbrouwerij',  la:51.922624,lo:4.480989,e:'🍻',address:'Halvemaanpassage 1'},
-  {id:'bar3',n:'Biergarten',           la:51.925423,lo:4.476304,e:'🥂',address:'Schiestraat 18'},
+  {id:'bar1',n:'Proeflokaal Reijngoud',la:51.91646,lo:4.48039,e:'🍺',address:'Schiedamse Vest 148',startMin:50,endMin:80},   // 14:50–15:50 window (30m before + 30m break)
+  {id:'bar2',n:'Thoms Stadsbrouwerij',  la:51.922624,lo:4.480989,e:'🍻',address:'Halvemaanpassage 1', startMin:130,endMin:160},// 16:10–17:10 window
+  {id:'bar3',n:'Biergarten',           la:51.925423,lo:4.476304,e:'🥂',address:'Schiestraat 18',     startMin:210,endMin:240},// 17:30–18:30 window
 ];
+// startMin/endMin are minutes from GAME_START (14:00 local). The 30-minute
+// preview window before each break (15:20→14:50, 16:40→16:10, 18:00→17:30)
+// lets teams see a pulsing beer marker on the map so they know where to walk
+// next. Window stays visible through the 30-minute break itself, then disappears.
 
 // V25 (#71): Two-radius task discovery UX.
 // PREVIEW_RADIUS — "getting warm" band. Task is close enough to plan a path to.
@@ -1723,6 +1735,15 @@ function App(){
   const[jorikDeviceId,setJorikDeviceId]=useState(null);
   const myDeviceIdRef=useRef(getDeviceId());
   const isJorikDevice=jorikDeviceId!=null&&myDeviceIdRef.current===jorikDeviceId;
+  // V41.13 — runtime test-mode override. null = use build-time TEST_MODE const;
+  // true/false = explicit cross-device override stored in game_state.test_mode_active.
+  // Hydrated on mount + realtime sync + visibility refetch. Admin toggles via
+  // AdminMenu → "Test mode" section. Lets Mike flip the lobby-open + GPS bypass
+  // gates instantly without redeploying (e.g. mid-gameday test → live → test).
+  const[testModeRuntime,setTestModeRuntime]=useState(null);
+  const effectiveTestMode=testModeRuntime!==null?testModeRuntime:TEST_MODE;
+  const effectiveLobbyOpen=effectiveTestMode;
+  const effectiveGpsBypass=effectiveTestMode;
   // V20: set of team ids that have ALREADY held Jorik (per activity_feed markers).
   // Source: SELECT message FROM activity_feed WHERE message LIKE '[JORIK] team=%'.
   // Used by AdminReviewView to render "✅ al bezocht" badges and warn before a
@@ -2217,6 +2238,9 @@ function App(){
         if(typeof gs.jorik_device_id==='string'&&gs.jorik_device_id.length>0){
           setJorikDeviceId(gs.jorik_device_id);
         }
+        // V41.13: hydrate runtime test-mode override. Missing column (legacy DB)
+        // → undefined → stays at null → falls back to build-time TEST_MODE.
+        if(typeof gs.test_mode_active==='boolean')setTestModeRuntime(gs.test_mode_active);
         // V21 P1-fix #35: seed gmLastSeen from initial fetch too
         if(gs.gm_heartbeat){
           const hb=new Date(gs.gm_heartbeat).getTime();
@@ -2296,6 +2320,12 @@ function App(){
       if('jorik_device_id' in gs){
         const v=gs.jorik_device_id;
         setJorikDeviceId(typeof v==='string'&&v.length>0?v:null);
+      }
+      // V41.13: realtime sync of test-mode toggle. Use 'in gs' so explicit
+      // setting to null (revert to build-time default) also propagates.
+      if('test_mode_active' in gs){
+        const v=gs.test_mode_active;
+        setTestModeRuntime(typeof v==='boolean'?v:null);
       }
       if(gs.bar_break_active){
         // Someone (admin) started a bar break — show the overlay
@@ -2514,6 +2544,7 @@ function App(){
         // V37: pick up Jorik device id during catch-up too
         // V37.1: same null-propagation fix as the realtime UPDATE handler — accept null clears
         if('jorik_device_id' in gs){const v=gs.jorik_device_id;setJorikDeviceId(typeof v==='string'&&v.length>0?v:null);}
+        if('test_mode_active' in gs){const v=gs.test_mode_active;setTestModeRuntime(typeof v==='boolean'?v:null);}
         if(gs.gm_heartbeat){const t=new Date(gs.gm_heartbeat).getTime();if(!isNaN(t))setGmLastSeen(t);}
       },()=>{});
       // step 2 — teams: scores + spectator + underdog_bonus_last_break
@@ -3196,6 +3227,33 @@ function App(){
   // Every other client picks it up via the realtime subscription and starts
   // filtering wp:1 wedding-pipeline content for the device that matches.
   // `clear=true` unmarks (writes null), useful if Mike taps the wrong phone.
+  // V41.13 — admin toggle for runtime test mode. Writes a boolean to
+  // game_state.test_mode_active; all clients pick it up via realtime within
+  // ~1s and re-derive lobby + GPS gates accordingly. Pass null to revert to
+  // the build-time TEST_MODE const (useful for back-to-default).
+  const setTestModeFromAdmin=useCallback((newValue)=>{
+    if(!isAdmin)return;
+    setTestModeRuntime(newValue);
+    if(!OFFLINE&&sb){
+      sb.from('game_state').update({test_mode_active:newValue}).eq('id',1).then(({error})=>{
+        if(error){
+          const msg=String(error.message||'').toLowerCase();
+          if(msg.includes('test_mode_active')||error.code==='42703'){
+            setToast('⚠️ Database mist test_mode_active kolom — voer SUPABASE-V41.13-TESTMODE-RUNTIME.sql uit');
+            // Revert local optimistic flip so UI matches DB
+            setTestModeRuntime(null);
+          }else{
+            setToast('⚠️ Test-mode flip mislukt — probeer opnieuw');
+          }
+          return;
+        }
+        setToast(newValue===true?'🧪 Test mode AAN — drempels uit':newValue===false?'🚦 Test mode UIT — productie-drempels actief':'↩️ Test mode standaard hersteld');
+      });
+    }else{
+      setToast('🧪 Test mode lokaal aangepast (offline)');
+    }
+  },[isAdmin]);
+
   const markJorikDevice=useCallback((clear=false)=>{
     if(!isAdmin)return;
     const id=clear?null:myDeviceIdRef.current;
@@ -3977,7 +4035,7 @@ function App(){
     // narrow viewports. Now it's a full-width thin banner stacked under the
     // optional in-app-browser warning. GM chip stays as a left-floating chip;
     // mute toggle stays in top-right. No more visual overlap.
-    const stickyTopOffset=(isInAppBrowser?60:0)+(TEST_MODE?32:0);
+    const stickyTopOffset=(isInAppBrowser?60:0)+(effectiveTestMode?32:0);
     return(
       <div className="screen-hero">
         {isInAppBrowser&&(
@@ -3988,7 +4046,7 @@ function App(){
         {/* V23: TESTMODUS banner — visible whenever TEST_MODE is on. V37: was a
             chip competing with mute toggle for top-row space; now a full-width
             thin banner that doesn't collide with anything. */}
-        {TEST_MODE&&<div role="status" style={{position:'absolute',top:isInAppBrowser?60:0,left:0,right:0,padding:'6px 14px',background:'rgba(110,163,255,0.16)',borderBottom:'1px solid rgba(110,163,255,0.35)',color:'var(--foto-2)',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',textAlign:'center',letterSpacing:'0.05em',zIndex:4}}>🧪 GENERALE REPETITIE · ALLE DREMPELS UIT</div>}
+        {effectiveTestMode&&<div role="status" style={{position:'absolute',top:isInAppBrowser?60:0,left:0,right:0,padding:'6px 14px',background:'rgba(110,163,255,0.16)',borderBottom:'1px solid rgba(110,163,255,0.35)',color:'var(--foto-2)',fontSize:'var(--fs-11)',fontWeight:'var(--fw-bold)',textAlign:'center',letterSpacing:'0.05em',zIndex:4}}>🧪 GENERALE REPETITIE · ALLE DREMPELS UIT</div>}
         {isAdmin&&<div className="chip chip-gold animate-in" style={{position:'absolute',top:`calc(var(--sp-6) + ${stickyTopOffset}px)`,left:'var(--sp-6)'}}>👑 Game Master</div>}
         {/* V29 — mute toggle. Persists in localStorage; defaults to UNMUTED so first-load
             users hear the cues. Top-right placement keeps it discoverable but out of
@@ -4111,7 +4169,7 @@ function App(){
             <span style={{fontSize:16}}>⚙</span><span>Admin</span>
           </button>
         )}
-        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
+        {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>{setScreen('game');setTab('review');}} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin} testModeRuntime={testModeRuntime} buildTestMode={TEST_MODE} onSetTestMode={setTestModeFromAdmin}/>}
         {/* V41.7 — 🔐 GM trigger for non-admins on lobby, same top-right slot
             as the ⚙ admin pill (mutually exclusive). */}
         {!isAdmin&&(
@@ -4186,7 +4244,7 @@ function App(){
             "Game Master" framing; non-admin sees the "testmodus" framing so
             it's obvious this is the loosened build. Live behavior restored
             when TEST_MODE flips to false (LOBBY_OPEN_TO_ALL becomes false). */}
-        {(LOBBY_OPEN_TO_ALL||isAdmin)?(
+        {(effectiveLobbyOpen||isAdmin)?(
           <div className="stack-3">
             {/* V28: stripped the teamCount<2 confirmAsync gate. Admin = Mike; no
                 friction, no dialog that could get obscured by stacked overlays
@@ -4257,7 +4315,7 @@ function App(){
           {reviewQueue.length>0&&<span style={{background:'#ff4444',color:'#fff',fontSize:10,fontWeight:800,padding:'2px 6px',borderRadius:9}}>{reviewQueue.length}</span>}
         </button>
       )}
-      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin}/>}
+      {isAdmin&&<AdminMenu open={adminMenuOpen} onClose={()=>setAdminMenuOpen(false)} phase={phase} queueCount={reviewQueue.length} teamCount={teams.filter(t=>t.id>0).length} jorikTeamId={jorikTeamId} teams={teams} barBreakActive={barBreakActive} onPause={()=>{broadcastMessage('⏸️ PAUZE — iedereen stopt even met scores');setAdminMenuOpen(false);}} onResume={()=>{broadcastMessage('▶️ GO — verder spelen!');setAdminMenuOpen(false);}} onResetToLobby={()=>{resetGame();setAdminMenuOpen(false);}} onWipeAndRestart={wipeAndRestart} onStartFinalePhase={()=>{startFinalePhase();setAdminMenuOpen(false);}} onStartFinale={()=>{startFinale();setAdminMenuOpen(false);}} onGoReview={()=>setTab('review')} confirmAsync={confirmAsync} promptAsync={promptAsync} jorikDeviceId={jorikDeviceId} isJorikDevice={isJorikDevice} onMarkJorikDevice={markJorikDevice} onLogout={logoutAdmin} testModeRuntime={testModeRuntime} buildTestMode={TEST_MODE} onSetTestMode={setTestModeFromAdmin}/>}
       {/* V41.7 — 🔐 GM trigger for non-admins in game view, same top-right slot
           as the ⚙ admin pill (mutually exclusive). V41.9: also hidden while a
           ChallengeSheet is open, same reason — would overlap the sheet's ✕. */}
@@ -4485,7 +4543,7 @@ function App(){
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
         {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} isJorikDevice={isJorikDevice}/>}
-        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} gpsOptOut={gpsOptOut}/>}
+        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} gpsOptOut={gpsOptOut} gameStart={gameStart}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter} jorikTeamId={jorikTeamId} jorikInTeam={jorikInTeam} isJorikDevice={isJorikDevice}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} onRenameTeam={renameTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync} jorikVisitedTeamIds={jorikVisitedTeamIds} teamMemberCounts={teamMemberCounts} nowTs={nowTs}/>}
       </div>
@@ -4556,7 +4614,7 @@ function App(){
       {phase===5&&<FinaleScreen teams={teams} scores={scores} myTeam={myTeam} elapsed={elapsed} activityFeed={activityFeed} jorikTeamId={jorikTeamId}/>}
 
       {/* Bottom sheet for challenges */}
-      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam} isJorikDevice={isJorikDevice} confirmAsync={confirmAsync}/>
+      {selLoc!=null&&<ChallengeSheet loc={L_DATA.find(l=>l.id===selLoc)} pos={pos} completed={completed[selLoc]||{}} completedPts={completedPts[selLoc]||{}} onComplete={completeChallenge} onClose={()=>setSelLoc(null)} jorikInTeam={jorikInTeam} seenQuizzes={seenQuizzes} isAdmin={isAdmin} myTeam={myTeam} isJorikDevice={isJorikDevice} confirmAsync={confirmAsync} gpsGateBypass={effectiveGpsBypass}/>
         /* V30: jorikInTeam already passed to ChallengeSheet — the new wp:1 secrecy lock reads it. No call-site change needed beyond the existing prop. */}
 
       {/* Wedding video modal — V16 hard-gates when Jorik is in team */}
@@ -5635,7 +5693,9 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 // ═══════════════════════════════════════════
 // MAP VIEW
 // ═══════════════════════════════════════════
-function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,nowTs,jorikInTeam=false,jorikMissionsDone=null,onShowJorikMissions=null,gpsOptOut=false}){
+function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,nowTs,jorikInTeam=false,jorikMissionsDone=null,onShowJorikMissions=null,gpsOptOut=false,gameStart=null}){
+  // V41.13 — refs for bar break pulse markers (managed by separate effect)
+  const barMarkersRef=useRef([]);
   const mapRef=useRef(null);
   const mapInst=useRef(null);
   const markersRef=useRef([]);
@@ -5710,6 +5770,34 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
       })
     }).addTo(mapInst.current);
   },[pos]);
+
+  // V41.13 — bar break pulse markers. Renders a pulsing beer-emoji marker on
+  // the map for each bar in BAR_BREAKS during its active window
+  // [startMin, endMin). Window opens 30 min BEFORE the break is scheduled so
+  // teams have lead time to walk there, stays open through the 30-min break,
+  // then disappears. Recomputes every tick of nowTs (1s) — cheap because
+  // BAR_BREAKS.length === 3. If gameStart isn't set yet (pre-lobby start),
+  // no markers render. Mike (admin) can override timing by manually triggering
+  // bar breaks regardless — these markers are pure UX guidance, not gating.
+  useEffect(()=>{
+    if(!mapInst.current)return;
+    barMarkersRef.current.forEach(mk=>{try{mapInst.current.removeLayer(mk);}catch(_){}});
+    barMarkersRef.current=[];
+    if(!gameStart||!nowTs)return;
+    const elapsedMin=(nowTs-gameStart)/60000;
+    BAR_BREAKS.forEach(b=>{
+      if(elapsedMin<b.startMin||elapsedMin>=b.endMin)return;
+      const mk=L.marker([b.la,b.lo],{
+        zIndexOffset:1000,
+        icon:L.divIcon({className:'',iconAnchor:[24,24],
+          html:`<div class="bar-break-marker" title="${b.e} ${b.n}"><div class="bar-break-pulse"></div><div class="bar-break-pulse-2"></div><div class="bar-break-icon">${b.e}</div></div>`
+        })
+      });
+      mk.bindTooltip(`${b.e} <b>${b.n}</b><br/>${b.address}`,{direction:'top',offset:[0,-12],opacity:0.95,className:'bar-tooltip'});
+      mk.addTo(mapInst.current);
+      barMarkersRef.current.push(mk);
+    });
+  },[nowTs,gameStart]);
 
   // V12 + V25 (#71): Combined restyler for visited fade AND proximity-band state.
   // Runs on visitedLocs OR pos changes. Priority: visited wins (muted grayscale),
@@ -6325,7 +6413,7 @@ function AdminLogin({onClose,onSuccess}){
   );
 }
 
-function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync,promptAsync,jorikDeviceId=null,isJorikDevice=false,onMarkJorikDevice,onLogout}){
+function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[],barBreakActive,onPause,onResume,onResetToLobby,onWipeAndRestart,onStartFinalePhase,onStartFinale,onGoReview,confirmAsync,promptAsync,jorikDeviceId=null,isJorikDevice=false,onMarkJorikDevice,onLogout,testModeRuntime=null,buildTestMode=false,onSetTestMode}){
   const ask=confirmAsync||((msg)=>Promise.resolve(window.confirm(msg)));
   const askInput=promptAsync||((msg,def)=>Promise.resolve(window.prompt(msg,def)));
   if(!open)return null;
@@ -6453,6 +6541,36 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
             )}
           </Section>
 
+          {/* V41.13 — runtime test mode toggle. Lets Mike flip lobby-open +
+              GPS-bypass gates instantly across all phones without redeploying.
+              Effective state = runtime override (testModeRuntime) ?? build-time
+              const (buildTestMode). Toggle writes game_state.test_mode_active. */}
+          {onSetTestMode&&(()=>{
+            const effective=testModeRuntime!==null?testModeRuntime:buildTestMode;
+            const isOverride=testModeRuntime!==null;
+            return(
+              <Section title="🧪 Test mode"
+                hint={effective?'Drempels UIT — iedereen kan lobby starten + GPS-foto gate is bypassed.':'Productie-modus actief — admin-only lobby + 50m GPS gate.'}>
+                <MenuButton icon={effective?'🟢':'⚪'} label={effective?'Test mode AAN — tik om uit te zetten':'Test mode UIT — tik om aan te zetten'}
+                  variant={effective?'accent':'default'}
+                  hint="Flipt cross-device via game_state. Lobby-gate + GPS-gate volgen direct."
+                  onClick={async()=>{
+                    const next=!effective;
+                    const ok=await ask(next?'Test mode AAN zetten? Lobby gaat open voor iedereen + GPS foto-gate wordt bypassed. Cross-device sync via Supabase.':'Test mode UIT zetten? Lobby wordt admin-only en de 50m GPS gate wordt actief. Cross-device sync via Supabase.',{confirmLabel:next?'Aanzetten':'Uitzetten'});
+                    if(ok)onSetTestMode(next);
+                  }}/>
+                {isOverride&&(
+                  <MenuButton icon="↩️" label="Herstel naar build-default" variant="default"
+                    hint={`Build-default: ${buildTestMode?'AAN':'UIT'}. Wist de runtime override.`}
+                    onClick={async()=>{
+                      const ok=await ask('Runtime override wissen en terugvallen op de build-default? Andere phones synchroniseren binnen ~1s.',{confirmLabel:'Reset'});
+                      if(ok)onSetTestMode(null);
+                    }}/>
+                )}
+              </Section>
+            );
+          })()}
+
           {/* V41.7 — admin uitloggen. Clears ssr_admin localStorage flag. */}
           {onLogout&&(
             <Section title="Sessie">
@@ -6467,10 +6585,6 @@ function AdminMenu({open,onClose,phase,queueCount,teamCount,jorikTeamId,teams=[]
             </Section>
           )}
 
-          <div className="t-caption t-muted" style={{textAlign:'center',padding:'var(--sp-3)',lineHeight:'var(--lh-relaxed)'}}>
-            Voor een schema-wipe (incl. tabellen die de UI niet kent): draai <code>SUPABASE-V23-RESET.sql</code> in de Supabase SQL editor.<br/>
-            <b>V37 nieuw:</b> draai <code>SUPABASE-V37-JORIK-DEVICE.sql</code> één keer voor de wp:1 device-filter te activeren.
-          </div>
         </div>
       </div>
     </div>
@@ -7191,7 +7305,7 @@ function FlippercoinGate({loc,teamId,onReveal,children}){
   );
 }
 
-function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam,jorikInTeam,isJorikDevice=false,confirmAsync}){
+function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,seenQuizzes,isAdmin,myTeam,jorikInTeam,isJorikDevice=false,confirmAsync,gpsGateBypass=false}){
   // V29 (§4): Escape-to-close wasn't wired. Backdrop click was, but the ✕
   // button was a dim 26px text glyph on no background — Mike couldn't find
   // it in his screenshots. Below we (a) listen for Escape globally while this
@@ -7451,7 +7565,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
                 {done&&!wasWrong&&<div className="t-body-emph t-success">✓ Voltooid {ptsEarned>0&&`(+${ptsEarned} pts)`}</div>}
                 {wasWrong&&<div className="t-body-emph t-danger">✗ Fout gegokt · 0 pts{isQuiz&&ch.a?` · antwoord: ${ch.a}`:''}</div>}
               </div>
-              {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} confirmAsync={confirmAsync}/>}
+              {!done&&!locked&&<ChallengeAction ch={ch} locId={loc.id} chIdx={idx} onComplete={onComplete} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} confirmAsync={confirmAsync} gpsGateBypass={gpsGateBypass}/>}
             </div>
           );
         })}
@@ -7473,7 +7587,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
             {/* V30 (Phase 8): dynamic bonus quizzes rotate — you can keep doing
                 them until the pool is dry. Make that obvious next to the card. */}
             <div className="t-label-sm t-muted" style={{marginBottom:'var(--sp-2)',letterSpacing:'0.3px'}}>♻️ Zo vaak je wilt · elke keer +{rotatedQuiz.p} pts</div>
-            <ChallengeAction ch={rotatedQuiz} locId={loc.id} chIdx={`dyn_${loc.id}_${Date.now()}`} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} confirmAsync={confirmAsync} onComplete={(lid,cidx,pts,photo)=>{
+            <ChallengeAction ch={rotatedQuiz} locId={loc.id} chIdx={`dyn_${loc.id}_${Date.now()}`} dist={dist} isAdmin={isAdmin} loc={loc} myTeam={myTeam} confirmAsync={confirmAsync} gpsGateBypass={gpsGateBypass} onComplete={(lid,cidx,pts,photo)=>{
               // Dynamic-quiz rewards: award points, log activity, but do NOT mark built-in challenge
               onComplete(lid,-99,pts,photo);
             }}/>
@@ -7484,7 +7598,7 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
   );
 }
 
-function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,confirmAsync}){
+function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,confirmAsync,gpsGateBypass=false}){
   const fileRef=useRef(null);
   const[preview,setPreview]=useState(null);
   const[quizAnswer,setQuizAnswer]=useState(null);
@@ -7516,7 +7630,7 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
   // V23: GPS_GATE_BYPASS (TEST_MODE) lets every team upload from anywhere —
   // critical for sofa testing the photo flow without walking to Rotterdam.
   // Live behavior restored when TEST_MODE flips to false.
-  const tooFar=isMedia&&!isAdmin&&!GPS_GATE_BYPASS&&dist!=null&&dist>gateRadius;
+  const tooFar=isMedia&&!isAdmin&&!gpsGateBypass&&dist!=null&&dist>gateRadius;
 
   // V16: spectator guard — disable challenge completion since the score wouldn't persist.
   // V35 P1 fix (Lisa persona): copy was always "Game Master kan geen punten scoren"
