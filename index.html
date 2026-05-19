@@ -285,7 +285,7 @@
     /* V36 P1 fix (Sandra/Bart personas): WCAG 2.5.5 says 44x44 minimum touch target.
        padding:10px + 2 lines × ~14px combined = ~38-41px. Bumped to 12px padding + 11px font
        so the visible/hit-tappable surface is comfortably ≥44px even on small phones. */
-    .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:12px 0;background:none;border:none;color:var(--text-tertiary);font-size:11px;font-weight:600;cursor:pointer;transition:color .25s var(--ease-out),transform .3s var(--spring);letter-spacing:0.03em;text-transform:uppercase;position:relative;border-radius:var(--r-pill);-webkit-tap-highlight-color:transparent;min-height:44px}
+    .tab-btn{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:12px 4px;background:none;border:none;color:var(--text-tertiary);font-size:11px;font-weight:600;cursor:pointer;transition:color .25s var(--ease-out),transform .3s var(--spring);letter-spacing:0.03em;text-transform:uppercase;position:relative;border-radius:var(--r-pill);-webkit-tap-highlight-color:transparent;min-height:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .tab-btn .tab-icon{font-size:20px;transition:transform .35s var(--spring),filter .25s}
     .tab-btn.active{color:var(--accent)}
     .tab-btn.active::before{content:'';position:absolute;inset:4px;background:var(--accent-glow);border-radius:var(--r-pill);z-index:-1;animation:fadeInPop .3s var(--spring) both}
@@ -874,6 +874,12 @@ const LOBBY_OPEN_TO_ALL=TEST_MODE;
 const GPS_GATE_BYPASS=TEST_MODE;
 const TASKLIST_NEARBY_ONLY=true;
 const TASKLIST_NEARBY_N=3;
+
+// V41.14 — prize teaser copy. Set to a non-empty string to render the
+// "🏆 Prijs voor het winnende team" card on the Ranking tab. Empty string
+// hides the card entirely (default — Mike fills in when prize is decided).
+// Example: "Eerste toast bij dinner + fles grappa"
+const PRIZE_TEASER='';
 
 // V41.7 — admin login whitelist (Mike-only by his choice). Email match is
 // case-insensitive; password is the shared secret reused from the ?admin= URL
@@ -4731,11 +4737,11 @@ function App(){
           {id:'leaderboard',icon:'🏆',label:'Ranking'},
           {id:'map',icon:'🗺️',label:'Kaart'},
           {id:'activity',icon:'📢',label:'Feed'},
-          ...(isAdmin?[{id:'review',icon:'✅',label:'Beoordeel',badge:reviewQueue.length}]:[]),
+          ...(isAdmin?[{id:'review',icon:'✅',label:'Review',badge:reviewQueue.length}]:[]),
         ].map(t=>(
           <button key={t.id} className={`tab-btn ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)} style={{position:'relative'}}>
             <span className="tab-icon">{t.icon}</span>{t.label}
-            {t.badge>0&&<span className="badge-count" style={{position:'absolute',top:2,right:'25%',
+            {t.badge>0&&<span className="badge-count" style={{position:'absolute',top:4,right:6,
               // V23 (#50): pulse the Beoordeel badge for 3 s after a new photo_review INSERT.
               animation:(t.id==='review'&&(nowTs-reviewFlashTs)<3000&&reviewFlashTs>0)?'reviewPulse 0.8s ease-out 3':'none'
             }}>{t.badge}</span>}
@@ -5441,20 +5447,23 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 
   return(
     <div style={{height:'100%',overflowY:'auto',padding:'var(--sp-5)',paddingBottom:'var(--sp-10)'}}>
-      {/* V30: next-tier banner — motivational progress to the next challenge tier (Extra-Tijd branch removed) */}
+      {/* V41.14: compacted next-tier card — single slim row + thin progress bar
+          below. Was a 90px tall reward-card; now ~52px. Frees vertical space and
+          reduces visual weight competing with the leaderboard. */}
       {myNextTier&&(()=>{
         const remainingTier=Math.max(0,myNextTier.min-myChallengesDone);
+        const pct=Math.min(100,(myChallengesDone/myNextTier.min)*100);
         return(
-        <div className="reward-card" style={{marginBottom:'var(--sp-3)'}}>
-          <div className="reward-icon">{myNextTier.badge}</div>
-          <div className="reward-info">
-            <div className="t-label-sm t-accent" style={{marginBottom:'var(--sp-1)'}}>Volgende beloning</div>
-            <div className="t-card-label">
-              {remainingTier===0?`${myNextTier.name} · bijna!`:`Nog ${remainingTier} challenge${remainingTier===1?'':'s'} → ${myNextTier.badge} ${myNextTier.name}`}
-            </div>
-            <div className="reward-progress" style={{marginTop:'var(--sp-2)'}}>
-              <div className="reward-progress-fill" style={{width:`${Math.min(100, (myChallengesDone/myNextTier.min)*100)}%`}}/>
-            </div>
+        <div style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'linear-gradient(135deg,rgba(110,163,255,0.08),rgba(178,155,255,0.04))',border:'1px solid rgba(110,163,255,0.2)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
+            <span style={{fontSize:18,flexShrink:0}}>{myNextTier.badge}</span>
+            <span className="t-caption flex-1" style={{color:'var(--text-secondary)',minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+              {remainingTier===0?`${myNextTier.name} · bijna!`:`Nog ${remainingTier} → ${myNextTier.name}`}
+            </span>
+            <span className="chip-xs" style={{flexShrink:0,fontVariantNumeric:'tabular-nums'}}>{myChallengesDone}/{myNextTier.min}</span>
+          </div>
+          <div style={{width:'100%',height:3,background:'rgba(255,255,255,0.06)',borderRadius:'var(--r-pill)',marginTop:6,overflow:'hidden'}}>
+            <div style={{height:'100%',background:'linear-gradient(90deg,var(--foto),var(--quiz))',width:`${pct}%`,transition:'width .5s var(--ease-out)'}}/>
           </div>
         </div>
         );
@@ -5462,12 +5471,9 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 
       {/* Max tier banner */}
       {myTier&&!myNextTier&&(
-        <div className="reward-card" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(228,178,92,0.4)'}}>
-          <div className="reward-icon">{myTier.badge}</div>
-          <div className="reward-info">
-            <div className="t-label-sm t-accent" style={{marginBottom:'var(--sp-1)'}}>Max tier behaald</div>
-            <div className="t-card-label">{myTier.name} · jullie zijn legendes</div>
-          </div>
+        <div style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'linear-gradient(135deg,rgba(228,178,92,0.12),rgba(228,178,92,0.04))',border:'1px solid rgba(228,178,92,0.4)',display:'flex',alignItems:'center',gap:'var(--sp-2)'}}>
+          <span style={{fontSize:18,flexShrink:0}}>{myTier.badge}</span>
+          <span className="t-caption t-accent flex-1" style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>Max tier · {myTier.name} · jullie zijn legendes</span>
         </div>
       )}
 
@@ -5490,78 +5496,82 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
         </div>
       )}
 
-      {/* V21: PRIZE TEASER — mid-game motivation. MIKE: vervang de tweede regel
-          zodra je de echte prijs weet (bv. "Eerste toast bij dinner + fles grappa"). */}
-      <div className="panel-sm" style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',background:'linear-gradient(145deg,rgba(228,178,92,0.16),rgba(255,107,107,0.05))',borderColor:'rgba(228,178,92,0.35)',textAlign:'center'}}>
-        <div className="t-card-label t-accent">🏆 Prijs voor het winnende team</div>
-        <div className="t-caption" style={{marginTop:'var(--sp-1)',opacity:0.85}}>Nog een geheim — Mike onthult bij dinner</div>
-      </div>
+      {/* V41.14 — PRIZE_TEASER card. Only renders when const at top of file is
+          non-empty. Hides the "placeholder noise" Mike flagged in V41.14 audit. */}
+      {PRIZE_TEASER&&PRIZE_TEASER.length>0&&(
+        <div className="panel-sm" style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',background:'linear-gradient(145deg,rgba(228,178,92,0.16),rgba(255,107,107,0.05))',borderColor:'rgba(228,178,92,0.35)',textAlign:'center'}}>
+          <div className="t-card-label t-accent">🏆 Prijs voor het winnende team</div>
+          <div className="t-caption" style={{marginTop:'var(--sp-1)',opacity:0.85}}>{PRIZE_TEASER}</div>
+        </div>
+      )}
 
-      {/* V21: WEDDING-VIDEO PIPELINE — 4 hand-picked landmarks deliver the surprise edit.
-          Computes from L_DATA wp:1 + completed[locId][chIdx]. Hidden when Jorik is IN the team.
-          V36 hot-fix (Lisa P0 audit finding): spectators (id=-2 / myTeam.spectator) had
-          jorikInTeam=false so the !jorikInTeam gate let them through. A spectator at the
-          Ranking tab could read the full wedding-edit progress and spoil the surprise.
-          Tightened gate to: !jorikInTeam && a real player team. Same fix below for the
-          🤫 Geheime missie banner. */}
-      {/* V37: also filter when this device IS Jorik's phone (regardless of token state). */}
+      {/* V41.14 — Consolidated wedding mission section. Previously rendered as
+          TWO separate cards (wp:1 pipeline button + Geheime missie banner) that
+          users read as duplicates. Now grouped under one purple-bordered panel
+          with a shared header + 2 sub-rows. Both interactive paths preserved:
+            Row 1: 📹 4 location-shots (wp:1) → tap shows remaining list
+            Row 2: 🎬 Script-takes (4-round checklist) → tap opens WeddingMission modal
+          Hidden entirely for Jorik-team / spectators / Jorik's device (same gate). */}
       {!jorikInTeam&&myTeam?.id>0&&!myTeam?.spectator&&!isJorikDevice&&(()=>{
         const wpChallenges=[];
         L_DATA.forEach(loc=>{(loc.ch||[]).forEach((ch,idx)=>{if(ch.wp)wpChallenges.push({loc,ch,idx});});});
-        // V22: cross-check completedPts > 0 so a rejected (0-pt) submission doesn't falsely
-        // increment the wedding-pipeline counter. Without this check, an admin rejecting a
-        // wp:1 photo deducts the points but the chip still shows the shot as "done".
         const wpDone=wpChallenges.filter(({loc,idx})=>{
           const isCompleted=!!(completed&&completed[loc.id]&&completed[loc.id][idx]);
           if(!isCompleted)return false;
           const pts=completedPts&&completedPts[loc.id]?completedPts[loc.id][idx]:undefined;
-          // Treat undefined as "yes, count it" (legacy completions before completedPts was wired).
-          // Treat 0 as "no, the photo was rejected" — exclude.
           return pts===undefined||pts>0;
         }).length;
         const wpTotal=wpChallenges.length;
-        if(wpTotal===0)return null;
-        const allWpDone=wpDone>=wpTotal;
-        const showRemaining=()=>{
-          // V22: same rejected-photo guard as the wpDone counter — a 0-pt entry counts as
-          // "still to do" so the team knows to retake.
+        const allWpDone=wpTotal>0&&wpDone>=wpTotal;
+        const showRemaining=(e)=>{
+          if(e&&e.stopPropagation)e.stopPropagation();
           const remaining=wpChallenges.filter(({loc,idx})=>{
             const isCompleted=!!(completed&&completed[loc.id]&&completed[loc.id][idx]);
             if(!isCompleted)return true;
             const pts=completedPts&&completedPts[loc.id]?completedPts[loc.id][idx]:undefined;
             return pts!==undefined&&pts<=0;
           });
-          if(remaining.length===0){showInfo('🎬 Alle 4 wedding-video shots gefilmd! Op naar de bruiloft.');return;}
-          showInfo('🎬 Wedding-video missie — nog te doen:\n\n'+remaining.map(({loc,ch})=>`• ${loc.e} ${loc.n} · ${ch.ti}`).join('\n'));
+          if(remaining.length===0){showInfo('🎬 Alle '+wpTotal+' wedding-video shots gefilmd! Op naar de bruiloft.');return;}
+          showInfo('🎬 Nog te doen op locatie:\n\n'+remaining.map(({loc,ch})=>`• ${loc.e} ${loc.n} · ${ch.ti}`).join('\n'));
         };
+        // Nothing to show: both already done AND no remaining surfaces
+        if(weddingDone&&allWpDone){
+          return(
+            <div className="chip-xs" style={{marginBottom:'var(--sp-3)',background:'rgba(95,216,165,0.12)',borderColor:'rgba(95,216,165,0.3)',color:'var(--success)'}}>
+              ✅ Bruiloftsmissie compleet
+            </div>
+          );
+        }
         return(
-          <button type="button" onClick={showRemaining}
-            className="panel-sm" style={{marginBottom:'var(--sp-3)',padding:'var(--sp-2) var(--sp-3)',background:allWpDone?'rgba(95,216,165,0.12)':'linear-gradient(145deg,rgba(255,107,107,0.16),rgba(228,178,92,0.05))',borderColor:allWpDone?'rgba(95,216,165,0.35)':'rgba(255,107,107,0.4)',cursor:'pointer',width:'100%',color:'#fff',textAlign:'left',display:'flex',alignItems:'center',gap:'var(--sp-3)'}}>
-            <span style={{fontSize:22}}>📹</span>
-            <span style={{flex:1}}>
-              <div className="t-card-label" style={{color:allWpDone?'var(--success)':'#ff8a8a'}}>{allWpDone?'Bruiloftsvideo compleet':'Geheime bruiloftsvideo · '+wpDone+'/'+wpTotal+' shots'}</div>
-              <div className="t-caption" style={{marginTop:'var(--sp-1)',opacity:0.85}}>{allWpDone?'Alle 4 shots gefilmd — chapeau':'Tik om te zien wat nog ontbreekt'}</div>
-            </span>
-            <span className="t-caption">ⓘ</span>
-          </button>
+          <div style={{marginBottom:'var(--sp-3)',padding:'var(--sp-3)',borderRadius:'var(--r-md)',background:'linear-gradient(155deg,rgba(155,123,234,0.10),rgba(178,155,255,0.04))',border:'1px solid rgba(155,123,234,0.30)'}}>
+            <div className="t-label" style={{color:'var(--quiz-2)',marginBottom:'var(--sp-2)',letterSpacing:'var(--ls-wider)'}}>🤫 Bruiloft · geheime missie</div>
+            <div className="stack-1">
+              {wpTotal>0&&(
+                <button type="button" onClick={showRemaining}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:'var(--sp-2)',padding:'10px 12px',minHeight:44,borderRadius:'var(--r-sm)',border:'1px solid',borderColor:allWpDone?'rgba(95,216,165,0.35)':'rgba(255,255,255,0.10)',background:allWpDone?'rgba(95,216,165,0.08)':'rgba(255,255,255,0.04)',color:'#fff',cursor:'pointer',textAlign:'left'}}>
+                  <span style={{fontSize:18,flexShrink:0}}>📹</span>
+                  <span style={{flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} className="t-card-label">{allWpDone?'Locatie-shots compleet':'Locatie-shots'}</span>
+                  <span className="chip-xs" style={{flexShrink:0,fontVariantNumeric:'tabular-nums',color:allWpDone?'var(--success)':'var(--text-secondary)'}}>{wpDone}/{wpTotal}</span>
+                </button>
+              )}
+              {!weddingDone&&(
+                <button type="button" onClick={onShowWedding}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:'var(--sp-2)',padding:'10px 12px',minHeight:44,borderRadius:'var(--r-sm)',border:'1px solid rgba(155,123,234,0.35)',background:'rgba(155,123,234,0.10)',color:'#fff',cursor:'pointer',textAlign:'left'}}>
+                  <span style={{fontSize:18,flexShrink:0}}>🎬</span>
+                  <span style={{flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} className="t-card-label">Script-takes opnemen</span>
+                  <span className="chip-xs" style={{flexShrink:0,background:'var(--accent-glow)',borderColor:'rgba(228,178,92,0.35)',color:'var(--accent-2)'}}>+{WEDDING_VIDEO_BONUS} pts</span>
+                </button>
+              )}
+              {weddingDone&&(
+                <div style={{display:'flex',alignItems:'center',gap:'var(--sp-2)',padding:'10px 12px',borderRadius:'var(--r-sm)',background:'rgba(95,216,165,0.08)',border:'1px solid rgba(95,216,165,0.25)'}}>
+                  <span style={{fontSize:18,flexShrink:0}}>✅</span>
+                  <span className="t-card-label" style={{color:'var(--success)',flex:1}}>Script-takes ingeleverd</span>
+                </div>
+              )}
+            </div>
+          </div>
         );
       })()}
-
-      {/* Wedding video mission */}
-      {/* V36 hot-fix (Lisa P0): spectator gate. V37 (Jorik P0): also gate on !isJorikDevice. */}
-      {!jorikInTeam&&!weddingDone&&myTeam?.id>0&&!myTeam?.spectator&&!isJorikDevice&&(
-        <div className="secret-banner" onClick={onShowWedding} style={{marginBottom:'var(--sp-3)',marginTop:0}}>
-          <div className="secret-badge">🤫 Geheime missie</div>
-          <div className="t-card-label" style={{marginTop:'var(--sp-2)'}}>Bruiloftsvideo opnemen</div>
-          <div className="t-body" style={{marginTop:'var(--sp-1)'}}>Tik hier voor instructies · +{WEDDING_VIDEO_BONUS} pts</div>
-        </div>
-      )}
-      {/* V18 (§1.5.7): once done, shrink to a single-line chip (was full panel) */}
-      {weddingDone&&(
-        <div className="chip" style={{marginBottom:'var(--sp-3)',background:'rgba(95,216,165,0.12)',borderColor:'rgba(95,216,165,0.3)',color:'var(--success)',padding:'4px 10px',fontSize:'var(--fs-12)',alignSelf:'flex-start'}}>
-          ✅ Geheime missie voltooid
-        </div>
-      )}
 
       {/* V19: Jorik-missions banner — ONLY shows when Jorik is in this team (inverse of wedding).
           Countdown removed — Jorik now swaps at the next bar break, not on a timer. */}
@@ -5587,16 +5597,20 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
       })()}
 
       {/* V19: non-holder chip — shows who currently has Jorik (no countdown; he swaps at next bar break) */}
+      {/* V41.14: restructured to a 2-line stack — "tot bar break" no longer competes
+          with the team name for horizontal space (was getting truncated on iPhone 13 width). */}
       {!jorikInTeam&&jorikTeamId!=null&&(()=>{
         const holder=teams.find(t=>t.id===jorikTeamId);
         if(!holder)return null;
         return(
-          <div className="panel-sm panel row-2" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(228,178,92,0.25)'}}>
-            <span style={{fontSize:18}}>💍</span>
-            <span className="t-caption flex-1" style={{color:'var(--text-secondary)'}}>
-              Jorik loopt nu met <span style={{color:holder.color,fontWeight:700}}>{holder.emoji} {holder.name}</span>
-            </span>
-            <span className="t-label-sm t-accent" style={{whiteSpace:'nowrap'}}>tot bar break</span>
+          <div className="panel-sm" style={{marginBottom:'var(--sp-3)',borderColor:'rgba(228,178,92,0.25)',padding:'var(--sp-2) var(--sp-3)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'var(--sp-2)',minWidth:0}}>
+              <span style={{fontSize:18,flexShrink:0}}>💍</span>
+              <span className="t-caption" style={{color:'var(--text-secondary)',minWidth:0,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                Jorik bij <span style={{color:holder.color,fontWeight:700}}>{holder.emoji} {holder.name}</span>
+              </span>
+              <span className="chip-xs" style={{flexShrink:0,background:'var(--accent-glow)',borderColor:'rgba(228,178,92,0.35)',color:'var(--accent-2)'}}>🍻 tot break</span>
+            </div>
           </div>
         );
       })()}
