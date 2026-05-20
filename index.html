@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Inter+Tight:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Inter+Tight:wght@500;600;700;800;900&family=Caveat:wght@600&display=swap" rel="stylesheet">
   <style>
     :root{
       /* V13: warmer near-black base with a subtle blue tint so accent colors pop */
@@ -192,6 +192,15 @@
     .btn-gm{display:inline-flex;align-items:center;gap:6px;padding:12px 16px;min-height:44px;border-radius:var(--r-md);background:rgba(228,178,92,0.10);border:1px solid rgba(228,178,92,0.35);color:var(--accent-2);cursor:pointer;font-size:var(--fs-11);font-weight:var(--fw-bold);letter-spacing:0.02em;transition:background .15s ease}
     .btn-gm:hover{background:rgba(228,178,92,0.16)}
     .btn-gm:active{transform:scale(0.97)}
+    /* V44 — handwritten splash tagline. 'Caveat' (a handwriting font, loaded
+       alongside Inter in the <head> font <link>) gives the handwritten LOOK; a
+       per-word fade+rise cascade gives the "being written" MOTION — each word's
+       animation-delay is set inline in the JSX so they appear left-to-right.
+       Falls back to Inter Tight if Caveat hasn't loaded; prefers-reduced-motion
+       snaps every word visible via the global animation-duration override. */
+    .splash-tagline{font-family:'Caveat','Inter Tight',cursive;font-size:var(--fs-24);font-weight:600;line-height:1.4;letter-spacing:0.01em;color:var(--quiz-2);max-width:340px}
+    .tagline-word{display:inline-block;margin-right:0.26em;animation:taglineWrite .5s var(--ease-out) both}
+    @keyframes taglineWrite{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     /* V30 — accessibility: respect prefers-reduced-motion. Keeps state correctness;
        only kills decorative motion (pulses, confetti, shimmer) so users with
        motion-sickness settings aren't punished. WCAG 2.1 SC 2.3.3. */
@@ -4194,7 +4203,14 @@ function App(){
         {/* V43: the event date/time is key info for a one-day event — lifted from
             12px tertiary to 13px secondary so it's no longer the dimmest line. */}
         <div className="t-caption animate-in animate-in-3 text-center" style={{fontSize:'var(--fs-13)',color:'var(--text-secondary)'}}>Jorik's Bachelor Party · 6 juni 2026 · 14:00 — 19:30</div>
-        <div className="t-body animate-in animate-in-4 text-center" style={{marginTop:'var(--sp-2)',color:'var(--quiz-2)',fontStyle:'italic'}}>"Laten we er samen een memorabele dag van maken — en Jorik is af en toe het haasje! 🐰"</div>
+        {/* V44: the tagline is rendered word-by-word so it can be "written on"
+            in a handwriting font (Caveat) — each word fades+rises in sequence
+            via a per-word animationDelay, reading as if it's being handwritten. */}
+        <div className="splash-tagline text-center" style={{marginTop:'var(--sp-3)'}}>
+          {'"Laten we er samen een memorabele dag van maken — en Jorik is af en toe het haasje! 🐰"'.split(' ').map((w,i)=>(
+            <span key={i} className="tagline-word" style={{animationDelay:`${(0.4+i*0.065).toFixed(3)}s`}}>{w}</span>
+          ))}
+        </div>
         <div style={{height:'var(--sp-8)'}}/>
         <button className="btn btn-gold btn-lg animate-in animate-in-5" onClick={()=>{
           const now=Date.now();if(now-tapGuardRef.current<250)return;tapGuardRef.current=now;
