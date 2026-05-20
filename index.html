@@ -20,7 +20,7 @@
       --border-strong:rgba(255,255,255,0.14);
       --text-primary:rgba(255,255,255,0.96);
       --text-secondary:rgba(255,255,255,0.72);
-      --text-tertiary:rgba(255,255,255,0.55);
+      --text-tertiary:rgba(255,255,255,0.64);/* V43: lifted 0.55→0.64 — the small (10-12px) caption/label text that uses this was low-contrast for the older/tipsy gameday audience */
       /* V13: richer accent — warmer gold + complementary hues */
       --accent:#e4b25c;
       --accent-2:#f0c373;
@@ -39,7 +39,7 @@
       /* V15: spacing scale — 4px base grid, used everywhere */
       --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-6:24px;--sp-7:32px;--sp-8:40px;--sp-9:56px;--sp-10:72px;
       /* V15: type scale — tight hierarchy, only these sizes allowed */
-      --fs-10:10px;--fs-11:11px;--fs-12:12px;--fs-13:13px;--fs-14:14px;--fs-15:15px;--fs-17:17px;--fs-20:20px;--fs-24:24px;--fs-30:30px;--fs-36:36px;--fs-48:48px;
+      --fs-10:10px;--fs-11:11px;--fs-12:12px;--fs-13:13px;--fs-14:14px;--fs-15:15px;--fs-16:16px;--fs-17:17px;--fs-20:20px;--fs-24:24px;--fs-30:30px;--fs-36:36px;--fs-48:48px;
       /* V15: font weight — semantic */
       --fw-regular:500;--fw-medium:600;--fw-semi:700;--fw-bold:800;--fw-black:900;
       /* V15: letter-spacing — semantic */
@@ -159,8 +159,13 @@
     .btn:focus-visible,.chip:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px;box-shadow:0 0 0 4px rgba(228,178,92,0.18)}
 
     /* V13: Chip — compact pill used for tags, meta, filters */
-    .chip{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:0.01em;transition:background .2s}
+    .chip{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);font-size:var(--fs-11);font-weight:600;color:var(--text-secondary);letter-spacing:0.01em;transition:background .2s}
     .chip:hover{background:var(--surface-hover)}
+    /* V43 design pass: chips rendered as a <button> are interactive — give them a
+       real ≥40px tap target (was ~24px tall, well under the 44px mobile minimum).
+       Label chips (<span>/<div class="chip">) are untouched, so this never
+       balloons the SYSTEEM/JIJ/category label chips. */
+    button.chip{min-height:40px}
     .chip-gold{background:var(--accent-glow);border-color:rgba(228,178,92,0.3);color:var(--accent)}
     .chip-blue{background:rgba(110,163,255,0.12);border-color:rgba(110,163,255,0.3);color:var(--foto)}
     /* V29 — richer chip variants for premium gamification feel */
@@ -176,7 +181,7 @@
     /* V41.14 — canonical danger badge for queue depths (Beoordeel review count etc.).
        Replaces four near-identical recipes (#ff4444 vs rgba(255,68,68,0.95) etc.).
        Pure red, tabular-nums, fixed 9px radius matching the existing in-the-wild pattern. */
-    .badge-count{background:#ff4444;color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:9px;line-height:1.4;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center;min-width:18px}
+    .badge-count{background:#ff4444;color:#fff;font-size:10px;font-weight:800;padding:2px 6px;border-radius:var(--r-xs);line-height:1.4;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center;min-width:18px}
     /* V41.14 — canonical modal close button. 44×44 WCAG, circular, high-contrast.
        Replaces 3 different recipes in ChallengeSheet/AdminMenu/AdminLogin/PhotoLightbox. */
     .btn-close{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s ease,transform .12s ease}
@@ -184,7 +189,7 @@
     .btn-close:active{transform:scale(0.94)}
     /* V41.14 — canonical Game Master entry-point button. Used on splash/setup/lobby/game
        (when user is NOT yet admin). Replaces 4 inline-styled variants. */
-    .btn-gm{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:var(--r-md);background:rgba(228,178,92,0.10);border:1px solid rgba(228,178,92,0.35);color:var(--accent-2);cursor:pointer;font-size:var(--fs-11);font-weight:var(--fw-bold);letter-spacing:0.02em;transition:background .15s ease}
+    .btn-gm{display:inline-flex;align-items:center;gap:6px;padding:12px 16px;min-height:44px;border-radius:var(--r-md);background:rgba(228,178,92,0.10);border:1px solid rgba(228,178,92,0.35);color:var(--accent-2);cursor:pointer;font-size:var(--fs-11);font-weight:var(--fw-bold);letter-spacing:0.02em;transition:background .15s ease}
     .btn-gm:hover{background:rgba(228,178,92,0.16)}
     .btn-gm:active{transform:scale(0.97)}
     /* V30 — accessibility: respect prefers-reduced-motion. Keeps state correctness;
@@ -260,7 +265,7 @@
     /* V14: XP progress bar in HUD */
     .xp-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:var(--r-pill);margin-top:6px;overflow:hidden;position:relative}
     .xp-fill{height:100%;background:linear-gradient(90deg,var(--foto),var(--accent));border-radius:var(--r-pill);transition:width .5s var(--ease-out);box-shadow:0 0 10px rgba(228,178,92,0.45)}
-    .xp-marker{position:absolute;top:-2px;font-size:9px;color:var(--text-tertiary);font-weight:700}
+    .xp-marker{position:absolute;top:-2px;font-size:var(--fs-11);color:var(--text-tertiary);font-weight:700}
     /* V14: countdown clock */
     .game-clock{position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:101;padding:5px 12px;border-radius:var(--r-pill);background:rgba(14,15,22,0.95);border:1px solid var(--border-strong);backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);font-family:var(--font-display);font-size:11px;font-weight:800;color:var(--text-secondary);letter-spacing:0.04em;display:flex;align-items:center;gap:6px;box-shadow:var(--sh-md)}
     .game-clock.urgent{color:var(--video-2);border-color:rgba(255,123,123,0.4);animation:breathing 1.5s ease-in-out infinite}
@@ -291,7 +296,7 @@
     .tab-btn.active::before{content:'';position:absolute;inset:4px;background:var(--accent-glow);border-radius:var(--r-pill);z-index:-1;animation:fadeInPop .3s var(--spring) both}
     .tab-btn.active .tab-icon{transform:scale(1.12) translateY(-1px);filter:drop-shadow(0 0 8px rgba(228,178,92,0.5))}
     .tab-btn:active{transform:scale(0.95)}
-    .tab-badge{position:absolute;top:4px;right:22%;background:linear-gradient(135deg,#ff8787,#c94d4d);color:#fff;font-size:9px;font-weight:800;padding:2px 6px;border-radius:var(--r-pill);min-width:18px;text-align:center;box-shadow:0 2px 8px rgba(255,107,107,0.45)}
+    .tab-badge{position:absolute;top:4px;right:22%;background:linear-gradient(135deg,#ff8787,#c94d4d);color:#fff;font-size:var(--fs-11);font-weight:800;padding:2px 6px;border-radius:var(--r-pill);min-width:18px;text-align:center;box-shadow:0 2px 8px rgba(255,107,107,0.45)}
 
     /* V13: Bottom sheet — premium with grabber */
     .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:10000;animation:fadeInUp .25s var(--ease-out)}
@@ -351,11 +356,11 @@
     .nearby-info{flex:1;min-width:0}
     .nearby-name{font-family:var(--font-display);font-size:15px;font-weight:700;letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .nearby-tags{display:flex;gap:5px;margin-top:4px}
-    .nearby-tag{font-size:9px;font-weight:700;padding:3px 8px;border-radius:var(--r-pill);letter-spacing:0.04em;text-transform:uppercase}
+    .nearby-tag{font-size:var(--fs-11);font-weight:700;padding:3px 8px;border-radius:var(--r-pill);letter-spacing:var(--ls-wide);text-transform:uppercase}
     .nearby-tag.t-foto{background:rgba(110,163,255,0.14);color:var(--foto-2)}.nearby-tag.t-quiz{background:rgba(178,155,255,0.14);color:var(--quiz-2)}.nearby-tag.t-creatief{background:rgba(95,216,165,0.14);color:var(--creatief-2)}.nearby-tag.t-video{background:rgba(255,123,123,0.14);color:var(--video-2)}
     .nearby-end{text-align:right;flex-shrink:0}
     .nearby-dist{font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--text-primary);letter-spacing:-0.02em}
-    .nearby-pts{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:0.04em;margin-top:2px}
+    .nearby-pts{font-size:var(--fs-11);font-weight:700;color:var(--accent);letter-spacing:var(--ls-wide);margin-top:2px}
     .nearby-chevron{font-size:20px;color:var(--text-tertiary);flex-shrink:0;margin-left:4px;transition:transform .25s var(--spring)}
     .nearby-card:hover .nearby-chevron{transform:translateX(3px);color:var(--text-primary)}
 
@@ -419,7 +424,7 @@
     .starter-card.taken{opacity:0.45;filter:grayscale(0.3)}
     .starter-card.locked{opacity:0.3;pointer-events:none;filter:grayscale(0.4);cursor:default}
     .starter-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-    .starter-edit-btn{position:absolute;top:6px;right:6px;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;border-radius:var(--r-pill);border:1px solid var(--border);background:rgba(20,22,32,0.65);color:#fff;font-size:12px;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0.55;transition:opacity .2s,transform .2s var(--spring);-webkit-tap-highlight-color:transparent;z-index:2}
+    .starter-edit-btn{position:absolute;top:6px;right:6px;width:36px;height:36px;min-width:36px;min-height:36px;padding:0;border-radius:var(--r-pill);border:1px solid var(--border);background:rgba(20,22,32,0.65);color:#fff;font-size:var(--fs-13);line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);opacity:0.55;transition:opacity .2s,transform .2s var(--spring);-webkit-tap-highlight-color:transparent;z-index:2}
     .starter-edit-btn:hover{opacity:1;transform:scale(1.08)}
     .starter-edit-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;opacity:1}
     .starter-emoji{font-size:40px;margin-bottom:10px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3));transition:transform .3s var(--spring)}
@@ -434,7 +439,7 @@
     .gps-dot.good{background:var(--success);animation:pulse 2.2s infinite;box-shadow:0 0 10px rgba(95,216,165,0.6)}
     .gps-dot.weak{background:var(--accent);animation:breathing 1.8s infinite}
     .gps-dot.sleep{background:var(--text-tertiary)}
-    .gps-pill .snap-btn{margin-left:4px;padding:4px 10px;border-radius:var(--r-pill);background:rgba(110,163,255,0.18);border:1px solid rgba(110,163,255,0.35);color:var(--foto-2);font-size:10px;font-weight:700;cursor:pointer}
+    .gps-pill .snap-btn{margin-left:4px;padding:8px 12px;border-radius:var(--r-pill);background:rgba(110,163,255,0.18);border:1px solid rgba(110,163,255,0.35);color:var(--foto-2);font-size:var(--fs-11);font-weight:700;cursor:pointer}
 
     /* V13: Story ticker */
     /* V30: .story-ticker removed with chapter-modal system */
@@ -492,7 +497,7 @@
 
     /* V13: Reactions */
     .reactions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-    .reaction-btn{padding:5px 12px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:transform .2s var(--spring),background .2s,border-color .2s;font-family:inherit;-webkit-tap-highlight-color:transparent}
+    .reaction-btn{padding:9px 12px;min-height:40px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);font-size:var(--fs-14);cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:transform .2s var(--spring),background .2s,border-color .2s;font-family:inherit;-webkit-tap-highlight-color:transparent}
     .reaction-btn:hover{background:var(--surface-hover);border-color:var(--border-strong);transform:translateY(-1px)}
     .reaction-btn:active{transform:scale(0.92)}
     .reaction-btn.my{background:var(--accent-glow);border-color:rgba(228,178,92,0.35);color:var(--accent-2)}
@@ -501,13 +506,13 @@
     /* V13: Filter pills */
     .filter-pills{display:flex;gap:8px;overflow-x:auto;padding:4px 0 14px;scrollbar-width:none}
     .filter-pills::-webkit-scrollbar{display:none}
-    .filter-pill{padding:8px 14px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;transition:transform .2s var(--spring),background .2s,border-color .2s;-webkit-tap-highlight-color:transparent}
+    .filter-pill{padding:8px 14px;min-height:44px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);font-size:var(--fs-12);font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;transition:transform .2s var(--spring),background .2s,border-color .2s;-webkit-tap-highlight-color:transparent}
     .filter-pill:hover{background:var(--surface-hover);border-color:var(--border-strong)}
     .filter-pill:active{transform:scale(0.95)}
     .filter-pill.active{background:var(--accent-glow);border-color:rgba(228,178,92,0.35);color:var(--accent-2)}
 
     /* V13: Section labels */
-    .section-label{font-size:10px;color:var(--text-secondary);font-weight:800;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:10px}
+    .section-label{font-size:var(--fs-11);color:var(--text-secondary);font-weight:800;letter-spacing:var(--ls-widest);text-transform:uppercase;margin-bottom:10px}
 
     /* V25 (#71): two-radius task discovery — band pill, two-ring mini-map, task rows */
     .band-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:var(--r-pill);font-size:11px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap}
@@ -531,7 +536,7 @@
     .task-row-emoji{font-size:22px;flex-shrink:0;width:28px;text-align:center}
     .task-row-body{flex:1;min-width:0;display:flex;flex-direction:column}
     .task-row-name{font-size:13px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .task-row-meta{font-size:10px;color:var(--text-tertiary);margin-top:1px;letter-spacing:0.02em}
+    .task-row-meta{font-size:var(--fs-11);color:var(--text-tertiary);margin-top:1px;letter-spacing:0.02em}
     .task-row-chevron{color:var(--text-tertiary);font-size:18px;flex-shrink:0;padding-right:2px}
     .task-group-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-tertiary);margin:14px 0 8px;padding-left:2px}
     .task-group-label.unlock{color:var(--creatief-2)}
@@ -4181,9 +4186,14 @@ function App(){
         <div style={{fontSize:'var(--icon-hero)',animation:'float 3.2s ease-in-out infinite',filter:'drop-shadow(0 10px 30px rgba(228,178,92,0.4))'}}>💍</div>
         <div style={{height:'var(--sp-6)'}}/>
         <h1 className="t-hero animate-in animate-in-1 text-center" style={{background:'linear-gradient(135deg,#ffffff 0%,var(--accent-2) 50%,var(--foto-2) 100%)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Stadsspel</h1>
-        <div className="t-label animate-in animate-in-2" style={{marginTop:'var(--sp-2)',letterSpacing:'0.5em'}}>Rotterdam</div>
+        {/* V43 design pass: "Rotterdam" was 11px uppercase tracked to 0.5em —
+            the least-readable text on the splash, and it's the place name.
+            Now a calm, confident subtitle: larger (14px) with restrained tracking. */}
+        <div className="t-label animate-in animate-in-2" style={{marginTop:'var(--sp-2)',fontSize:'var(--fs-14)',letterSpacing:'0.16em'}}>Rotterdam</div>
         <div style={{height:'var(--sp-5)'}}/>
-        <div className="t-caption animate-in animate-in-3 text-center">Jorik's Bachelor Party · 6 juni 2026 · 14:00 — 19:30</div>
+        {/* V43: the event date/time is key info for a one-day event — lifted from
+            12px tertiary to 13px secondary so it's no longer the dimmest line. */}
+        <div className="t-caption animate-in animate-in-3 text-center" style={{fontSize:'var(--fs-13)',color:'var(--text-secondary)'}}>Jorik's Bachelor Party · 6 juni 2026 · 14:00 — 19:30</div>
         <div className="t-body animate-in animate-in-4 text-center" style={{marginTop:'var(--sp-2)',color:'var(--quiz-2)',fontStyle:'italic'}}>"Laten we er samen een memorabele dag van maken — en Jorik is af en toe het haasje! 🐰"</div>
         <div style={{height:'var(--sp-8)'}}/>
         <button className="btn btn-gold btn-lg animate-in animate-in-5" onClick={()=>{
@@ -4198,7 +4208,11 @@ function App(){
             short why-we-need-it line on splash so the user is informed BEFORE
             tapping Speel mee → game view → wakeGps → OS prompt. Doesn't change
             app boot flow, just primes the user. */}
-        <div className="t-caption animate-in animate-in-5 text-center" style={{marginTop:'var(--sp-3)',maxWidth:320,lineHeight:'var(--lh-relaxed)',color:'var(--text-secondary)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(110,163,255,0.06)',border:'1px solid rgba(110,163,255,0.18)'}}>
+        {/* V43 design pass: the privacy notice was a bordered, tinted box sitting
+            right under the CTA — nearly as heavy as the gold button and pulling
+            focus from it. Now a quiet, borderless caption so the "Speel mee"
+            button is the clear visual endpoint of the hero. */}
+        <div className="t-caption animate-in animate-in-5 text-center" style={{marginTop:'var(--sp-4)',maxWidth:300,lineHeight:'var(--lh-relaxed)',color:'var(--text-tertiary)'}}>
           📍 Straks vragen we om je locatie — om opdrachten in de buurt vrij te geven, foto's te valideren en je team <b>live op de kaart</b> te tonen aan de andere teams. Alleen tijdens het spel.
         </div>
         <div style={{height:'var(--sp-7)'}}/>
@@ -5807,7 +5821,7 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
                     {q.required.map(locId=>{
                       const loc=L_DATA.find(l=>l.id===locId);
                       const visited=completed[locId]&&Object.keys(completed[locId]).length>0;
-                      return <span key={locId} style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:visited?'rgba(95,216,165,0.2)':'rgba(255,255,255,0.06)',color:visited?'#5fd8a5':'var(--text-tertiary)',border:`1px solid ${visited?'rgba(95,216,165,0.3)':'rgba(255,255,255,0.08)'}`}}>{loc?loc.n:locId}</span>;
+                      return <span key={locId} style={{fontSize:'var(--fs-11)',padding:'3px 7px',borderRadius:4,background:visited?'rgba(95,216,165,0.2)':'rgba(255,255,255,0.06)',color:visited?'#5fd8a5':'var(--text-secondary)',border:`1px solid ${visited?'rgba(95,216,165,0.3)':'rgba(255,255,255,0.08)'}`}}>{loc?loc.n:locId}</span>;
                     })}
                   </div>
                   <div className="t-caption" style={{marginTop:4}}>{complete?'Voltooid! Bonus bijgeschreven.':done+'/'+total+' locaties'}</div>
@@ -6087,7 +6101,7 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
         })()}
 
         {/* V12: legend — bottom-left, stacked (V30: offset reduced since map is now fixed-height) */}
-        <div style={{position:'absolute',bottom:10,left:10,zIndex:1000,padding:'6px 8px',borderRadius:10,backdropFilter:'blur(12px)',background:'rgba(8,9,13,0.7)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:3,fontSize:9,color:'var(--text-secondary)'}}>
+        <div style={{position:'absolute',bottom:10,left:10,zIndex:1000,padding:'6px 8px',borderRadius:10,backdropFilter:'blur(12px)',background:'rgba(8,9,13,0.7)',border:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:3,fontSize:'var(--fs-12)',color:'var(--text-secondary)'}}>
           <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--foto)'}}/>Foto</div>
           <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--video)'}}/>Video</div>
           <div style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:8,height:8,borderRadius:4,background:'var(--creatief)'}}/>Creatief</div>
@@ -6096,7 +6110,7 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
 
         {/* V12: center-on-me (V30: offset reduced since map is now fixed-height) */}
         {pos&&(
-          <button onClick={centerOnMe} style={{position:'absolute',bottom:10,right:12,zIndex:1000,width:38,height:38,borderRadius:19,background:'rgba(8,9,13,0.85)',border:'1px solid var(--border)',backdropFilter:'blur(12px)',cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center'}} title="Centreer op mij">📍</button>
+          <button onClick={centerOnMe} style={{position:'absolute',bottom:10,right:12,zIndex:1000,width:44,height:44,borderRadius:22,background:'rgba(8,9,13,0.85)',border:'1px solid var(--border)',backdropFilter:'blur(12px)',cursor:'pointer',fontSize:'var(--fs-16)',display:'flex',alignItems:'center',justifyContent:'center'}} title="Centreer op mij" aria-label="Centreer de kaart op mijn locatie">📍</button>
         )}
       </div>
 
@@ -8425,7 +8439,7 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
             floats at the top-right and stays put during scroll so "back to game" is one tap
             regardless of scroll position. */}
         <div style={{position:'sticky',top:0,zIndex:5,display:'flex',justifyContent:'flex-end',marginTop:-8,marginBottom:-32,pointerEvents:'none'}}>
-          <button onClick={onClose} aria-label="Terug naar spel" style={{pointerEvents:'auto',background:'rgba(20,20,20,0.85)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.18)',color:'#fff',fontSize:20,cursor:'pointer',width:40,height:40,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,boxShadow:'0 4px 14px rgba(0,0,0,0.45)'}}>✕</button>
+          <button onClick={onClose} aria-label="Terug naar spel" style={{pointerEvents:'auto',background:'rgba(20,20,20,0.85)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',border:'1px solid rgba(255,255,255,0.18)',color:'#fff',fontSize:20,cursor:'pointer',width:44,height:44,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,boxShadow:'0 4px 14px rgba(0,0,0,0.45)'}}>✕</button>
         </div>
         <div style={{textAlign:'center',marginBottom:'var(--sp-4)'}}>
           <div style={{fontSize:56}}>💍🎭</div>
