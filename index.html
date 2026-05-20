@@ -928,7 +928,7 @@ function dinerTs(){
 const BAR_BREAK_DURATION_MS=30*60*1000;
 
 // V20 balance: CATCH-UP / UNDERDOG BONUS.
-// At each bar-break the current last-place team gets a silent +UNDERDOG_BONUS
+// At each bar-break the current last-place team gets a +UNDERDOG_BONUS
 // so a single bad streak in hour 1 doesn't end the game psychologically.
 // Awarded once per bar-break ordinal, tracked in teams.underdog_bonus_last_break.
 const UNDERDOG_BONUS=75;
@@ -1414,8 +1414,21 @@ async function compressPhotoAdaptive(dataURL){
   return out;
 }
 
-// Detect whether dataURL is a video (keep raw; don't try to compress)
-function isVideoData(d){return typeof d==='string'&&d.startsWith('data:video')}
+// Detect whether a media value is a video.
+// V42 P1-1 fix: since V41.11, uploads land in Supabase Storage and come back as
+// https URLs with NO 'data:video' prefix. The old prefix-only check therefore
+// classified every Storage-hosted video as a photo, so the activity feed,
+// finale photo grid, finale MVP "Video-regisseur" award and the admin review
+// queue all rendered videos inside a broken <img>. We now also match by file
+// extension (Storage filenames end in the contentType-derived ext: mp4 /
+// quicktime / webm — plus mov/m4v/qt/ogv defensively). Pre-upload base64
+// (data:video…) is still caught by the prefix; photo URLs (jpeg/png/heic/
+// heif/webp) never match the video extension list, so they stay images.
+function isVideoData(d){
+  if(typeof d!=='string')return false;
+  if(d.startsWith('data:video'))return true;
+  return /\.(mp4|m4v|mov|qt|webm|ogv|quicktime)(?:[?#]|$)/i.test(d);
+}
 
 // V23 (#48): stable winner ranking with tiebreakers.
 // Primary: score (desc). Tie-breakers in order:
@@ -1977,7 +1990,13 @@ function App(){
       motionCheck=setInterval(()=>{
         if(!active)return;
         const stillFor=Date.now()-motionRef.current.lastMotion;
-        if(stillFor>STILL_TIMEOUT_MS&&watchId!=null){
+        // V42 UX: never sleep GPS before the FIRST fix is acquired. Previously a
+        // player who opened the app and stood still reading the intro for 30s
+        // had GPS put to sleep before it ever got a position — the nearby-
+        // challenge list then stayed empty and the only recovery was finding
+        // the small "tik om te activeren" pill. Battery-saving sleep still
+        // kicks in once we have a fix.
+        if(stillFor>STILL_TIMEOUT_MS&&watchId!=null&&gotFix){
           stopWatch();
           motionRef.current.still=true;
           setGpsStatus('sleep');
@@ -2099,22 +2118,13 @@ function App(){
   // V14: celebration auto-dismiss
   useEffect(()=>{if(celebration){const t=setTimeout(()=>setCelebration(null),2400);return()=>clearTimeout(t)}},[celebration]);
 
-  // V23 (#52): fire winner celebration ONCE when we enter phase 5 (FINALE).
-  // Uses rankTeams() so the celebrated team is identical to FinaleScreen's winner
-  // after the tiebreaker. A ref latches per-phase so an effect re-run (teams/scores
-  // shifting in the same phase, or a refresh) doesn't double-fire.
-  const finaleCelebratedRef=React.useRef(false);
-  useEffect(()=>{
-    if(phase!==5){finaleCelebratedRef.current=false;return;}
-    if(finaleCelebratedRef.current)return;
-    if(!teams||teams.length===0)return;
-    const winner=rankTeams(teams,scores,activityFeed)[0];
-    if(!winner)return;
-    finaleCelebratedRef.current=true;
-    celebrate({big:true,emoji:'🏆',title:`${winner.emoji} ${winner.name} wint!`,sub:`${winner.score} pts`});
-  },[phase,teams,scores,activityFeed,celebrate]);
-
   // V14: trigger haptic + sound
+  // V42 P2-1 fix: `celebrate` MUST be declared before the finale-celebration
+  // effect below — that effect lists `celebrate` in its dependency array, and a
+  // dependency array is evaluated during render. Previously `celebrate` sat
+  // AFTER the effect, a temporal-dead-zone hazard that only avoided a hard
+  // ReferenceError because @babel/standalone transpiles `const`→`var`. Moving
+  // the declaration up makes the code correct regardless of the transpile.
   const celebrate=useCallback((payload)=>{
     setCelebration(payload);
     // Haptic (works on mobile with user gesture already granted earlier in session)
@@ -2136,6 +2146,23 @@ function App(){
       }
     }catch(e){}
   },[]);
+
+  // V23 (#52): fire winner celebration ONCE when we enter phase 5 (FINALE).
+  // Uses rankTeams() so the celebrated team is identical to FinaleScreen's winner
+  // after the tiebreaker. A ref latches per-phase so an effect re-run (teams/scores
+  // shifting in the same phase, or a refresh) doesn't double-fire.
+  // V42 P2-1: relocated below `celebrate` so its dependency array no longer
+  // references `celebrate` before declaration.
+  const finaleCelebratedRef=React.useRef(false);
+  useEffect(()=>{
+    if(phase!==5){finaleCelebratedRef.current=false;return;}
+    if(finaleCelebratedRef.current)return;
+    if(!teams||teams.length===0)return;
+    const winner=rankTeams(teams,scores,activityFeed)[0];
+    if(!winner)return;
+    finaleCelebratedRef.current=true;
+    celebrate({big:true,emoji:'🏆',title:`${winner.emoji} ${winner.name} wint!`,sub:`${winner.score} pts`});
+  },[phase,teams,scores,activityFeed,celebrate]);
 
   // V23 (#50): soft single-beep ping for a newly-submitted photo_review.
   // Fires only for admin when `tab!=='review'` so the admin gets audible attention
@@ -2578,9 +2605,20 @@ function App(){
       // step 2 — teams: scores + spectator + underdog_bonus_last_break
       sb.from('teams').select('*').then(({data})=>{
         if(!data)return;
-        setTeams(data);
-        const sc={};data.forEach(t=>{sc[t.id]=t.score||0;});
-        setScores(sc);
+        // V42 P2-4 fix: merge by id (same as the initial fetch) instead of a
+        // hard setTeams(data). A raw replace dropped the synthetic spectator
+        // row — Game Master id=-1 / Toeschouwer id=-2, which lives only in
+        // local state and never in the DB — on every tab background→foreground.
+        setTeams(prev=>{
+          const byId=new Map(prev.map(t=>[t.id,t]));
+          data.forEach(t=>byId.set(t.id,{...byId.get(t.id),...t}));
+          return[...byId.values()];
+        });
+        setScores(prev=>{
+          const next={...prev};
+          data.forEach(t=>{next[t.id]=t.score||0;});
+          return next;
+        });
       },()=>{});
       // step 3 — activity_feed tail: catch up missed rows while backgrounded
       sb.from('activity_feed').select('*').order('created_at',{ascending:false}).limit(100).then(res=>{
@@ -3236,6 +3274,26 @@ function App(){
     },()=>{});
   },[myTeam]);
 
+  // V42: GPS TEAM-VISIBILITY — every device on a real team writes its current
+  // GPS position to teams.lat/lng so all other phones can see where each team
+  // is on the map. "Every team device writes" (last-write-wins) keeps a team
+  // visible even if one phone dies, loses signal or hands off. Throttled hard:
+  // at most one write per 20 s, and only when the position actually moved
+  // ≥15 m — so 4 teams × ~4 phones is still only a trickle of writes. The teams
+  // realtime subscription already in place delivers these to every client;
+  // MapView renders a colored team pin per position. Spectators never write.
+  const lastPosWriteRef=React.useRef({ts:0,lat:null,lng:null});
+  useEffect(()=>{
+    if(OFFLINE||!sb||!pos)return;
+    if(!myTeam||!(myTeam.id>0)||myTeam.spectator)return;
+    const now=Date.now();
+    const prev=lastPosWriteRef.current;
+    const movedM=(prev.lat==null)?Infinity:haversine(prev.lat,prev.lng,pos.lat,pos.lng);
+    if(now-prev.ts<20000&&movedM<15)return; // ≤1 write/20s unless moved ≥15m
+    lastPosWriteRef.current={ts:now,lat:pos.lat,lng:pos.lng};
+    sb.from('teams').update({lat:pos.lat,lng:pos.lng}).eq('id',myTeam.id).then(()=>{},()=>{});
+  },[pos,myTeam]);
+
   // V10: admin moves Jorik to a specific team (or nowhere)
   // V12: also persist on game_state so late-joining phones know who has Jorik
   // V22 audit fix (concurrency agent): client-side rate-limit — two admin tabs / a
@@ -3533,10 +3591,12 @@ function App(){
         }
       }catch(e){/* if the Jorik rotate fails we still want the bar break to proceed */}
 
-      // V20 balance: UNDERDOG BONUS — the current last-place team gets a silent
+      // V20 balance: CATCH-UP BONUS — the current last-place team gets a
       // +UNDERDOG_BONUS so they stay psychologically in the race. Guarded against
       // double-awarding via teams.underdog_bonus_last_break (set to startedAt's
       // unix seconds, a unique-per-break integer).
+      // V42 P3-3: the feed line is framed as an encouraging "inhaalbonus" rather
+      // than publicly tagging the last team "UNDERDOG … still in it!".
       const breakKey=Math.floor(startedAt/1000);
       sb.from('teams').select('id,name,score,underdog_bonus_last_break,spectator').then(({data:allTeams,error})=>{
         if(error||!allTeams?.length)return;
@@ -3553,7 +3613,7 @@ function App(){
             sb.from('teams').update({underdog_bonus_last_break:breakKey}).eq('id',last.id).then(()=>{},()=>{});
             sb.from('activity_feed').insert({
               team_id:last.id,team_name:last.name,team_emoji:'💪',team_color:'#d4a054',
-              message:`💪 UNDERDOG BONUS voor ${last.name}! +${UNDERDOG_BONUS} pts (still in it!)`,
+              message:`💪 Inhaalbonus voor ${last.name}! +${UNDERDOG_BONUS} pts — de race is nog niet gelopen.`,
               points:UNDERDOG_BONUS,created_at:new Date().toISOString(),
             });
           })
@@ -3735,12 +3795,16 @@ function App(){
   // to have exactly N" is the mental model. If concurrency becomes an issue
   // (unlikely — single GM device), rewrite to use applyScoreDelta(teamId,delta).
   const adjustScore=useCallback((teamId,delta)=>{
-    if(!isAdmin||!teamId)return;
+    if(!isAdmin||!teamId||!Number.isFinite(delta))return;
     const cur=scores[teamId]||0;
     const next=Math.max(0,cur+delta);
-    setScores(prev=>({...prev,[teamId]:next}));
+    // V42 P2-2 fix: route through the atomic increment_team_score RPC instead of
+    // a client-computed read-modify-write. A bare update({score:next}) silently
+    // loses concurrent writes — e.g. a teammate completing a challenge in the
+    // same instant the GM adjusts that team's score. applyScoreDelta does the
+    // optimistic local bump AND the atomic server delta, then reconciles.
+    applyScoreDelta(teamId,delta);
     if(!OFFLINE&&sb){
-      sb.from('teams').update({score:next}).eq('id',teamId).then(()=>{},()=>{});
       const team=teams.find(t=>t.id===teamId);
       sb.from('activity_feed').insert({
         team_id:teamId, team_name:team?.name||'Team', team_emoji:team?.emoji||'🎮', team_color:team?.color||'#d4a054',
@@ -3784,6 +3848,14 @@ function App(){
     setTeams(prev=>prev.filter(t=>t.id!==teamId));
     setScores(prev=>{const n={...prev};delete n[teamId];return n;});
     if(!OFFLINE&&sb){
+      // V42 P3-4: completed_challenges, activity_feed, challenge_first_finder and
+      // team_members all FK to teams with ON DELETE CASCADE, so deleting the team
+      // row cleans them automatically (and frees any first-finder slot the team
+      // held). photo_reviews.team_id is a bare BIGINT with no FK, so it won't
+      // cascade — and anon has no DELETE policy on photo_reviews. Instead mark
+      // this team's still-pending reviews resolved so they drop out of the admin
+      // review queue rather than lingering as orphan cards.
+      sb.from('photo_reviews').update({status:'rejected'}).eq('team_id',teamId).eq('status','pending').then(()=>{},()=>{});
       sb.from('teams').delete().eq('id',teamId).then(()=>{},()=>{});
     }
   },[isAdmin,confirmAsync]);
@@ -3978,70 +4050,83 @@ function App(){
   },[isAdmin,phase]);
 
 
+  // V42 P2-3: synchronous re-entrancy lock. The `phase>0` check alone only
+  // catches a SECOND call after React has committed setPhase(1); a fast double-
+  // tap or a BroadcastChannel echo can re-enter before that commit. This ref is
+  // set synchronously so a single device can never run startGame twice.
+  const startGameLockRef=React.useRef(false);
+
   const startGame=()=>{
-    // V29 (§1): guard against double-fire. The old startGame would run again
-    // if the admin tapped Start twice, or if a BroadcastChannel tab-echo
-    // bounced back to the initiating tab, giving the "Het spel is begonnen! 🎮"
-    // ×2 bug in Mike's screenshot. If phase is already >0 we're mid-game;
-    // the second call is a no-op.
-    if(phase>0)return;
+    // V29 (§1) + V42 P2-3: guard against double-fire. `phase>0` catches a
+    // post-commit re-tap; `startGameLockRef` catches a pre-commit double-tap /
+    // tab-echo on the same device.
+    if(phase>0||startGameLockRef.current)return;
+    startGameLockRef.current=true;
     const now=Date.now();
     setGameStart(now);
     setPhase(1);
     setScreen('game');
-    addActivity('Het spel is begonnen! 🎮');
-    // V30: intro story trigger removed with the chapter-modal system.
-    // V12: broadcast start via game_state — every phone snaps out of lobby
-    // V27 P0-A: ALSO seed jorik_team_id + jorik_moved_at. Pre-V27 startGame never
-    // wrote these, so game_state.jorik_team_id stayed NULL, the auto-rotate watcher
-    // early-returned on `if(!jorikTeamId||!jorikMovedAt)`, and the Jorik mechanic
-    // was silently dead for every fresh game. Live forensic audit (18 Apr 2026)
-    // confirmed all 4 teams had has_jorik=false after a phase=1 upsert.
-    if(!OFFLINE&&sb){
-      // V19: pick the starting Jorik team RANDOMLY (previously was "first non-spectator"
-      // which reliably handed Jorik to Team 1 every game). Matches the bar-break
-      // rotation rule — fair, no predictability.
-      const eligibleSeed=(Array.isArray(teams)?teams:[]).filter(t=>!t.spectator);
-      const seedTeam=eligibleSeed.length?eligibleSeed[Math.floor(Math.random()*eligibleSeed.length)]:null;
-      const seedPayload={id:1,phase:1,started_at:new Date(now).toISOString(),game_ended:false,bar_break_active:null,bar_break_started_at:null};
-      if(seedTeam){
-        seedPayload.jorik_team_id=seedTeam.id;
-        seedPayload.jorik_moved_at=new Date(now).toISOString();
-      }
-      sb.from('game_state').upsert(seedPayload).then(()=>{
-        if(seedTeam){
-          // Mirror locally so the banners wake up immediately, even before the
-          // realtime UPDATE echoes back.
-          setJorikTeamId(seedTeam.id);
-          setJorikMovedAt(now);
-          // V19: loud announcement — Jorik's start team deserves a dedicated feed line
-          // so every player knows who begins with him.
-          sb.from('activity_feed').insert({
-            team_id:null, team_name:'Game Master', team_emoji:'💍', team_color:'#d4a054',
-            message:`💍 Jorik begint bij ${seedTeam.emoji||''} ${seedTeam.name}! Veel succes met de ${JORIK_MISSIONS.length} Jorik-missies!`,
-            points:0, created_at:new Date().toISOString(),
-          }).then(()=>{},()=>{});
-          // Also the [JORIK] canonical marker so mid-game join clients pick it up
-          // the same way they pick up admin-triggered moves.
-          sb.from('activity_feed').insert({
-            team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#d4a054',
-            message:`[JORIK] team=${seedTeam.id}`,
-            points:0, created_at:new Date().toISOString(),
-          }).then(()=>{},()=>{});
-        }
-      },(err)=>{
-        // Pre-V21 DBs don't have jorik_moved_at — retry without it so start
-        // doesn't stall. Admin can manually seed Jorik via the chip row.
-        const msg=String(err?.message||'').toLowerCase();
-        if(msg.includes('jorik_moved_at')||err?.code==='42703'){
-          const retryPayload=Object.assign({},seedPayload);
-          delete retryPayload.jorik_moved_at;
-          sb.from('game_state').upsert(retryPayload).then(()=>{
-            if(seedTeam){setJorikTeamId(seedTeam.id);setJorikMovedAt(now);}
-          },()=>{});
-        }
-      });
+    if(OFFLINE||!sb){
+      // Offline/demo mode — no shared DB, announce locally and stop.
+      addActivity('Het spel is begonnen! 🎮');
+      return;
     }
+    // V19: pick the starting Jorik team RANDOMLY (previously "first non-spectator",
+    // which reliably handed Jorik to Team 1). V27 P0-A: also seed jorik_team_id +
+    // jorik_moved_at so the auto-rotate watcher isn't dead on a fresh game.
+    const eligibleSeed=(Array.isArray(teams)?teams:[]).filter(t=>!t.spectator);
+    const seedTeam=eligibleSeed.length?eligibleSeed[Math.floor(Math.random()*eligibleSeed.length)]:null;
+    const seedPayload={phase:1,started_at:new Date(now).toISOString(),game_ended:false,bar_break_active:null,bar_break_started_at:null};
+    if(seedTeam){
+      seedPayload.jorik_team_id=seedTeam.id;
+      seedPayload.jorik_moved_at=new Date(now).toISOString();
+    }
+    // The race-winner owns the announcements (feed rows + local Jorik mirror).
+    const announceStart=()=>{
+      if(seedTeam){
+        // Mirror locally so banners wake immediately, before the realtime echo.
+        setJorikTeamId(seedTeam.id);
+        setJorikMovedAt(now);
+      }
+      addActivity('Het spel is begonnen! 🎮');
+      if(seedTeam){
+        sb.from('activity_feed').insert({
+          team_id:null, team_name:'Game Master', team_emoji:'💍', team_color:'#d4a054',
+          message:`💍 Jorik begint bij ${seedTeam.emoji||''} ${seedTeam.name}! Veel succes met de ${JORIK_MISSIONS.length} Jorik-missies!`,
+          points:0, created_at:new Date().toISOString(),
+        }).then(()=>{},()=>{});
+        sb.from('activity_feed').insert({
+          team_id:null, team_name:'Game Master', team_emoji:'👑', team_color:'#d4a054',
+          message:`[JORIK] team=${seedTeam.id}`,
+          points:0, created_at:new Date().toISOString(),
+        }).then(()=>{},()=>{});
+      }
+    };
+    // V42 P2-3: CONDITIONAL start. The UPDATE matches `phase=0`, so only the
+    // FIRST device to flip game_state wins — a second racing device's update
+    // affects 0 rows and skips the announcements. This makes the Jorik seed
+    // deterministic (one winner, one random pick) and removes the duplicate
+    // "Het spel is begonnen!" / "Jorik begint bij…" feed rows. Losing racers +
+    // every other phone receive phase/Jorik/feed via the realtime subscription.
+    sb.from('game_state').update(seedPayload).eq('id',1).eq('phase',0).select().then(({data,error})=>{
+      if(error){
+        // Pre-V21 DBs lack jorik_moved_at — retry without it so start doesn't stall.
+        const msg=String(error?.message||'').toLowerCase();
+        if(msg.includes('jorik_moved_at')||error?.code==='42703'){
+          const retry=Object.assign({},seedPayload);delete retry.jorik_moved_at;
+          sb.from('game_state').update(retry).eq('id',1).eq('phase',0).select().then(({data:d2})=>{
+            if(d2&&d2.length)announceStart();
+          },()=>{startGameLockRef.current=false;});
+          return;
+        }
+        // Genuine failure — unlock so the admin can retry.
+        startGameLockRef.current=false;
+        return;
+      }
+      // data.length>0 → we won the race. data.length===0 → another device
+      // already started; realtime will deliver everything, nothing to do.
+      if(data&&data.length)announceStart();
+    },()=>{startGameLockRef.current=false;});
   };
 
   // V30: phase-story queue + dispatcher effects removed with the chapter-modal system.
@@ -4114,7 +4199,7 @@ function App(){
             tapping Speel mee → game view → wakeGps → OS prompt. Doesn't change
             app boot flow, just primes the user. */}
         <div className="t-caption animate-in animate-in-5 text-center" style={{marginTop:'var(--sp-3)',maxWidth:320,lineHeight:'var(--lh-relaxed)',color:'var(--text-secondary)',padding:'var(--sp-2) var(--sp-3)',borderRadius:'var(--r-md)',background:'rgba(110,163,255,0.06)',border:'1px solid rgba(110,163,255,0.18)'}}>
-          📍 Straks vragen we om je locatie. <b>Géén tracking, géén opslag</b> — alleen om opdrachten in de buurt vrij te geven en foto's te valideren.
+          📍 Straks vragen we om je locatie — om opdrachten in de buurt vrij te geven, foto's te valideren en je team <b>live op de kaart</b> te tonen aan de andere teams. Alleen tijdens het spel.
         </div>
         <div style={{height:'var(--sp-7)'}}/>
         {/* V23: dropped "≈4 uur buiten / Neem een power bank mee" tail per Mike's
@@ -4374,7 +4459,7 @@ function App(){
               </h2>
               <div className="t-body" style={{marginTop:'var(--sp-2)'}}>
                 {gpsStatus==='denied'
-                  ?'Het spel gebruikt je locatie om opdrachten in de buurt vrij te geven en foto-uploads te valideren. Géén tracking, géén opslag — alleen tijdens het spel.'
+                  ?'Het spel gebruikt je locatie om opdrachten in de buurt vrij te geven, foto-uploads te valideren en je team live op de kaart te tonen aan de andere teams. Alleen tijdens het spel.'
                   :'Je toestel kan op dit moment geen GPS-signaal vinden. Probeer naar buiten te lopen, weg van hoge gebouwen.'}
               </div>
             </div>
@@ -4534,14 +4619,22 @@ function App(){
         );
       })()}
 
-      {/* Phase progress */}
+      {/* Phase progress — V42 UX fix: the game has TWO real stages, the
+          Zoektocht (phases 1-3) and the Finale (phase 4+). The old bar showed
+          four segments incl. "Geruchten" and "Cirkel", which never light up
+          because the game jumps phase 1→4 — a phantom journey that left players
+          waiting for stages that never arrive. Two honest segments now; if an
+          admin ever advances to phase 2/3 the bar still correctly reads
+          "Zoektocht" since those are part of the hunt. */}
       <div style={{padding:`var(--sp-2) var(--sp-5) var(--sp-3)`}}>
         <div className="phase-bar">
-          {[1,2,3,4].map(p=><div key={p} className={`phase-dot ${phase>p?'done':phase===p?'active':''}`}/>)}
+          {[{lo:1,hi:3},{lo:4,hi:99}].map((seg,i)=>(
+            <div key={i} className={`phase-dot ${phase>seg.hi?'done':phase>=seg.lo?'active':''}`}/>
+          ))}
         </div>
         <div className="row-between" style={{marginTop:'var(--sp-2)'}}>
-          {['Zoektocht','Geruchten','Cirkel','Finale'].map((l,i)=>(
-            <span key={l} className="t-label-sm" style={{color:phase>=i+1?'var(--accent-2)':'var(--text-tertiary)',transition:'color .4s',letterSpacing:'var(--ls-wider)'}}>{l}</span>
+          {[{l:'Zoektocht',lo:1},{l:'Finale',lo:4}].map(seg=>(
+            <span key={seg.l} className="t-label-sm" style={{color:phase>=seg.lo?'var(--accent-2)':'var(--text-tertiary)',transition:'color .4s',letterSpacing:'var(--ls-wider)'}}>{seg.l}</span>
           ))}
         </div>
       </div>
@@ -4559,10 +4652,15 @@ function App(){
           <span className="t-card-label" style={{letterSpacing:'var(--ls-wider)'}}>FINALE LIVE</span>
           {(()=>{
             const msLeft=Math.max(0,dinerTs()-nowTs);
-            const m=Math.floor(msLeft/60000);
-            const s=Math.floor((msLeft%60000)/1000);
-            const mmss=`${m}:${String(s).padStart(2,'0')}`;
-            return <span className="t-card-label" style={{letterSpacing:'var(--ls-wider)',color:msLeft<60000?'#ff8a8a':'var(--accent-2)',fontVariantNumeric:'tabular-nums'}} aria-label={`Aftelklok: ${m} minuten ${s} seconden tot eindceremonie`}>⏱ {mmss}</span>;
+            const totalSec=Math.floor(msLeft/1000);
+            const h=Math.floor(totalSec/3600);
+            const m=Math.floor((totalSec%3600)/60);
+            const s=totalSec%60;
+            // V42 P3-6: show h:mm:ss once we're an hour or more out (e.g. the
+            // +4h dev offset in test mode) so the chip never reads a bare,
+            // alarming-looking "240:00". Inside the final hour it's plain m:ss.
+            const clock=h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`;
+            return <span className="t-card-label" style={{letterSpacing:'var(--ls-wider)',color:msLeft<60000?'#ff8a8a':'var(--accent-2)',fontVariantNumeric:'tabular-nums'}} aria-label={`Aftelklok: ${h>0?h+' uur ':''}${m} minuten ${s} seconden tot eindceremonie`}>⏱ {clock}</span>;
           })()}
           <span className="t-caption" style={{opacity:0.85}}>dichtste bij Jorik wint · loop snel naar de Markthal-cirkel</span>
         </div>
@@ -4580,7 +4678,7 @@ function App(){
       {/* Tab content */}
       <div style={{flex:1,overflow:'hidden',position:'relative'}}>
         {tab==='leaderboard'&&<LeaderboardView teams={teams} scores={scores} myTeam={myTeam} phase={phase} elapsed={elapsed} barBreak={barBreak} jorikInTeam={jorikInTeam} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} nowTs={nowTs} weddingDone={weddingDone} onShowWedding={()=>setShowWedding(true)} pendingMine={pendingMine} completed={completed} completedPts={completedPts} visitedLocs={visitedLocs} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} isJorikDevice={isJorikDevice} confirmAsync={confirmAsync}/>}
-        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} gpsOptOut={gpsOptOut} gameStart={gameStart}/>}
+        {tab==='map'&&<MapView pos={pos} completed={completed} visitedLocs={visitedLocs} onSelect={setSelLoc} phase={phase} gpsStatus={gpsStatus} gpsSnap={gpsSnap} onWakeGps={wakeGps} nowTs={nowTs} jorikInTeam={jorikInTeam} jorikMissionsDone={jorikMissionsDone} onShowJorikMissions={()=>setShowJorikMissions(true)} gpsOptOut={gpsOptOut} gameStart={gameStart} teams={teams} myTeam={myTeam}/>}
         {tab==='activity'&&<ActivityView feed={activityFeed} myTeamId={myTeam?.id} onPhoto={setPhotoLightbox} filter={feedFilter} setFilter={setFeedFilter} jorikTeamId={jorikTeamId} jorikInTeam={jorikInTeam} isJorikDevice={isJorikDevice}/>}
         {tab==='review'&&isAdmin&&<AdminReviewView queue={reviewQueue} onApprove={approveReview} onReject={rejectReview} onPhoto={setPhotoLightbox} teams={teams} jorikTeamId={jorikTeamId} jorikMovedAt={jorikMovedAt} onMoveJorik={moveJorik} onTriggerBarBreak={triggerBarBreak} onEndBarBreak={endBarBreak} barBreakActive={barBreakActive} onStartFinalePhase={startFinalePhase} onStartFinale={startFinale} phase={phase} scores={scores} onAdjustScore={adjustScore} onRemoveTeam={removeTeam} onRenameTeam={renameTeam} reviewUndo={reviewUndo} onUndoReview={undoReview} onBroadcast={broadcastMessage} onResetGame={resetGame} confirmAsync={confirmAsync} jorikVisitedTeamIds={jorikVisitedTeamIds} teamMemberCounts={teamMemberCounts} nowTs={nowTs}/>}
       </div>
@@ -4594,7 +4692,7 @@ function App(){
       {dialog&&<DialogSheet {...dialog} onClose={closeDialog}/>}
 
       {/* V10/V16/V18: Bar-break overlay — minimizable, persistent chip when hidden */}
-      {barBreakActive&&!barBreakHidden&&<BarBreakOverlay info={barBreakActive} onClose={()=>setBarBreakHidden(true)} onComplete={(mini,pts,photo)=>{
+      {barBreakActive&&<BarBreakOverlay key={`bb-${barBreakActive.name||'bar'}-${barBreakActive.started||0}`} hidden={barBreakHidden} info={barBreakActive} onClose={()=>setBarBreakHidden(true)} onComplete={(mini,pts,photo)=>{
         // V21 P1-fix #21: idempotent bar-break mini completion.
         // A stable pseudo challenge_id lets the completed_challenges UNIQUE index (team_id, challenge_id)
         // block duplicate submissions after a reload or network retry. 23505 means "already counted" — no-op.
@@ -5747,13 +5845,14 @@ function LeaderboardView({teams,scores,myTeam,phase,elapsed,barBreak,jorikInTeam
 // ═══════════════════════════════════════════
 // MAP VIEW
 // ═══════════════════════════════════════════
-function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,nowTs,jorikInTeam=false,jorikMissionsDone=null,onShowJorikMissions=null,gpsOptOut=false,gameStart=null}){
+function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onWakeGps,nowTs,jorikInTeam=false,jorikMissionsDone=null,onShowJorikMissions=null,gpsOptOut=false,gameStart=null,teams=[],myTeam=null}){
   // V41.13 — refs for bar break pulse markers (managed by separate effect)
   const barMarkersRef=useRef([]);
   const mapRef=useRef(null);
   const mapInst=useRef(null);
   const markersRef=useRef([]);
   const userMarkerRef=useRef(null);
+  const teamMarkersRef=useRef({}); // V42: teamId -> L.marker for live team-visibility
   const dinnerCircleRef=useRef(null); // V12: phase-gated dinner zone circle
 
   // Init map
@@ -5824,6 +5923,44 @@ function MapView({pos,completed,visitedLocs,onSelect,phase,gpsStatus,gpsSnap,onW
       })
     }).addTo(mapInst.current);
   },[pos]);
+
+  // V42: LIVE TEAM-VISIBILITY markers. Renders a colored pin (team colour +
+  // emoji) for every OTHER team that has a known GPS position. Positions come
+  // from teams.lat/lng — written by each device (see App's position-writer
+  // effect) — and the teams realtime subscription pushes updates, so the pins
+  // move live. The local team is intentionally skipped: that's already the
+  // gold pulsing "jij" dot, so a second pin on top would just be clutter.
+  // Spectators and teams without a position are skipped. Markers are diffed by
+  // id: created once, repositioned on update, removed when a team disappears.
+  useEffect(()=>{
+    const m=mapInst.current;
+    if(!m)return;
+    const live={};
+    (teams||[]).forEach(t=>{
+      if(!t||t.spectator)return;
+      if(myTeam&&t.id===myTeam.id)return;
+      if(typeof t.lat!=='number'||typeof t.lng!=='number')return;
+      live[t.id]=true;
+      const color=t.color||'#d4a054';
+      const emoji=t.emoji||'🚩';
+      const icon=L.divIcon({className:'',iconAnchor:[16,32],html:
+        `<div style="width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:2px solid rgba(255,255,255,0.92);box-shadow:0 3px 10px rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center"><span style="transform:rotate(45deg);font-size:16px;line-height:1">${emoji}</span></div>`});
+      let mk=teamMarkersRef.current[t.id];
+      if(mk){mk.setLatLng([t.lat,t.lng]);mk.setIcon(icon);}
+      else{
+        mk=L.marker([t.lat,t.lng],{icon,zIndexOffset:200,interactive:true});
+        try{mk.bindTooltip(`${emoji} ${t.name||'Team'}`,{direction:'top',offset:[0,-30]});}catch(e){}
+        mk.addTo(m);
+        teamMarkersRef.current[t.id]=mk;
+      }
+    });
+    Object.keys(teamMarkersRef.current).forEach(id=>{
+      if(!live[id]){
+        try{m.removeLayer(teamMarkersRef.current[id]);}catch(e){}
+        delete teamMarkersRef.current[id];
+      }
+    });
+  },[teams,myTeam]);
 
   // V41.13 — bar break pulse markers. Renders a pulsing beer-emoji marker on
   // the map for each bar in BAR_BREAKS during its active window
@@ -7374,33 +7511,12 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
   const dist=pos?haversine(pos.lat,pos.lng,loc.la,loc.lo):null;
   // V25 (#71): two-radius band classification for this POI
   const{band}=locBand(pos,loc);
-  // V7.1 hotfix: only lock quizzes when the location actually HAS a photo challenge to unlock against.
-  // Otherwise quiz-only locations (Spido Kade, BlueCity, Willemswerf) would be permanently unreachable.
-  // V38: for Flippercoin locations, only consider the coin-selected media challenge
-  // as the gate for quiz unlock — otherwise quizzes stay locked forever if the
-  // non-selected media type is the only "photo" type the location has.
-  const hasAnyPhoto=loc.ch.some((ch,i)=>{
-    const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
-    if(!isMedia)return false;
-    // If flippercoin is active, only count visible challenges
-    if(isFlipLoc&&flipVisibleIdx&&!flipVisibleIdx.has(i))return false;
-    return true;
-  });
-  const hasPhotoCompleted=loc.ch.some((ch,i)=>{
-    const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
-    if(!isMedia)return false;
-    if(isFlipLoc&&flipVisibleIdx&&!flipVisibleIdx.has(i))return false;
-    return completed[i];
-  });
-
-  // V5: compute the quiz to show for this visit (rotate through unseen)
-  // We render one rotating-quiz slot that replaces all the location's built-in quizzes.
-  // Built-in quiz indexes and a virtual index 'rotatedQuiz' for the dynamic slot.
-  const locQuizIndexes=loc.ch.map((c,i)=>c.t==='quiz'?i:-1).filter(i=>i>=0);
-  const allLocQuizzesDone=locQuizIndexes.length>0&&locQuizIndexes.every(i=>completed[i]);
-  // The rotated quiz is only relevant once all built-in quizzes are done; then we draw from the pool
-  const rotatedQuiz=allLocQuizzesDone?pickQuiz(loc,seenQuizzes||new Set()):null;
-
+  // V42 P3-1 fix: the Flippercoin detection (isFlipLoc / flipResult /
+  // flipVisibleIdx) is declared HERE, before hasAnyPhoto/hasPhotoCompleted use
+  // it. Previously it sat below them — a temporal-dead-zone hazard masked only
+  // by the @babel/standalone const→var transpile, which left isFlipLoc and
+  // flipVisibleIdx evaluating to `undefined` inside the gate checks, so the V38
+  // coin-aware quiz-gate filtering never actually ran.
   // V38: Flippercoin mechanic — detect if this location qualifies
   const isFlipLoc=isFlippercoinLocation(loc);
   const[flipResult,setFlipResult]=useState(()=>{
@@ -7434,6 +7550,43 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
     }
     return visible;
   },[isFlipLoc,flipResult,loc]);
+
+  // V7.1 hotfix: only lock quizzes when the location actually HAS a photo challenge to unlock against.
+  // Otherwise quiz-only locations (Spido Kade, BlueCity, Willemswerf) would be permanently unreachable.
+  // V38: for Flippercoin locations, only consider the coin-selected media challenge
+  // as the gate for quiz unlock — otherwise quizzes stay locked forever if the
+  // non-selected media type is the only "photo" type the location has.
+  const hasAnyPhoto=loc.ch.some((ch,i)=>{
+    const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
+    if(!isMedia)return false;
+    // If flippercoin is active, only count visible challenges
+    if(isFlipLoc&&flipVisibleIdx&&!flipVisibleIdx.has(i))return false;
+    return true;
+  });
+  const hasPhotoCompleted=loc.ch.some((ch,i)=>{
+    const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
+    if(!isMedia)return false;
+    if(isFlipLoc&&flipVisibleIdx&&!flipVisibleIdx.has(i))return false;
+    return completed[i];
+  });
+  // V42 P3-5: the gating media challenge can be a photo, video OR creative — derive
+  // a label so the quiz-lock copy names the right thing (it was hard-coded "foto"
+  // even when the challenge that unlocks the quiz is a video).
+  const gateCh=loc.ch.find((ch,i)=>{
+    const isMedia=ch.t==='photo'||ch.t==='video'||ch.t==='creative';
+    if(!isMedia)return false;
+    if(isFlipLoc&&flipVisibleIdx&&!flipVisibleIdx.has(i))return false;
+    return !completed[i];
+  });
+  const gateLabel=gateCh?(gateCh.t==='video'?'video-opdracht':gateCh.t==='creative'?'opdracht':'foto-opdracht'):'opdracht';
+
+  // V5: compute the quiz to show for this visit (rotate through unseen)
+  // We render one rotating-quiz slot that replaces all the location's built-in quizzes.
+  // Built-in quiz indexes and a virtual index 'rotatedQuiz' for the dynamic slot.
+  const locQuizIndexes=loc.ch.map((c,i)=>c.t==='quiz'?i:-1).filter(i=>i>=0);
+  const allLocQuizzesDone=locQuizIndexes.length>0&&locQuizIndexes.every(i=>completed[i]);
+  // The rotated quiz is only relevant once all built-in quizzes are done; then we draw from the pool
+  const rotatedQuiz=allLocQuizzesDone?pickQuiz(loc,seenQuizzes||new Set()):null;
 
   return(
     <>
@@ -7529,9 +7682,10 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
           // V18 (V14 A5): show the full unlock chain when the quiz is locked
           const photoGate=PHOTO_GATE_RADIUS+PHOTO_GATE_GRACE;
           const farFromPoi=locked&&!isAdmin&&dist!=null&&dist>photoGate;
+          // V42 P3-5: name the actual gating challenge type, not a hard-coded "foto".
           const lockMsg=farFromPoi
-            ?`🔒 Loop naar ${loc.n} · foto maken · dan opent de quiz`
-            :'🔒 Eerst een foto-opdracht — dan opent de quiz';
+            ?`🔒 Loop naar ${loc.n} · doe de ${gateLabel} · dan opent de quiz`
+            :`🔒 Eerst de ${gateLabel} hier — dan opent de quiz`;
           // V30 — secrecy lock takes precedence over the quiz-locked overlay.
           // V37 — copy branches on isJorikDevice (Jorik's own phone gets innocuous).
           // V40.1 (security review P0): TWO hardening fixes:
@@ -8419,7 +8573,7 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
 // ═══════════════════════════════════════════
 // V10: BAR BREAK OVERLAY
 // ═══════════════════════════════════════════
-function BarBreakOverlay({info,onClose,onComplete}){
+function BarBreakOverlay({info,onClose,onComplete,hidden}){
   const[done,setDone]=useState(new Set());
   const[nowTs,setNowTs]=useState(Date.now());
   const fileRefs=useRef({}); // V16: per-mini file input refs for photo upload
@@ -8430,6 +8584,13 @@ function BarBreakOverlay({info,onClose,onComplete}){
     window.addEventListener('keydown',onKey);
     return()=>window.removeEventListener('keydown',onKey);
   },[onClose]);
+  // V42 P3-2 fix: while minimized the overlay renders nothing, but the COMPONENT
+  // stays mounted — the parent keeps <BarBreakOverlay> rendered (keyed per break)
+  // and just toggles `hidden`. So the `done` set survives minimize→reopen.
+  // Previously the overlay was conditionally mounted, so minimizing unmounted it
+  // and every completed mini re-showed its upload button on reopen. All hooks
+  // above run unconditionally; this early return sits after them.
+  if(hidden)return null;
   const endsAt=(info.started||Date.now())+BAR_BREAK_DURATION_MS;
   const msLeft=Math.max(0,endsAt-nowTs);
   const secLeft=Math.floor(msLeft/1000);
