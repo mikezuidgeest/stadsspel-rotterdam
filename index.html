@@ -1482,18 +1482,10 @@ function rankTeams(teams,scores,activityFeed){
     });
 }
 
-// V30 (Phase 6): bar breaks are now a single shared group-photo + proost moment.
-// The old 3-of-6 seeded pool was too much cognitive load mid-pub — everyone reading
-// three different mini-challenges and deciding which to do killed the vibe. One
-// clear action: everyone in one frame, glass in the air, done.
-const BAR_MOMENT={emoji:'🍻',title:'Groepsfoto + proost',desc:'Iedereen samen, glazen in de lucht — één foto of video per team.',pts:40};
-
-// V30: signature preserved (admin trigger, echo handler, rehydrate all call with
-// barName+startedAt). Always returns a 1-item array so existing `.mini.map(...)`
-// and `mini.title` callsites keep working.
-function defaultBarMinis(_barName,_startedAt){
-  return[BAR_MOMENT];
-}
+// V52: BAR_MOMENT + defaultBarMinis removed. V48 decoupled the bar break from
+// scoring (the overlay no longer renders a mini-challenge), so the `mini` payload
+// on barBreakActive became dead — BarBreakOverlay never reads it. barBreakActive
+// is now shape {name, started}.
 
 // V12: bar POIs for the admin dropdown (derived from L_DATA at runtime; fallback list here)
 function getBarOptions(){
@@ -2294,10 +2286,8 @@ function App(){
         }
         if(gs.bar_break_active){
           // Bar break is currently live
-          // V20: seed the mini pick with name + started so every client agrees on 3-of-6
           const startedMs=gs.bar_break_started_at?new Date(gs.bar_break_started_at).getTime():Date.now();
-          const minis=defaultBarMinis(gs.bar_break_active,startedMs);
-          setBarBreakActive({name:gs.bar_break_active,mini:minis,started:startedMs});
+          setBarBreakActive({name:gs.bar_break_active,started:startedMs});
           setBarBreak({name:gs.bar_break_active,time:Date.now()});
         }else{
           // V40 P3 fix: parallel branch — initial hydration with no active bar break
@@ -2408,10 +2398,8 @@ function App(){
       }
       if(gs.bar_break_active){
         // Someone (admin) started a bar break — show the overlay
-        // V20: seed 3-of-6 pick so every client sees the same minis
         const startedMs=gs.bar_break_started_at?new Date(gs.bar_break_started_at).getTime():Date.now();
-        const minis=defaultBarMinis(gs.bar_break_active,startedMs);
-        setBarBreakActive({name:gs.bar_break_active,mini:minis,started:startedMs});
+        setBarBreakActive({name:gs.bar_break_active,started:startedMs});
         setBarBreak({name:gs.bar_break_active,time:Date.now()});
       }else{
         // Admin cleared the bar break — V40 P3 fix (sim finding #8): also clear the
@@ -2613,7 +2601,7 @@ function App(){
         if(gs.bar_break_active){
           const startedMs=gs.bar_break_started_at?new Date(gs.bar_break_started_at).getTime():Date.now();
           if(!barBreakActive||barBreakActive.name!==gs.bar_break_active||barBreakActive.started!==startedMs){
-            setBarBreakActive({name:gs.bar_break_active,mini:defaultBarMinis(gs.bar_break_active,startedMs),started:startedMs});
+            setBarBreakActive({name:gs.bar_break_active,started:startedMs});
           }
         }else if(barBreakActive){
           setBarBreakActive(null);
@@ -3480,7 +3468,7 @@ function App(){
 
   // V10/V12: bar-break trigger — admin signals a break at specific bar name
   // V12: persisted on game_state so all phones open the overlay at the same moment
-  const[barBreakActive,setBarBreakActive]=useState(null); // {name, mini, started}
+  const[barBreakActive,setBarBreakActive]=useState(null); // {name, started}
   const[barBreakHidden,setBarBreakHidden]=useState(false); // V18: minimize overlay, show chip
   useEffect(()=>{setBarBreakHidden(false);},[barBreakActive?.name,barBreakActive?.started]);
 
@@ -3488,6 +3476,13 @@ function App(){
   // this session, so the 1-second nowTs tick can't re-fire. Cross-session dedup
   // is the DB check inside the pre-announcement effect below.
   const barPreAnnouncedRef=React.useRef(new Set());
+  // V51 (audit P0) — wipe the per-session dedup whenever a new game starts.
+  // gameStart changes on startGame (null→ts), resetGame and wipeAndRestart
+  // (ts→null→ts). Without this the ref survives a reset and would PERMANENTLY
+  // suppress the pre-announcement for every replayed game in the same browser
+  // tab — and Mike resets often while testing. Fires on null→ts too (clears an
+  // already-empty set, harmless). gameStart never changes ts→other-ts mid-game.
+  useEffect(()=>{barPreAnnouncedRef.current.clear();},[gameStart]);
 
   // V21 P0-fix #8: client-side watchdog — if an admin's "end bar break" RPC fails to replicate,
   // phones would be stuck on the bar-break overlay forever. Auto-clear locally after
@@ -3534,18 +3529,33 @@ function App(){
       barPreAnnouncedRef.current.add(b.id);                   // claim synchronously so the 1s tick can't re-fire
       const addr=b.address?` (${b.address})`:'';
       (async()=>{
-        // Skip if a Game Master feed row already mentions this bar — either a
-        // pre-announcement from an earlier admin session, or the 🍺 break
-        // trigger itself (admin started the break ahead of the window).
-        const{data:existing}=await sb.from('activity_feed')
-          .select('id').eq('team_name','Game Master')
-          .ilike('message',`%${b.n}%`).limit(1);
-        if(existing&&existing.length)return;
-        sb.from('activity_feed').insert({
-          team_id:null, team_name:'Game Master', team_emoji:'🔔', team_color:'#d4a054',
-          message:`🔔 Over ~30 min: bar break → ${b.n}${addr}. Rond je missies in de buurt af en loop er alvast rustig naartoe.`,
-          points:0, created_at:new Date().toISOString(),
-        });
+        try{
+          // Skip if a Game Master heads-up/break row already mentions this bar —
+          // either a 🔔 pre-announcement from an earlier admin session, or the
+          // 🍺 break trigger itself (admin started the break ahead of the
+          // window). V51 (audit P1): scoped to the 🔔/🍻 emojis so an unrelated
+          // GM broadcast or [JORIK] row that happens to contain a bar name
+          // (e.g. the common word "Biergarten") cannot wrongly suppress it.
+          const{data:existing,error:selErr}=await sb.from('activity_feed')
+            .select('id').eq('team_name','Game Master')
+            .in('team_emoji',['🔔','🍻'])
+            .ilike('message',`%${b.n}%`).limit(1);
+          if(selErr)throw selErr;
+          if(existing&&existing.length)return;
+          const{error:insErr}=await sb.from('activity_feed').insert({
+            team_id:null, team_name:'Game Master', team_emoji:'🔔', team_color:'#d4a054',
+            message:`🔔 Over ~30 min: bar break → ${b.n}${addr}. Rond je missies in de buurt af en loop er alvast rustig naartoe.`,
+            points:0, created_at:new Date().toISOString(),
+          });
+          if(insErr)throw insErr;
+        }catch(e){
+          // V51 (audit P1): network/DB hiccup — release the claim so the next
+          // 1-second tick retries. The [startMin,endMin) window is ~30 min wide
+          // so there is ample room to recover from a transient blip. Without
+          // this the claim taken synchronously above would lose the heads-up
+          // for the whole session on a single failed request.
+          barPreAnnouncedRef.current.delete(b.id);
+        }
       })();
     });
   },[nowTs,gameStart,isAdmin]);
@@ -3564,8 +3574,7 @@ function App(){
           const existingMs=new Date(gs.bar_break_started_at).getTime();
           if(!isNaN(existingMs)&&Date.now()-existingMs<45000){
             // Another admin tab already fired this break — reflect their state locally and bail.
-            const minisExisting=defaultBarMinis(gs.bar_break_active||barName,existingMs);
-            setBarBreakActive({name:gs.bar_break_active||barName,mini:minisExisting,started:existingMs});
+            setBarBreakActive({name:gs.bar_break_active||barName,started:existingMs});
             setBarBreak({name:gs.bar_break_active||barName,time:existingMs});
             return;
           }
@@ -3573,9 +3582,7 @@ function App(){
       }catch(e){/* fall through — worst case we do the original behaviour */}
     }
     const startedAt=Date.now();
-    // V20: seeded 3-of-6 mini pick
-    const minis=defaultBarMinis(barName,startedAt);
-    setBarBreakActive({name:barName,mini:minis,started:startedAt});
+    setBarBreakActive({name:barName,started:startedAt});
     setBarBreak({name:barName,time:startedAt});
     if(!OFFLINE&&sb){
       sb.from('game_state').update({bar_break_active:barName,bar_break_started_at:new Date(startedAt).toISOString()}).eq('id',1).then(()=>{},()=>{});
