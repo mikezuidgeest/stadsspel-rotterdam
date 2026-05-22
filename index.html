@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Stadsspel Rotterdam V20 - Jorik's Bachelor Party</title>
+  <title>Stadsspel Rotterdam — Jorik's Bachelor Party</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
@@ -1903,6 +1903,7 @@ function App(){
   // The ref is updated synchronously, so the second firing sees the new level.
   const lastLevelSeenRef=useRef(null);
   const[nowTs,setNowTs]=useState(Date.now()); // tick state for countdown clocks
+  const[isOnline,setIsOnline]=useState(typeof navigator==='undefined'||navigator.onLine!==false); // V53 (audit F2): live connectivity flag
   const tapGuardRef=useRef(0); // V14: A4 — prevents repeated-click loss during re-render
   // V30: hotTarget state removed along with the timed-next-thing system.
   const hotTarget=null;
@@ -4045,6 +4046,29 @@ function App(){
     }
   },[myTeam,phase,screen]);
 
+  // V53 (audit F1): inverse of the V36 auto-flip. When the admin resets the
+  // running game (phase 1→0), the realtime handler / hydration / visibilitychange
+  // catch-up all push phase→0 but never route `screen` — stranding remote players
+  // on a dead game screen (a reload doesn't recover them: the session persists
+  // screen:'game'). This one effect closes all three paths. A spectator's myTeam
+  // is truthy so they return to lobby too; a teamless player (myTeam null) no-ops;
+  // the admin's own tab already set screen='lobby' synchronously inside resetGame.
+  useEffect(()=>{
+    if(myTeam&&phase===0&&screen==='game'){
+      setScreen('lobby');
+    }
+  },[myTeam,phase,screen]);
+
+  // V53 (audit F2): live connectivity listeners — pre-V53 there were none, so a
+  // real network drop gave the player zero feedback (the realtime feed and the
+  // leaderboard silently froze). Drives the `isOnline` flag for the banner below.
+  useEffect(()=>{
+    const on=()=>setIsOnline(true),off=()=>setIsOnline(false);
+    window.addEventListener('online',on);
+    window.addEventListener('offline',off);
+    return()=>{window.removeEventListener('online',on);window.removeEventListener('offline',off);};
+  },[]);
+
   // V35 P1 fix (Erik/Sandra personas): silent phase transitions confused everyone
   // who was tabbed away or new to the day. Now fire a toast on every advance so
   // late-joiners + players in the middle of an upload see the world change. Skip
@@ -4481,6 +4505,8 @@ function App(){
       {/* V22 audit fix: private-browsing warning. localStorage is unavailable (iOS Private
           mode / locked-down browsers) so progress cannot survive a force-quit. One-shot banner. */}
       {!OFFLINE&&!localStorageWorks()&&<div className="offline-banner" style={{top:OFFLINE?26:0,color:'#e4b25c',background:'rgba(228,178,92,0.12)',borderBottomColor:'rgba(228,178,92,0.25)'}}>⚠︎ Private browsing actief — voortgang wordt niet bewaard bij tab sluiten</div>}
+      {/* V53 (audit F2): live offline banner — driven by the online/offline listeners, not the OFFLINE build constant. */}
+      {!OFFLINE&&isOnline===false&&<div className="offline-banner">⚡ Geen internetverbinding — je wijzigingen worden niet opgeslagen tot je weer online bent</div>}
       {toast&&<div className="toast" role="status" aria-live="polite" aria-atomic="true"><div className="toast-inner">{toast}</div></div>}
       {/* V24: cross-device admin broadcast banner. Renders above everything
           else (z-index above toast/modal/sheet). Tap to dismiss; auto-clears
@@ -4939,6 +4965,7 @@ function CatchupSummary({teams=[],scores={},jorikTeamId=null,activityFeed=[],bar
     return (activityFeed||[]).filter(a=>{
       const m=String(a.message||'');
       if(m.startsWith('[JORIK] team='))return false;
+      if(m.startsWith('[WP1] '))return false; // V53 (audit F12): drop wp:1 rows — the "Bruiloftsmissie" text in the catch-up panel would spoil the surprise to a late-joining Jorik
       return true;
     }).slice(0,3).map(a=>({...a,message:String(a.message||'').replace(/^\[WP1\] /,'')}));
   },[activityFeed]);
@@ -8590,7 +8617,7 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
                     <div style={{marginTop:'var(--sp-2)'}}>
                       {isDone||runComplete?(
                         <div className="panel-sm text-center t-success t-body-emph" style={{background:'rgba(95,216,165,0.1)',borderColor:'rgba(95,216,165,0.3)'}}>
-                          ✅ Voltooid · +{m.pts} pts{isRunning?` (${runCount}/${runTarget})`:''}
+                          ✅ Voltooid · +{Math.round(m.pts*0.5)} pts{isRunning?` (${runCount}/${runTarget})`:''}
                         </div>
                       ):(
                         <>
@@ -8722,6 +8749,7 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
     teams.forEach(t=>{byTeam[t.id]={team:t,photos:0,videos:0,locs:new Set(),best:0,totalPts:0};});
     (activityFeed||[]).forEach(a=>{
       if(!a||a.team_id==null)return;
+      if(String(a.message||'').startsWith('[WP1] '))return; // V53 (audit F9): exclude wp:1 wedding-pipeline rows from MVP tallies, mirroring allPhotos
       const rec=byTeam[a.team_id];if(!rec)return;
       if(a.photo){if(isVideoData(a.photo))rec.videos++;else rec.photos++;}
       if(a.points>0){rec.totalPts+=a.points;if(a.points>rec.best)rec.best=a.points;}
@@ -8853,7 +8881,28 @@ function FinaleScreen({teams,scores,myTeam,elapsed,activityFeed,jorikTeamId}){
 // ═══════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+// V53 (audit F3): error boundary. Pre-V53 any render-time throw produced an
+// unrecoverable white screen — bad on a one-shot gameday with 16-20 phones.
+// React requires a class component for getDerivedStateFromError/componentDidCatch.
+class ErrorBoundary extends React.Component{
+  constructor(p){super(p);this.state={error:null};}
+  static getDerivedStateFromError(error){return{error};}
+  componentDidCatch(error,info){try{console.error('[ErrorBoundary]',error,info);}catch(e){}}
+  render(){
+    if(this.state.error){
+      return(
+        <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,padding:24,textAlign:'center',background:'#0c0d12',color:'#fff',fontFamily:'system-ui,-apple-system,sans-serif'}}>
+          <div style={{fontSize:40}}>🐰</div>
+          <div style={{fontSize:18,fontWeight:800}}>Er ging iets mis</div>
+          <div style={{fontSize:14,opacity:0.72,maxWidth:320,lineHeight:1.5}}>Het spel liep even vast. Herlaad de pagina — je team en voortgang blijven bewaard.</div>
+          <button onClick={()=>location.reload()} style={{marginTop:8,padding:'12px 26px',borderRadius:999,border:'none',background:'#e4b25c',color:'#1a1205',fontWeight:800,fontSize:15,cursor:'pointer'}}>↻ Herlaad de app</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App/></ErrorBoundary>);
 </script>
 </body>
 </html>
