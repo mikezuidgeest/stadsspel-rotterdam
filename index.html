@@ -2331,10 +2331,19 @@ function App(){
     const teamSub=sb.channel('teams').on('postgres_changes',{event:'UPDATE',schema:'public',table:'teams'},payload=>{
       const t=payload.new;
       setTeams(prev=>prev.map(p=>p.id===t.id?{...p,...t}:p));
-      setScores(prev=>({...prev,[t.id]:t.score||0}));
-      if(t.id!==myTeam?.id){
-        setToast(`${t.emoji} ${t.name}: ${t.score} pts`);
-      }
+      // V55 (audit V4): only toast on a REAL score change. Position writes
+      // (lat/lng, throttled ~1/20s while a team walks) used to fire a misleading
+      // "Team: N pts" toast on every phone — constant HUD spam during transit.
+      // Comparing against the previously-known score also suppresses the spurious
+      // toast on first hydration (prevScore undefined → no toast).
+      setScores(prev=>{
+        const prevScore=prev[t.id];
+        const newScore=t.score||0;
+        if(t.id!==myTeam?.id&&prevScore!==undefined&&newScore!==prevScore){
+          setToast(`${t.emoji} ${t.name}: ${newScore} pts`);
+        }
+        return {...prev,[t.id]:newScore};
+      });
     }).subscribe();
 
     // V19: teams DELETE — admin pruned a team. Propagate cleanly: drop it
@@ -2358,8 +2367,14 @@ function App(){
     // V12: game_state sync — admin's START/BAR BREAK/FINALE broadcast to every phone
     const gsSub=sb.channel('game-state').on('postgres_changes',{event:'UPDATE',schema:'public',table:'game_state'},payload=>{
       const gs=payload.new;
+      // V55 (audit V2): always sync phase — including a reset to 0. Previously
+      // setPhase was gated inside `if(gs.phase>=1)`, so an admin reset (phase→0)
+      // never reached a connected, FOREGROUNDED player tab: phase stayed at 1, the
+      // reset-to-lobby effect (which needs phase===0) never fired, and the player
+      // was stranded on a dead game screen until a refocus/reload. Syncing phase
+      // unconditionally lets that effect route them back to the lobby live.
+      if(typeof gs.phase==='number')setPhase(gs.phase);
       if(gs.phase>=1){
-        setPhase(gs.phase);
         if(!gameStart&&gs.started_at)setGameStart(new Date(gs.started_at).getTime());
         // V14 (A2): when a player transitions from lobby to game via admin broadcast,
         // they miss the PROLOOG (only admin's local startGame() triggers it).
@@ -3093,7 +3108,13 @@ function App(){
         const awardIfWon=()=>{
           applyScoreDelta(myTeam.id,firstBonusPts);
           setToast(`🏆 Eerste bij ${loc.n}! +${firstBonusPts} pts bonus`);
-          addActivity(`was als eerste bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · +${firstBonusPts} pts bonus`,firstBonusPts,null,locId);
+          // V55 (audit V3 — wedding LEAK): tag the first-finder bonus row with the
+          // [WP1] prefix for wp:1 (wedding-pipeline) challenges. Without this, a
+          // non-holder being FIRST on a wedding POI posted an UNtagged feed row
+          // naming the wedding location+title; the visibleFeed secrecy filter only
+          // drops [WP1]-prefixed rows, so it surfaced on the Jorik holder/device feed
+          // — every other wp:1 feed surface is tagged, this was the one leak path.
+          addActivity(`${isWp1?'[WP1] ':''}was als eerste bij "${loc.ch[chIdx]?.ti}" (${loc.n}) · +${firstBonusPts} pts bonus`,firstBonusPts,null,locId);
           // V35 P1 fix (Tom persona): the eerste-team bonus used to land as a
           // muted toast + score-popup — same visual weight as a regular finish.
           // The bonus is the PRIDE moment of the day. Now we fire a dedicated
@@ -6410,7 +6431,13 @@ function ActivityView({feed,myTeamId,onPhoto,filter,setFilter,jorikTeamId,jorikI
   // which team currently holds the rotating Jorik token. The V34 jorikInTeam-based
   // filter only fires when the team-with-token contains Jorik — wrong, since Jorik
   // (the person) sits in ONE team all day and the token rotates separately.
-  const visibleFeed=(jorikInTeam||isJorikDevice)?feed.filter(item=>!String(item.message||'').startsWith('[WP1] ')):feed;
+  // V55 (audit — clutter): drop the internal "[JORIK] team=" rotation markers from the
+  // rendered feed for everyone. CatchupSummary already hides them on the join screen, but
+  // the live ActivityView leaked them as raw "[JORIK] team=149 · SYSTEEM" rows. The
+  // never-twice rotation history reads these markers via separate DB queries (not this
+  // array), so hiding them here is render-only and safe.
+  const feedNoMarkers=feed.filter(item=>!String(item.message||'').startsWith('[JORIK] team='));
+  const visibleFeed=(jorikInTeam||isJorikDevice)?feedNoMarkers.filter(item=>!String(item.message||'').startsWith('[WP1] ')):feedNoMarkers;
   const filtered=visibleFeed.filter(item=>{
     if(filter==='photos')return !!item.photo;
     if(filter==='mine')return item.team_id===myTeamId;
