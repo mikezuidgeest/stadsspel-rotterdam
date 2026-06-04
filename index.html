@@ -2948,21 +2948,50 @@ function App(){
     // Normal one-shot path
     const awardedPts=capped?0:Math.round(m.pts*phaseMult*JORIK_SCORE_MULTIPLIER);
     setJorikMissionsDone(prev=>new Set([...prev,id]));
-    if(awardedPts>0){
-      setScorePopup(`+${awardedPts}`);
-      triggerConfetti(awardedPts);
-      applyScoreDelta(myTeam?.id,awardedPts);
-      setJorikMissionsThisHold(prev=>prev+1);
-    }
+    // V56 (audit — Jorik double-score): the award below was applied purely from THIS
+    // device's local state. Jorik's holding team passes phones around (4-5 devices share
+    // one team_id), and jorikMissionsDone / jorikMissionsThisHold are per-device — so two
+    // teammates could each score the SAME Jorik mission, doubling the points. Regular
+    // L_DATA challenges are protected by the unique (team_id, challenge_id) constraint on
+    // completed_challenges; Jorik missions wrote NOTHING to the DB. Fix: claim the mission
+    // in completed_challenges as `jorik_<id>` (same unique constraint, location_id -2
+    // sentinel, won't match the wp:1 trigger pattern). Only the FIRST device to complete it
+    // for the team scores; a teammate's duplicate hits 23505 → marked done, no double
+    // points, no duplicate feed row. (The per-window 3-cap remains per-device — a softer,
+    // separate fairness ceiling, documented in PROJECT-MEMORY; this closes the score-double.)
     const ptsSuffix=capped?' (cap — wacht op rotatie)':'';
-    addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${awardedPts} pts${finaleSuffix}${ptsSuffix}`,awardedPts,photoData);
-    if(capped){
-      // V40.1 (UX-review P1): reword. Dropped "Andere teams een kans" (designer voice).
-      // Switched vocab from "ronde" (used nowhere else) to "beurt" (rotation-aligned).
-      // Reframed cap as "missie blijft tellen voor de bruiloftsedit" — gives players a
-      // reason to keep doing missions even though points pause.
-      try{const setToast=window.__ssrSetToast;if(setToast)setToast(`🌟 Top — ${JORIK_HOLD_CAP} Jorik-missies in deze beurt. Extra missies blijven mooi voor de bruiloftsedit, maar punten pauzeren tot de volgende rotatie.`);}catch(_){}
+    const applyJorikAward=()=>{
+      if(awardedPts>0){
+        setScorePopup(`+${awardedPts}`);
+        triggerConfetti(awardedPts);
+        applyScoreDelta(myTeam?.id,awardedPts);
+        setJorikMissionsThisHold(prev=>prev+1);
+      }
+      addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${awardedPts} pts${finaleSuffix}${ptsSuffix}`,awardedPts,photoData);
+      if(capped){
+        // V40.1 (UX-review P1): reword. Dropped "Andere teams een kans" (designer voice).
+        // Switched vocab from "ronde" (used nowhere else) to "beurt" (rotation-aligned).
+        // Reframed cap as "missie blijft tellen voor de bruiloftsedit" — gives players a
+        // reason to keep doing missions even though points pause.
+        try{const setToast=window.__ssrSetToast;if(setToast)setToast(`🌟 Top — ${JORIK_HOLD_CAP} Jorik-missies in deze beurt. Extra missies blijven mooi voor de bruiloftsedit, maar punten pauzeren tot de volgende rotatie.`);}catch(_){}
+      }
+    };
+    if(OFFLINE||!sb||!myTeam){
+      // No DB to dedup against (demo/offline build or no team yet) — fall back to local award.
+      applyJorikAward();return;
     }
+    sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:`jorik_${id}`,location_id:-2,challenge_type:'jorik',points_earned:awardedPts}).then(({error:e})=>{
+      if(!e){applyJorikAward();return;}
+      // 23505 = a teammate on another device already scored this Jorik mission for the team.
+      if(e.code==='23505'||String(e.message||'').includes('duplicate')){
+        try{const setToast=window.__ssrSetToast;if(setToast)setToast('✅ Deze Jorik-missie heeft je team al gedaan — punten staan al genoteerd');}catch(_){}
+        return;
+      }
+      // Any other error (missing table / transient blip) — fail OPEN so a network hiccup
+      // never robs Jorik of his points; worst case reverts to the pre-V56 behaviour.
+      console.warn('jorik completed_challenges claim failed — awarding anyway',e);
+      applyJorikAward();
+    });
   };
 
   const completeChallenge=(locId,chIdx,pts,photoData=null)=>{
