@@ -1860,6 +1860,14 @@ function App(){
     try{localStorage.removeItem('ssr_admin');}catch(e){}
     setIsAdmin(false);
   },[]);
+  // V57: armed auto-start toggle (admin-only, persisted per device). When ON,
+  // the game auto-starts once MAX_TEAMS non-spectator teams exist. Default OFF so
+  // pre-gameday early-bird teams can NEVER trigger a premature start — the admin
+  // explicitly arms it when everyone is gathered. Manual start still works too.
+  const[autoStartArmed,setAutoStartArmed]=useState(()=>{try{return localStorage.getItem('ssr_autostart_armed')==='1';}catch(e){return false;}});
+  const toggleAutoStart=React.useCallback(()=>{
+    setAutoStartArmed(v=>{const nv=!v;try{if(nv)localStorage.setItem('ssr_autostart_armed','1');else localStorage.removeItem('ssr_autostart_armed');}catch(e){}return nv;});
+  },[]);
   // V30 (Less-is-More): storyShown / storySeen / nextStory state removed along with
   // the NARRATIVE chapter-modal system. Nothing queues or shows story chapters any more.
   // V5 FEATURE 3: seen quiz tracking
@@ -3884,6 +3892,7 @@ function App(){
           phase:0,started_at:null,game_ended:false,
           bar_break_active:null,bar_break_started_at:null,
           jorik_team_id:null,jorik_moved_at:null,
+          jorik_device_id:null,// V57: 🧨 now also clears the Jorik-phone marking so the pre-kickoff reset is a truly clean slate (re-mark after).
         }).eq('id',1);
       }catch(e){/* swallow — local reset still happens */}
     }
@@ -4272,6 +4281,18 @@ function App(){
     },()=>{startGameLockRef.current=false;});
   };
 
+  // V57: armed auto-start watcher. Fires startGame() once the admin has armed it
+  // AND there are MAX_TEAMS non-spectator teams AND we're still in the lobby
+  // (phase 0). Admin-only evaluation (the GM device); startGame's eq('phase',0)
+  // conditional UPDATE + startGameLockRef keep it idempotent against re-runs and
+  // realtime echoes. Default-off arming is what makes this safe against early-bird
+  // teams created before gameday — see autoStartArmed above.
+  React.useEffect(()=>{
+    if(!isAdmin||!autoStartArmed||phase!==0||startGameLockRef.current)return;
+    const activeTeams=(Array.isArray(teams)?teams:[]).filter(t=>t&&!t.spectator&&t.id>0).length;
+    if(activeTeams>=MAX_TEAMS)startGame();
+  },[isAdmin,autoStartArmed,phase,teams]);
+
   // V30: phase-story queue + dispatcher effects removed with the chapter-modal system.
 
   // Completion counts
@@ -4441,6 +4462,8 @@ function App(){
   // ═══════════ LOBBY ═══════════
   if(screen==='lobby'){
     const teamCount=teams.length;
+    // V57: non-spectator team count for the lobby progress UI + auto-start parity.
+    const lobbyActiveTeams=(Array.isArray(teams)?teams:[]).filter(t=>t&&!t.spectator&&t.id>0).length;
     return(
       <div className="screen">
         {/* V33: floating ⚙ admin button — Mike-only; opens AdminMenu drawer */}
@@ -4534,13 +4557,18 @@ function App(){
                 wants to start with 0 or 1 teams, that's his call. Teams can
                 still register mid-lobby via realtime after phase flips. */}
             <button className="btn btn-gold btn-lg" onClick={()=>startGame()} style={{width:'100%'}}>{isAdmin?'🎮 Start het spel':'🎮 Start spel (testmodus)'}{teamCount>0?` (${teamCount})`:''}</button>
-            <div className="t-caption text-center">{isAdmin?'Jij bent de Game Master — druk zodra iedereen er is':'🧪 Testmodus — iedereen kan het spel starten · GPS-checks staan uit'}</div>
+            {/* V57: admin-only armed auto-start toggle. Default OFF; when armed the
+                game starts automatically once MAX_TEAMS non-spectator teams exist. */}
+            {isAdmin&&(
+              <button className="btn btn-ghost btn-sm" onClick={toggleAutoStart} aria-pressed={autoStartArmed} style={{width:'100%',borderColor:autoStartArmed?'rgba(110,200,120,0.5)':'var(--border)',color:autoStartArmed?'#7bd88f':'var(--text-secondary)'}}>{autoStartArmed?`🤖 Auto-start AAN — start vanzelf bij ${MAX_TEAMS} teams (tik om uit te zetten)`:'🤖 Auto-start UIT — tik om aan te zetten'}</button>
+            )}
+            <div className="t-caption text-center">{isAdmin?(autoStartArmed?`🤖 Auto-start staat aan · ${lobbyActiveTeams}/${MAX_TEAMS} teams — het spel start vanzelf zodra er ${MAX_TEAMS} zijn`:'Jij bent de Game Master — druk zodra iedereen er is'):'🧪 Testmodus — iedereen kan het spel starten · GPS-checks staan uit'}</div>
           </div>
         ):(
           <div className="panel text-center" style={{background:'linear-gradient(155deg,rgba(110,163,255,0.08),rgba(110,163,255,0.02))',borderColor:'rgba(110,163,255,0.25)'}}>
             <div style={{fontSize:36}}>⏳</div>
-            <div className="t-card-label" style={{color:'var(--foto-2)',marginTop:'var(--sp-2)'}}>Wachten op de Game Master</div>
-            <div className="t-body" style={{marginTop:'var(--sp-2)'}}>Verzamel bij het terras op de Leuvehaven-kade.<br/>Mike start zodra iedereen er is.</div>
+            <div className="t-card-label" style={{color:'var(--foto-2)',marginTop:'var(--sp-2)'}}>Nog even wachten — het spel is nog niet gestart</div>
+            <div className="t-body" style={{marginTop:'var(--sp-2)'}}><strong>{lobbyActiveTeams} van {MAX_TEAMS} teams</strong> aangemaakt.<br/>{lobbyActiveTeams>=MAX_TEAMS?'Alle teams zijn er — het spel start zo! 🚀':'Het spel start zodra alle teams er zijn. Verzamel bij het terras op de Leuvehaven-kade.'}</div>
           </div>
         )}
         {OFFLINE&&<div className="text-center" style={{marginTop:'var(--sp-4)'}}><button className="btn btn-ghost btn-sm" onClick={startGame}>Demo: start zelf</button></div>}
