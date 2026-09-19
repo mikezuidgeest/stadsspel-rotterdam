@@ -113,9 +113,10 @@ die kolom, zodat een niet-gepatcht project blijft werken zoals het was.
 
 ## Wat je moet doen om dit live te krijgen
 
-1. **`SUPABASE-MEDIA-FIX-V57.sql` draaien** in Supabase → SQL Editor.
-   Voegt `client_id` toe aan `photo_reviews` en `activity_feed`, en zet de
-   bucketlimiet omhoog. Veilig om meerdere keren te draaien.
+1. **`SUPABASE-SETUP.sql` draaien** in Supabase → SQL Editor. Dat bundelt deze
+   patch met die van V58 tot één plak-actie, met onderaan een checklist die per
+   onderdeel OK of ONTBREEKT zegt. Wil je alleen dit deel, dan kan
+   `SUPABASE-MEDIA-FIX-V57.sql` ook los. Veilig om meerdere keren te draaien.
 2. **Controleer de echte bucketlimiet** in Storage → media → Configuration. Het
    gratis plan kan een lagere harde grens afdwingen dan wat de SQL vraagt.
 3. **`index.html` en `sw.js` deployen.** De service-worker-cache is gebumpt naar

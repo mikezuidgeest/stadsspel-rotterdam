@@ -87,9 +87,11 @@ zodat de server het alsnog registreert in plaats van er nooit van te horen.
 
 ## Wat je moet doen
 
-1. **`SUPABASE-SCORE-QUEUE-V58.sql` draaien** in Supabase → SQL Editor. Maakt
-   `score_deltas` + `increment_team_score_idem`. Veilig om meerdere keren te
-   draaien.
+1. **`SUPABASE-SETUP.sql` draaien** in Supabase → SQL Editor. Dat bundelt deze
+   patch met die van V57, dus het is één plak-actie; onderaan verschijnt een
+   checklist die per onderdeel OK of ONTBREEKT zegt. Wil je ze los, dan staan
+   `SUPABASE-MEDIA-FIX-V57.sql` en `SUPABASE-SCORE-QUEUE-V58.sql` er nog met de
+   volledige uitleg erbij. Veilig om meerdere keren te draaien.
 2. **`index.html` deployen.** De service-worker-cache staat al op `stadsspel-v57`;
    bump hem opnieuw als je tussendoor niet hebt gedeployed.
 
