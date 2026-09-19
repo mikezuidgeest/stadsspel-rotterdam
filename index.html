@@ -1312,131 +1312,471 @@ function pickQuiz(loc,seen){
 }
 
 // ═══════════════════════════════════════════
-// V5 FEATURE 2: PHOTO COMPRESSION
+// V57: MEDIA PIPELINE — capture → Storage → row
 // ═══════════════════════════════════════════
-// Compress a dataURL to a small thumbnail for storage + live feed
-function compressPhoto(dataURL,maxWidth=480,quality=0.55){
-  return new Promise((resolve)=>{
-    try{
-      const img=new Image();
-      img.onload=()=>{
-        try{
-          // V21 P1-fix #31 + audit fix: guard against Safari/iOS 16.7MP canvas ceiling
-          // WITHOUT cropping. Old code capped each axis independently at 4096, which
-          // cropped a 8000×1200 panorama to 4096×1200 (lost 49% of the frame).
-          // Correct approach: compute one proportional downscale factor against the
-          // larger dimension so aspect ratio is preserved, then apply maxWidth ratio.
-          const SRC_MAX=4096;
-          const origW=Math.max(1,img.width||1);
-          const origH=Math.max(1,img.height||1);
-          const capRatio=Math.min(1,SRC_MAX/Math.max(origW,origH));
-          const srcW=Math.max(1,Math.round(origW*capRatio));
-          const srcH=Math.max(1,Math.round(origH*capRatio));
-          const canvas=document.createElement('canvas');
-          const ratio=Math.min(1,maxWidth/srcW);
-          canvas.width=Math.max(1,Math.round(srcW*ratio));
-          canvas.height=Math.max(1,Math.round(srcH*ratio));
-          const ctx=canvas.getContext('2d');
-          if(!ctx){resolve(dataURL);return;}
-          // draw the full original onto the (already-proportionally-scaled) dest canvas
-          ctx.drawImage(img,0,0,origW,origH,0,0,canvas.width,canvas.height);
-          try{
-            resolve(canvas.toDataURL('image/jpeg',quality));
-          }catch(inner){
-            // Safari throws on huge canvases — return original untouched so upload still happens
-            console.warn('canvas toDataURL failed — returning original',inner?.message||inner);
-            resolve(dataURL);
-          }
-        }catch(e){
-          console.warn('canvas draw failed — returning original',e?.message||e);
-          resolve(dataURL);
-        }
-      };
-      img.onerror=()=>resolve(dataURL); // fallback
-      img.src=dataURL;
-    }catch(e){resolve(dataURL)}
-  });
-}
+// Replaces the V5 compressPhoto / V20 compressPhotoAdaptive / V41.11 upload path.
+//
+// WHY THIS WAS REWRITTEN (Mike, na de echte speeldag 6 juni 2026: "veel video's
+// en foto's zijn niet doorgekomen"). Four independent loss mechanisms, all of
+// which silently threw away media that the player believed had been submitted:
+//
+//   1. addActivity deleted every payload over 600 kB before insert
+//      (`if(shareable.photo.length>600000){delete shareable.photo}`). Jorik-mission
+//      video never goes through Storage — it was handed to addActivity as raw
+//      base64, which is ALWAYS over 600 kB. So 100% of Jorik-mission video was
+//      dropped on the client. That was the wedding-edit footage.
+//   2. compressPhotoAdaptive returned null for any photo still over 500 kB after
+//      three tiers, "rather than nuking the whole feed insert". That cap existed
+//      because media used to live inline in a Postgres row. Since V41.11 media
+//      lands in Storage, where a 4 MB JPEG is completely fine — but the drop was
+//      never removed. Perfectly uploadable photos were discarded, the challenge
+//      completed anyway, and photo_url went in as null.
+//   3. The challenge path base64-round-tripped every file: FileReader →
+//      readAsDataURL → atob → a byte-at-a-time Uint8Array loop. For a 100 MB
+//      iPhone clip that is ~350 MB of peak memory and 100M loop iterations on a
+//      phone. iOS Safari kills the tab. Nothing uploaded, no error, no media.
+//      (The wedding-mission path at ~line 4957 already handed the File straight
+//      to Storage — the challenge path simply never got that fix.)
+//   4. Every failure was silent. addActivity's insert swallowed errors, the
+//      600 kB delete was silent, the null from compression was a console.warn.
+//      No player ever learned their video hadn't made it.
+//
+// THE RULE NOW: media is never dropped to protect a row. A file either reaches
+// Storage, or it is parked in IndexedDB (as a real Blob, no base64) and retried
+// until it does — across reloads, tab crashes and dead-zone walks between bars.
+//
+// Shape of the pipeline:
+//   capture (File)
+//     → compressPhotoBlob   (photos only; on ANY failure the original passes through)
+//     → uploadMedia         (raw Blob to Storage, 4 attempts, exponential backoff)
+//     → insertSubmission    (photo_reviews / activity_feed row carrying the URL)
+//   any step fails → MediaQueue.add(the Blob + the row) → flushMediaQueue retries
+//                    on reconnect, on an interval, and at app start.
+//
+// ══ MEDIA-PIPELINE-START ══ (delimiters used by test/media-pipeline.test.mjs)
 
-// V20 P0: adaptive tiered compression. Some phones (especially old iPhones
-// shooting HEIC-converted giant JPEGs, or Android panoramas) still exceed
-// Supabase row-size limits even after the default 640/0.6 pass. Retry with
-// progressively smaller targets before giving up and returning null.
-// Target = ~220 kB dataURL, which comfortably fits inside a 500kB row ceiling.
-const COMPRESS_TARGET_BYTES=220000;
-const COMPRESS_HARD_CAP_BYTES=500000;
-
-// V41.11 — Supabase Storage migration. Uploads media (photos/videos) to a
-// public bucket and stores the resulting URL in photo_reviews.photo_url and
-// activity_feed.photo instead of inline base64. Requires
-// SUPABASE-V41.11-STORAGE-MEDIA.sql to be applied once. If Storage is
-// unavailable (bucket missing, RLS denied, network error), uploadMediaToStorage
-// returns null and the caller transparently falls back to inline base64
-// (V41.5 behavior). To revert globally: flip STORAGE_ENABLED to false.
 const STORAGE_BUCKET='media';
 const STORAGE_ENABLED=true;
 
-// Convert a data URL ('data:image/jpeg;base64,...') to a Blob for upload.
-function dataUrlToBlob(dataUrl){
-  if(typeof dataUrl!=='string'||!dataUrl.startsWith('data:'))return null;
-  const commaIdx=dataUrl.indexOf(',');
-  if(commaIdx<0)return null;
-  const meta=dataUrl.slice(5,commaIdx);
-  const mime=(meta.split(';')[0])||'application/octet-stream';
-  const isB64=meta.includes('base64');
-  const payload=dataUrl.slice(commaIdx+1);
+// Bucket ceiling. Supabase rejects anything larger with a 413, so we warn the
+// player up front instead of burning four upload attempts. Over the limit the
+// file is STILL queued — raising the bucket limit in the dashboard then makes
+// the next flush pick it up, so a too-big clip is never lost, only delayed.
+const MEDIA_HARD_LIMIT_BYTES=50*1024*1024;
+
+// Photos are resized for bandwidth now, not to fit inside a database row.
+// 1600px at q0.82 is ~400-900 kB — sharp enough to blow up for the wedding edit,
+// small enough to leave a 4G dead zone quickly.
+const PHOTO_MAX_EDGE=1600;
+const PHOTO_QUALITY=0.82;
+// Below this a photo is already small; re-encoding would only lose detail.
+const PHOTO_SKIP_COMPRESS_BELOW=400*1024;
+
+const UPLOAD_ATTEMPTS=4;
+const UPLOAD_BACKOFF_MS=[0,1500,4000,9000];
+
+// Legacy constants — kept so older call sites and PROJECT-MEMORY references
+// still resolve. Nothing in the V57 path reads them.
+const COMPRESS_TARGET_BYTES=220000;
+const COMPRESS_HARD_CAP_BYTES=500000;
+
+function mediaLog(...args){try{console.log('[media]',...args);}catch(e){}}
+
+// Stable per-submission id, so a queued row replayed after a crash cannot
+// insert twice. Paired with the UNIQUE client_id column added in
+// SUPABASE-MEDIA-FIX-V57.sql; degrades gracefully when that patch isn't applied.
+function newClientId(){
   try{
-    if(isB64){
-      const bin=atob(payload);
-      const arr=new Uint8Array(bin.length);
-      for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
-      return new Blob([arr],{type:mime});
-    }
-    return new Blob([decodeURIComponent(payload)],{type:mime});
-  }catch(e){return null;}
+    if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();
+  }catch(e){}
+  return 'cid_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
 }
 
-// Upload a Blob to the media bucket; return public URL or null on failure.
-// Filename pattern: {pathPrefix}_{timestamp}_{rand}.{ext} — extension derived
-// from contentType so iPhone .mov / .mp4 / .heic / .jpg all sort correctly.
-async function uploadMediaToStorage(sb,blob,pathPrefix,contentType){
-  if(!STORAGE_ENABLED||!sb||!blob)return null;
+function isVideoFile(file){
+  if(!file)return false;
+  const t=String(file.type||'').toLowerCase();
+  if(t.startsWith('video/'))return true;
+  return /\.(mp4|m4v|mov|qt|webm|ogv)$/i.test(String(file.name||''));
+}
+
+function extForType(mime){
+  const m=String(mime||'').toLowerCase();
+  const map={'image/jpeg':'jpg','image/jpg':'jpg','image/png':'png','image/webp':'webp',
+             'image/heic':'heic','image/heif':'heif','video/quicktime':'mov',
+             'video/mp4':'mp4','video/webm':'webm','video/x-m4v':'m4v'};
+  if(map[m])return map[m];
+  const tail=(m.split('/')[1]||'bin').replace(/\+.*$/,'').replace(/[^a-z0-9]/gi,'').slice(0,8);
+  return tail||'bin';
+}
+
+// ── Photo compression ────────────────────────────────────────────────────────
+// Blob in, Blob out. Contract: ALWAYS resolves to a usable Blob. Every failure
+// path returns the ORIGINAL file, because uploading a 6 MB original beats
+// dropping the only photo of that moment. The old code's `return null` on a
+// too-large result is exactly the bug this contract exists to prevent.
+async function compressPhotoBlob(file){
+  if(!file)return file;
+  if(isVideoFile(file))return file;                       // video never re-encoded
+  if(file.size&&file.size<PHOTO_SKIP_COMPRESS_BELOW)return file;
+  if(typeof document==='undefined')return file;
+
+  let bitmap=null,objectUrl=null;
   try{
-    const mt=String(contentType||blob.type||'application/octet-stream');
-    const ext=(mt.split('/')[1]||'bin').replace(/\+.*$/,'').replace(/[^a-z0-9]/gi,'').slice(0,8)||'bin';
-    const safePrefix=String(pathPrefix||'media').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,80);
-    const filename=`${safePrefix}_${Date.now()}_${Math.floor(Math.random()*1e6)}.${ext}`;
-    const{data,error}=await sb.storage.from(STORAGE_BUCKET).upload(filename,blob,{contentType:mt,upsert:false,cacheControl:'3600'});
-    if(error){
-      console.warn('[storage] upload failed, falling back to inline base64:',error.message||error);
-      return null;
+    // createImageBitmap applies EXIF orientation and skips the data-URL round
+    // trip entirely. HEIC on a browser that can't decode it throws here — and
+    // then the original .heic is uploaded untouched rather than lost.
+    if(typeof createImageBitmap==='function'){
+      try{bitmap=await createImageBitmap(file,{imageOrientation:'from-image'});}
+      catch(e){bitmap=await createImageBitmap(file);}
+    }else{
+      objectUrl=URL.createObjectURL(file);
+      bitmap=await new Promise((resolve,reject)=>{
+        const img=new Image();
+        img.onload=()=>resolve(img);
+        img.onerror=()=>reject(new Error('decode failed'));
+        img.src=objectUrl;
+      });
     }
-    const{data:pub}=sb.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
-    return(pub&&pub.publicUrl)||null;
+
+    const srcW=Math.max(1,bitmap.width||1);
+    const srcH=Math.max(1,bitmap.height||1);
+    // One proportional factor against the LONGEST edge, so a panorama keeps its
+    // full frame instead of being cropped (the V21 lesson, preserved).
+    const ratio=Math.min(1,PHOTO_MAX_EDGE/Math.max(srcW,srcH));
+    const dstW=Math.max(1,Math.round(srcW*ratio));
+    const dstH=Math.max(1,Math.round(srcH*ratio));
+
+    const canvas=document.createElement('canvas');
+    canvas.width=dstW;canvas.height=dstH;
+    const ctx=canvas.getContext('2d');
+    if(!ctx)return file;
+    ctx.drawImage(bitmap,0,0,srcW,srcH,0,0,dstW,dstH);
+
+    const out=await new Promise((resolve)=>{
+      try{
+        if(canvas.toBlob)canvas.toBlob((b)=>resolve(b),'image/jpeg',PHOTO_QUALITY);
+        else resolve(null);
+      }catch(e){resolve(null);}
+    });
+
+    if(!out||!out.size)return file;
+    // Re-encoding can inflate an already-optimised JPEG. Keep whichever is smaller.
+    if(file.size&&out.size>=file.size)return file;
+    return out;
   }catch(err){
-    console.warn('[storage] upload exception, falling back:',err);
-    return null;
+    mediaLog('compress failed, using original',err&&err.message||err);
+    return file;
+  }finally{
+    try{if(bitmap&&bitmap.close)bitmap.close();}catch(e){}
+    try{if(objectUrl)URL.revokeObjectURL(objectUrl);}catch(e){}
   }
 }
 
-async function compressPhotoAdaptive(dataURL){
-  if(typeof dataURL!=='string')return dataURL;
-  // Try 3 tiers before bailing. Each tier halves-ish the budget.
-  const tiers=[[640,0.6],[480,0.5],[320,0.4]];
-  let out=dataURL;
-  for(const [w,q] of tiers){
-    out=await compressPhoto(dataURL,w,q);
-    if((out?.length||0)<=COMPRESS_TARGET_BYTES)return out;
+// ── Storage upload ───────────────────────────────────────────────────────────
+// Blob straight to the bucket. No FileReader, no base64, no atob loop — a 200 MB
+// clip costs the same peak memory as a 2 MB one. Returns {url, error}.
+async function uploadMedia(sb,blob,pathPrefix,contentType){
+  if(!STORAGE_ENABLED)return{url:null,error:new Error('storage uitgeschakeld')};
+  if(!sb)return{url:null,error:new Error('geen verbinding met de server')};
+  if(!blob)return{url:null,error:new Error('geen bestand')};
+
+  const mt=String(contentType||blob.type||'application/octet-stream');
+  const safePrefix=String(pathPrefix||'media').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,80);
+  const filename=`${safePrefix}_${Date.now()}_${Math.floor(Math.random()*1e6)}.${extForType(mt)}`;
+
+  let lastError=null;
+  for(let attempt=0;attempt<UPLOAD_ATTEMPTS;attempt++){
+    if(attempt>0){
+      const wait=UPLOAD_BACKOFF_MS[Math.min(attempt,UPLOAD_BACKOFF_MS.length-1)];
+      await new Promise(r=>setTimeout(r,wait));
+    }
+    // Don't burn an attempt while the radio is plainly dead; the queue will
+    // retry the moment 'online' fires.
+    if(typeof navigator!=='undefined'&&navigator.onLine===false){
+      return{url:null,error:new Error('offline')};
+    }
+    try{
+      const{data,error}=await sb.storage.from(STORAGE_BUCKET)
+        .upload(filename,blob,{contentType:mt,upsert:false,cacheControl:'3600'});
+      if(error){
+        lastError=error;
+        const msg=String(error.message||error.error||'').toLowerCase();
+        const status=error.statusCode||error.status;
+        // Retrying a rejected file just wastes battery: too large, bad bucket,
+        // denied by policy. Bail out and let the caller queue it.
+        if(String(status)==='413'||msg.includes('too large')||msg.includes('exceeded')
+           ||msg.includes('not found')||msg.includes('bucket')||msg.includes('violates')){
+          break;
+        }
+        continue;
+      }
+      const{data:pub}=sb.storage.from(STORAGE_BUCKET).getPublicUrl(data.path);
+      const url=(pub&&pub.publicUrl)||null;
+      if(url)return{url,error:null};
+      lastError=new Error('geen publieke URL teruggekregen');
+    }catch(err){
+      lastError=err;   // TypeError: Failed to fetch → 4G dropped mid-POST
+    }
   }
-  // Final safety net: if we're still over the hard cap, drop the thumbnail
-  // rather than nuking the whole feed insert. Challenge still completes;
-  // photo just won't show in the live feed.
-  if((out?.length||0)>COMPRESS_HARD_CAP_BYTES){
-    console.warn('photo still too large after 3 compression tiers — dropping thumbnail',out?.length);
-    return null;
-  }
-  return out;
+  return{url:null,error:lastError||new Error('upload mislukt')};
 }
+
+// ── Persistent retry queue (IndexedDB) ───────────────────────────────────────
+// Blobs are stored natively by IndexedDB, so a parked 80 MB video costs 80 MB on
+// disk, not 110 MB of base64 in localStorage (which would blow the 5 MB quota
+// instantly — the reason no queue existed before).
+const QUEUE_DB_NAME='ssr_media_queue';
+const QUEUE_STORE='pending';
+const QUEUE_DB_VERSION=1;
+
+let queueDbPromise=null;
+function queueOpen(){
+  if(queueDbPromise)return queueDbPromise;
+  queueDbPromise=new Promise((resolve,reject)=>{
+    try{
+      if(typeof indexedDB==='undefined'){reject(new Error('geen indexedDB'));return;}
+      const req=indexedDB.open(QUEUE_DB_NAME,QUEUE_DB_VERSION);
+      req.onupgradeneeded=()=>{
+        const db=req.result;
+        if(!db.objectStoreNames.contains(QUEUE_STORE)){
+          db.createObjectStore(QUEUE_STORE,{keyPath:'id'});
+        }
+      };
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error||new Error('indexedDB open mislukt'));
+    }catch(err){reject(err);}
+  }).catch((err)=>{queueDbPromise=null;throw err;});
+  return queueDbPromise;
+}
+
+function queueTx(mode,fn){
+  return queueOpen().then((db)=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(QUEUE_STORE,mode);
+    const store=tx.objectStore(QUEUE_STORE);
+    let result;
+    try{result=fn(store);}catch(err){reject(err);return;}
+    tx.oncomplete=()=>resolve(result&&result.__req?result.__req.result:result);
+    tx.onerror=()=>reject(tx.error||new Error('indexedDB transactie mislukt'));
+    tx.onabort=()=>reject(tx.error||new Error('indexedDB transactie afgebroken'));
+  }));
+}
+
+const queueListeners=new Set();
+function notifyQueue(count){
+  queueListeners.forEach((fn)=>{try{fn(count);}catch(e){}});
+}
+
+const MediaQueue={
+  onChange(fn){queueListeners.add(fn);return()=>queueListeners.delete(fn);},
+  async add(record){
+    const rec={attempts:0,createdAt:Date.now(),...record};
+    if(!rec.id)rec.id=newClientId();
+    await queueTx('readwrite',(store)=>({__req:store.put(rec)}));
+    notifyQueue(await MediaQueue.count());
+    mediaLog('queued',rec.id,rec.kind,rec.blob&&rec.blob.size);
+    return rec.id;
+  },
+  async all(){
+    const rows=await queueTx('readonly',(store)=>({__req:store.getAll()}));
+    return(rows||[]).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  },
+  async update(rec){
+    await queueTx('readwrite',(store)=>({__req:store.put(rec)}));
+  },
+  async remove(id){
+    await queueTx('readwrite',(store)=>({__req:store.delete(id)}));
+    notifyQueue(await MediaQueue.count());
+  },
+  async count(){
+    const n=await queueTx('readonly',(store)=>({__req:store.count()}));
+    return n||0;
+  },
+};
+
+// ── Row inserts ──────────────────────────────────────────────────────────────
+// A queued submission is replayed after a crash, so inserts must be idempotent.
+// client_id carries a UNIQUE constraint (SUPABASE-MEDIA-FIX-V57.sql); a replay
+// therefore hits 23505 and is treated as already-landed rather than as an error.
+// 42703 / PGRST204 mean the patch hasn't been applied — retry without the column
+// so an un-patched project keeps working exactly as before.
+async function insertRow(sb,table,row){
+  if(!sb)return{ok:false,error:new Error('geen verbinding')};
+  try{
+    const{error}=await sb.from(table).insert(row);
+    if(!error)return{ok:true,error:null};
+    const code=error.code||'';
+    const msg=String(error.message||'').toLowerCase();
+    if(code==='23505')return{ok:true,error:null};                    // replay — already in
+    if(code==='42P01'||code==='PGRST205')return{ok:true,error:null}; // legacy: table absent
+    if((code==='42703'||code==='PGRST204'||msg.includes('client_id'))&&row&&row.client_id!==undefined){
+      const retry={...row};delete retry.client_id;
+      return insertRow(sb,table,retry);
+    }
+    if(msg.includes('loc_id')||code==='42703'){
+      if(row&&row.loc_id!==undefined){
+        const retry={...row};delete retry.loc_id;
+        return insertRow(sb,table,retry);
+      }
+    }
+    return{ok:false,error};
+  }catch(err){
+    return{ok:false,error:err};   // network
+  }
+}
+
+// Writes every row belonging to one submission. Rows already written in an
+// earlier attempt are skipped via `done`, so a flush never duplicates a feed line.
+async function writeSubmissionRows(sb,rec,url){
+  const done={...(rec.done||{})};
+  if(rec.reviewRow&&!done.review){
+    const res=await insertRow(sb,'photo_reviews',{...rec.reviewRow,photo_url:url,client_id:rec.id});
+    if(!res.ok)return{ok:false,error:res.error,done};
+    done.review=true;
+  }
+  if(rec.activityRow&&!done.activity){
+    const res=await insertRow(sb,'activity_feed',{...rec.activityRow,photo:url,client_id:rec.id+'_a'});
+    if(!res.ok)return{ok:false,error:res.error,done};
+    done.activity=true;
+  }
+  // Patch mode: the row was already inserted locally (addActivity writes the
+  // feed line immediately so the player sees it), and only the media URL is
+  // backfilled once the upload lands. Used by the Jorik-mission path.
+  if(rec.patch&&!done.patch){
+    const{table,column,clientId}=rec.patch;
+    try{
+      const upd={};upd[column]=url;
+      const{error}=await sb.from(table).update(upd).eq('client_id',clientId);
+      // A missing client_id column means SUPABASE-MEDIA-FIX-V57.sql hasn't been
+      // applied. The media is in Storage either way (and the export script finds
+      // it via the bucket listing), so don't keep the item queued forever.
+      if(error&&error.code!=='42703'&&error.code!=='PGRST204')
+        return{ok:false,error,done};
+    }catch(err){
+      return{ok:false,error:err,done};
+    }
+    done.patch=true;
+  }
+  return{ok:true,error:null,done};
+}
+
+// ── Queue flush ──────────────────────────────────────────────────────────────
+let flushing=false;
+let flushSb=null;
+
+async function flushMediaQueue(sb){
+  const client=sb||flushSb;
+  if(!client||flushing)return{uploaded:0,remaining:-1};
+  if(typeof navigator!=='undefined'&&navigator.onLine===false)return{uploaded:0,remaining:-1};
+  flushing=true;
+  let uploaded=0;
+  try{
+    const rows=await MediaQueue.all();
+    for(const rec of rows){
+      try{
+        let url=rec.url||null;
+        if(!url&&rec.blob){
+          const res=await uploadMedia(client,rec.blob,rec.prefix,rec.contentType);
+          if(!res.url){
+            rec.attempts=(rec.attempts||0)+1;
+            rec.lastError=String(res.error&&res.error.message||res.error||'onbekend');
+            await MediaQueue.update(rec);
+            continue;   // stays queued — never discarded, however often it fails
+          }
+          url=res.url;
+          rec.url=url;          // upload survived; a later row failure won't re-upload
+          await MediaQueue.update(rec);
+        }
+        const written=await writeSubmissionRows(client,rec,url);
+        if(!written.ok){
+          rec.done=written.done;
+          rec.attempts=(rec.attempts||0)+1;
+          rec.lastError=String(written.error&&written.error.message||written.error||'onbekend');
+          await MediaQueue.update(rec);
+          continue;
+        }
+        await MediaQueue.remove(rec.id);
+        uploaded++;
+        mediaLog('queue flushed',rec.id,url);
+      }catch(err){
+        mediaLog('queue item failed',rec&&rec.id,err&&err.message||err);
+      }
+    }
+    return{uploaded,remaining:await MediaQueue.count()};
+  }finally{
+    flushing=false;
+  }
+}
+
+// ── The single entry point every capture path uses ───────────────────────────
+// Returns {ok, url, queued, error, clientId}.
+//   ok=true,  queued=false → media is in Storage and the rows are written
+//   ok=true,  queued=true  → media is safe on this phone, will land on reconnect
+//   ok=false               → only when there is no file at all
+// There is deliberately no outcome where media is discarded.
+async function submitMedia(sb,opts){
+  const{file,prefix,reviewRow=null,activityRow=null,patch=null,kind='challenge'}=opts||{};
+  if(!file)return{ok:false,url:null,queued:false,error:new Error('geen bestand'),clientId:null};
+
+  const clientId=(opts&&opts.clientId)||newClientId();
+  const blob=await compressPhotoBlob(file);
+  const contentType=blob.type||file.type||(isVideoFile(file)?'video/mp4':'image/jpeg');
+  const oversize=blob.size>MEDIA_HARD_LIMIT_BYTES;
+
+  const queueRecord={
+    id:clientId,kind,blob,contentType,prefix,
+    reviewRow,activityRow,patch,
+    originalName:file.name||null,originalSize:file.size||0,
+  };
+
+  // Too big for the bucket, or plainly offline: park it now, don't waste attempts.
+  const offline=typeof navigator!=='undefined'&&navigator.onLine===false;
+  if(oversize||offline||!sb){
+    await MediaQueue.add(queueRecord);
+    return{
+      ok:true,url:null,queued:true,clientId,
+      error:oversize
+        ?new Error(`Bestand is ${Math.round(blob.size/1048576)} MB — groter dan de serverlimiet. Bewaard op je telefoon; het gaat automatisch alsnog door zodra de limiet verhoogd is.`)
+        :new Error('Geen verbinding — bewaard op je telefoon, gaat automatisch door zodra je weer online bent.'),
+    };
+  }
+
+  const res=await uploadMedia(sb,blob,prefix,contentType);
+  if(!res.url){
+    await MediaQueue.add({...queueRecord,attempts:1,
+      lastError:String(res.error&&res.error.message||res.error||'onbekend')});
+    return{ok:true,url:null,queued:true,clientId,
+      error:new Error('Upload lukte nog niet — bewaard op je telefoon en wordt vanzelf opnieuw geprobeerd.')};
+  }
+
+  const written=await writeSubmissionRows(sb,{id:clientId,reviewRow,activityRow,patch},res.url);
+  if(!written.ok){
+    // The file IS in Storage. Queue only the row write, with url set so the
+    // flush skips straight past the upload.
+    await MediaQueue.add({...queueRecord,blob:null,url:res.url,done:written.done,attempts:1,
+      lastError:String(written.error&&written.error.message||written.error||'onbekend')});
+    return{ok:true,url:res.url,queued:true,clientId,
+      error:new Error('Foto/video is opgeslagen, de score volgt zodra je weer verbinding hebt.')};
+  }
+
+  return{ok:true,url:res.url,queued:false,error:null,clientId};
+}
+
+// Background retry: on reconnect, on an interval, and once at boot.
+function startMediaQueueWorker(sb,intervalMs=45000){
+  flushSb=sb;
+  const kick=()=>{flushMediaQueue(sb).catch(()=>{});};
+  try{
+    if(typeof window!=='undefined'){
+      window.addEventListener('online',kick);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)kick();});
+    }
+  }catch(e){}
+  const timer=setInterval(kick,intervalMs);
+  kick();
+  return()=>{clearInterval(timer);};
+}
+
+// ══ MEDIA-PIPELINE-END ══
 
 // Detect whether a media value is a video.
 // V42 P1-1 fix: since V41.11, uploads land in Supabase Storage and come back as
@@ -2094,6 +2434,30 @@ function App(){
   if(typeof window!=='undefined')window.__ssrSetToast=setToast;
   useEffect(()=>()=>{if(typeof window!=='undefined'&&window.__ssrSetToast===setToast)delete window.__ssrSetToast;},[]);
   useEffect(()=>{if(scorePopup){const t=setTimeout(()=>setScorePopup(null),1200);return()=>clearTimeout(t)}},[scorePopup]);
+
+  // V57 — media upload queue. Nothing a player captures can be lost any more:
+  // an upload that fails is parked in IndexedDB as a real Blob and retried here
+  // on reconnect, when the tab comes back to the foreground, and every 45s.
+  // `pendingUploads` drives the badge so the player can see there is still
+  // something in flight before they close the app or go home.
+  const[pendingUploads,setPendingUploads]=useState(0);
+  useEffect(()=>{
+    if(OFFLINE||!sb)return;
+    const off=MediaQueue.onChange(setPendingUploads);
+    const stop=startMediaQueueWorker(sb);
+    MediaQueue.count().then(setPendingUploads).catch(()=>{});
+    const poll=setInterval(()=>{MediaQueue.count().then(setPendingUploads).catch(()=>{});},5000);
+    return()=>{off();stop();clearInterval(poll);};
+  },[]);
+  // Last line of defence: warn before the tab closes with media still queued.
+  // A player who walks home and closes the app would otherwise only find out
+  // the next time they open it — if ever.
+  useEffect(()=>{
+    if(!pendingUploads)return;
+    const warn=(e)=>{e.preventDefault();e.returnValue='';return'';};
+    window.addEventListener('beforeunload',warn);
+    return()=>window.removeEventListener('beforeunload',warn);
+  },[pendingUploads]);
 
   // V41.10 — wedding-mission 4/4 bonus award. When all 4 round-ticks land in
   // completed[-1], INSERT a sentinel bonus row (chIdx=0). UNIQUE constraint on
@@ -2820,7 +3184,7 @@ function App(){
     setReviewUndo(null);
   };
 
-  const addActivity=(msg,pts=0,photoData=null,locId=null)=>{
+  const addActivity=(msg,pts=0,photoData=null,locId=null,clientId=null)=>{
     // V22 audit fix (security agent): cap the message at 500 chars client-side so a
     // crafted broadcast or pack rename can't blow up the feed. Normal activity lines
     // are 40-120 chars — 500 is plenty of headroom for legitimate admin broadcasts.
@@ -2836,19 +3200,42 @@ function App(){
     // V21: raise in-memory cap from 50 → 500 so FinaleScreen's MVP awards
     // (which iterate the whole feed) aren't truncated after a 6-hour game.
     setActivityFeed(prev=>[entry,...prev].slice(0,500));
-    // Only send to Supabase if the payload is manageable. Drop raw video blobs
-    // (>500KB) to respect row limits; compressed photo thumbnails are fine.
     if(!OFFLINE&&sb){
+      // V57 — the line that ate the wedding footage is gone. It read:
+      //     if(shareable.photo&&shareable.photo.length>600000){delete shareable.photo}
+      // Every payload over 600 kB was silently dropped before insert, and
+      // Jorik-mission video (raw base64, never routed through Storage) is
+      // ALWAYS over 600 kB — so all of it was discarded on the client, with no
+      // error anywhere. Since V57 `photo` only ever holds a short Storage URL,
+      // set by the media pipeline, so there is nothing left to cap. A payload
+      // that still looks like inline media means a call site bypassed the
+      // pipeline: queue it rather than delete it, and shout in the console.
       const shareable={...entry};
-      // V21: loc_id column is now part of the schema (supabase-v21-schema.sql) — keep it
-      if(shareable.photo&&shareable.photo.length>600000){delete shareable.photo}
-      sb.from('activity_feed').insert(shareable).then(()=>{},(err)=>{
-        // Graceful fallback: if the column doesn't exist yet (pre-v21 DB), retry without loc_id
-        const msg=String(err?.message||'').toLowerCase();
-        if(msg.includes('loc_id')||err?.code==='42703'){
-          const retry={...shareable};delete retry.loc_id;
-          sb.from('activity_feed').insert(retry).then(()=>{},()=>{});
-        }
+      if(clientId)shareable.client_id=clientId;
+      if(typeof shareable.photo==='string'&&shareable.photo.startsWith('data:')){
+        console.warn('[media] inline payload reached addActivity — queueing instead of dropping');
+        const inline=shareable.photo;
+        shareable.photo=null;
+        try{
+          const blob=(()=>{
+            const comma=inline.indexOf(',');
+            const meta=inline.slice(5,comma);
+            const mime=(meta.split(';')[0])||'application/octet-stream';
+            const bin=atob(inline.slice(comma+1));
+            const arr=new Uint8Array(bin.length);
+            for(let k=0;k<bin.length;k++)arr[k]=bin.charCodeAt(k);
+            return new Blob([arr],{type:mime});
+          })();
+          const cid=clientId||newClientId();
+          shareable.client_id=cid;
+          MediaQueue.add({id:cid+'_rescue',kind:'rescue',blob,contentType:blob.type,
+            prefix:`t${myTeam?.id||0}_rescue`,
+            patch:{table:'activity_feed',column:'photo',clientId:cid}}).catch(()=>{});
+        }catch(e){}
+      }
+      // insertRow handles the legacy 42703/loc_id and missing-client_id fallbacks.
+      insertRow(sb,'activity_feed',shareable).then((res)=>{
+        if(!res.ok)console.warn('[media] activity insert failed',res.error&&res.error.message);
       });
     }
   };
@@ -2911,7 +3298,7 @@ function App(){
     setJorikMissionsThisHold(0);
   },[jorikMovedAt,jorikTeamId]);
 
-  const completeJorikMission=(id,_unusedPts,photoData=null)=>{
+  const completeJorikMission=(id,_unusedPts,photoData=null,clientId=null)=>{
     if(jorikMissionsDone.has(id))return;
     const m=JORIK_MISSIONS.find(x=>x.id===id);
     if(!m)return;
@@ -2941,7 +3328,7 @@ function App(){
         applyScoreDelta(myTeam?.id,stepPts);
       }
       const ptsSuffix=stepCapped?' (cap)':'';
-      addActivity(`${m.emoji} Jorik ruil ${newCount}/${m.tradeTarget} · ${m.title} · +${stepPts} pts${finaleSuffix}${ptsSuffix}`,stepPts,photoData);
+      addActivity(`${m.emoji} Jorik ruil ${newCount}/${m.tradeTarget} · ${m.title} · +${stepPts} pts${finaleSuffix}${ptsSuffix}`,stepPts,photoData,null,clientId);
       if(isFinalStep){
         setJorikMissionsDone(prev=>new Set([...prev,id]));
         addActivity(`🏁 Jorik voltooide de hele dag-mission: ${m.title}!`,0,null);
@@ -2975,7 +3362,7 @@ function App(){
         applyScoreDelta(myTeam?.id,awardedPts);
         setJorikMissionsThisHold(prev=>prev+1);
       }
-      addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${awardedPts} pts${finaleSuffix}${ptsSuffix}`,awardedPts,photoData);
+      addActivity(`${m.emoji} Jorik-missie: ${m.title} · +${awardedPts} pts${finaleSuffix}${ptsSuffix}`,awardedPts,photoData,null,clientId);
       if(capped){
         // V40.1 (UX-review P1): reword. Dropped "Andere teams een kans" (designer voice).
         // Switched vocab from "ronde" (used nowhere else) to "beurt" (rotation-aligned).
@@ -4949,49 +5336,33 @@ function App(){
             // by team+location+challenge_idx). After successful upload, also
             // auto-tick the round so the 4/4 bonus counter advances.
             if(!myTeam)throw new Error('Geen team gevonden');
-            if(typeof navigator!=='undefined'&&navigator.onLine===false)throw new Error('Geen verbinding — wacht tot je weer online bent.');
-            // V41.11 — try Storage bucket first (avoids multi-MB inline base64
-            // bloat in Postgres). On any Storage failure, fall back to inline.
-            // We try Storage with the raw File blob first (cheaper than data URL
-            // round-trip), and only read as data URL if Storage failed.
-            const tryStorageUrl=await uploadMediaToStorage(sb,file,`t${myTeam.id}_wed${n}`,file.type||'video/mp4');
-            const buildRow=(photo_url)=>({
-              team_id:myTeam.id,team_name:myTeam.name,team_emoji:myTeam.emoji,team_color:myTeam.color,
-              location_id:-1,location_name:`Bruiloftsmissie · Ronde ${n}`,
-              challenge_idx:n,challenge_title:`Wedding take ronde ${n}`,
-              challenge_type:'video',gps_distance:null,points_awarded:0,
-              photo_url,status:'approved'
+            // V57 — was the only path that already handed the raw File to
+            // Storage, but it still fell back to reading a whole wedding video
+            // into a base64 string and stuffing it in a Postgres row, which on
+            // a phone means a crashed tab and no video at all. It now shares the
+            // pipeline: on failure the clip is parked in IndexedDB and uploaded
+            // later instead of being force-fed into a row.
+            const res=await submitMedia(sb,{
+              file,
+              kind:'wedding',
+              prefix:`t${myTeam.id}_wed${n}`,
+              reviewRow:{
+                team_id:myTeam.id,team_name:myTeam.name,team_emoji:myTeam.emoji,team_color:myTeam.color,
+                location_id:-1,location_name:`Bruiloftsmissie · Ronde ${n}`,
+                challenge_idx:n,challenge_title:`Wedding take ronde ${n}`,
+                challenge_type:'video',gps_distance:null,points_awarded:0,
+                status:'approved'
+              },
             });
-            const doInsert=async(row)=>{
-              if(OFFLINE||!sb)return;
-              const{error}=await sb.from('photo_reviews').insert(row);
-              if(error){
-                const friendly=/fetch|network|failed/i.test(String(error.message||''))
-                  ?'Geen verbinding — video niet opgeslagen. Probeer opnieuw.'
-                  :('Upload mislukt: '+(error.message||'onbekende fout'));
-                throw new Error(friendly);
-              }
-            };
-            if(tryStorageUrl){
-              try{await doInsert(buildRow(tryStorageUrl));}
-              catch(err){throw err;}
-              tickRoundOnce(n,true);
-              return;
+            if(!res||!res.ok)throw new Error('Bestand kon niet gelezen worden.');
+            // Queued counts as taken: the clip is safe on the phone and the row
+            // is written from the queue. Ticking the round keeps the 4/4 bonus
+            // honest instead of punishing a dead zone.
+            tickRoundOnce(n,true);
+            if(res.queued){
+              try{const setToast=window.__ssrSetToast;if(setToast)setToast('📼 Take opgeslagen op je telefoon — gaat automatisch door zodra je weer bereik hebt.');}catch(_){}
             }
-            // Storage failed — fall back to inline base64 via FileReader.
-            return new Promise((resolve,reject)=>{
-              const reader=new FileReader();
-              reader.onload=async(ev)=>{
-                const dataUrl=ev.target.result;
-                if(!dataUrl){reject(new Error('Bestand kon niet gelezen worden.'));return;}
-                try{await doInsert(buildRow(dataUrl));}
-                catch(err){reject(err);return;}
-                tickRoundOnce(n,true);
-                resolve();
-              };
-              reader.onerror=()=>reject(new Error('Bestand kon niet gelezen worden.'));
-              reader.readAsDataURL(file);
-            });
+            return;
           }}/>;
       })()}
 
@@ -5000,6 +5371,22 @@ function App(){
           Note: barBreakActive (truthy ONLY during the live overlay window) is used here,
           NOT the sticky barBreak state. Bar set-pieces should only light up while the break is actually running. */}
       {showJorikMissions&&<JorikMissions onClose={()=>setShowJorikMissions(false)} onComplete={completeJorikMission} done={jorikMissionsDone} runningCounts={jorikRunningCounts} jorikInTeam={jorikInTeam} pos={pos} barBreak={barBreakActive} holdCount={jorikMissionsThisHold} holdCap={JORIK_HOLD_CAP} isJorikDevice={isJorikDevice}/>}
+
+      {/* V57 — pending-upload chip. Sits just above the tab bar so it is visible
+          on every screen. Tapping it forces a flush instead of waiting for the
+          45s timer, which is what an anxious player will do at the dinner table. */}
+      {pendingUploads>0&&(
+        <div
+          onClick={()=>{flushMediaQueue(sb).catch(()=>{});}}
+          style={{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:'calc(var(--tab-h, 64px) + 12px)',zIndex:60,
+                  display:'flex',alignItems:'center',gap:8,padding:'8px 14px',borderRadius:999,cursor:'pointer',
+                  background:'rgba(26,19,16,0.92)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',
+                  border:'1px solid rgba(228,178,92,0.45)',color:'#e4b25c',fontSize:13,fontWeight:600,
+                  boxShadow:'0 6px 20px rgba(0,0,0,0.45)'}}>
+          <span style={{fontSize:15}}>📤</span>
+          <span>{pendingUploads} {pendingUploads===1?'foto/video wacht':"foto's/video's wachten"} op upload</span>
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="tab-bar">
@@ -7988,6 +8375,10 @@ function ChallengeSheet({loc,pos,completed,completedPts={},onComplete,onClose,se
 function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,confirmAsync,gpsGateBypass=false}){
   const fileRef=useRef(null);
   const[preview,setPreview]=useState(null);
+  // V57: preview is a blob: object URL now (no FileReader), and a blob: URL has
+  // neither a data:video prefix nor a file extension — so isVideoData can't
+  // classify it. Carry the type alongside instead of guessing from the string.
+  const[previewIsVideo,setPreviewIsVideo]=useState(false);
   const[quizAnswer,setQuizAnswer]=useState(null);
   const[quizFeedback,setQuizFeedback]=useState(null);
   const[processing,setProcessing]=useState(false);
@@ -8037,112 +8428,82 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
     );
   }
 
+  // V57 — rewritten on the V57 media pipeline. The file goes to Storage as a
+  // Blob; nothing is base64-encoded, so a 200 MB clip no longer kills the tab.
+  // An upload that can't land right now is parked in IndexedDB and retried in
+  // the background — the challenge still completes, because the media is safe
+  // on the phone and the photo_reviews row is written from the queue.
   const handleFile=async(e)=>{
     const f=e.target.files[0];
     if(!f)return;
     setProcessing(true);
-    setUploadError(null);  // V41.6: clear stale errors on every new attempt
-    // V41.6 (F-1 fix): pre-flight offline check. If the browser already reports offline,
-    // skip the upload entirely so we don't pretend it succeeded.
-    if(typeof navigator!=='undefined'&&navigator.onLine===false){
-      setProcessing(false);
-      setUploadError('Geen verbinding — wacht tot je weer online bent en probeer opnieuw.');
-      return;
-    }
-    // V29 — confirm photo capture started with a soft haptic + audio cue.
+    setUploadError(null);
+    // V29 — confirm capture started with a soft haptic + audio cue.
     try{const c=window.__ssrPlayCue;if(c)c('upload');}catch(e2){}
     try{if(navigator.vibrate)navigator.vibrate(10);}catch(e2){}
-    const r=new FileReader();
-    r.onload=async(ev)=>{
-      const raw=ev.target.result;
-      let shareable=raw;
-      if(!isVideoData(raw)){
-        // V20: adaptive tiered compression (falls back to null only if 3 tiers still fail)
-        shareable=await compressPhotoAdaptive(raw);
-      }
-      // V41.11 — try Storage bucket upload first; on any failure fall back to
-      // inline base64 (V41.5 behavior). The `shareable` value gets the URL
-      // when Storage works, else stays as the original/compressed data URL.
-      // Storage upload skipped when shareable is null (compress failed) — the
-      // null is propagated to photo_url and handled downstream.
-      if(shareable){
-        const blob=dataUrlToBlob(shareable);
-        if(blob){
-          const ct=blob.type||(isVideoData(raw)?'video/mp4':'image/jpeg');
-          const prefix=`t${myTeam?.id||0}_l${locId}_c${typeof chIdx==='number'?chIdx:'x'}`;
-          const url=await uploadMediaToStorage(sb,blob,prefix,ct);
-          if(url)shareable=url;
-        }
-      }
-      setPreview(raw);
-      setProcessing(false);
 
-      // V6: Insert a photo_review row into Supabase for the admin queue
-      // V24: auto-approve when GPS distance is within AUTO_APPROVE_RADIUS (100m since V40).
-      // Mike's spec: in-range submissions skip the manual queue. Distant or no-GPS
-      // submissions still go to 'pending' so the admin (or agent harness mass-approve)
-      // can spot-check. The admin queue UI already filters status='pending', so
-      // approved rows just don't appear there — points are awarded the same way.
-      // V41.6 (F-1 fix): we now AWAIT the insert and react to errors. The two error
-      // categories we care about: (1) network failure → show retry prompt + DON'T
-      // mark challenge complete locally (which would corrupt score state); (2) any
-      // other Supabase error → same fallback. The "table missing" silent path is
-      // preserved for legacy environments via the err.code check.
-      let insertError=null;
-      if(!OFFLINE&&sb&&myTeam&&isMedia){
-        const autoApprove=dist!=null&&dist<=AUTO_APPROVE_RADIUS;
-        const reviewRow={
-          team_id:myTeam.id,
-          team_name:myTeam.name,
-          team_emoji:myTeam.emoji,
-          team_color:myTeam.color,
-          location_id:locId,
-          location_name:loc?.n||'',
-          challenge_idx:typeof chIdx==='number'?chIdx:-99,
-          challenge_title:ch.ti,
-          challenge_type:ch.t,
-          gps_distance:dist!=null?Math.round(dist):null,
-          points_awarded:ch.p,
-          // V41.5: store ALL bytes, no size cap. See V41.5 comment above.
-          photo_url:shareable||null,
-          status:autoApprove?'approved':'pending',
-        };
-        try{
-          const{error}=await sb.from('photo_reviews').insert(reviewRow);
-          if(error){
-            const code=error.code||'';
-            // 42P01 = table doesn't exist (pre-V6 schema). Treat as legacy-silent,
-            // not a user-visible error — the challenge still completes locally.
-            if(code!=='42P01'&&code!=='PGRST205'){
-              insertError=error;
-            }
-          }
-        }catch(netErr){
-          // TypeError: Failed to fetch / NetworkError → 4G dropped mid-POST
-          insertError=netErr;
-        }
-      }
-      if(insertError){
-        // V41.6: surface to user inline. DO NOT call onComplete — that would advance
-        // the local score state without a matching DB row, causing leaderboard drift.
-        const msg=insertError.message||'';
-        const friendly=/fetch|network|failed/i.test(msg)
-          ?'Geen verbinding — foto niet opgeslagen. Probeer opnieuw als je weer online bent.'
-          :'Upload mislukt — probeer opnieuw. ('+(msg||'onbekende fout')+')';
-        setUploadError(friendly);
-        try{if(navigator.vibrate)navigator.vibrate([60,40,60]);}catch(e2){}
-        return;
-      }
+    // Local preview straight off the File — no FileReader, instant, free.
+    let previewUrl=null;
+    try{
+      previewUrl=URL.createObjectURL(f);
+      setPreviewIsVideo(isVideoFile(f));
+      setPreview((old)=>{try{if(old&&old.startsWith('blob:'))URL.revokeObjectURL(old);}catch(e3){}return previewUrl;});
+    }catch(e2){}
 
-      onComplete(locId,chIdx,ch.p,shareable);
-      // V37 P1: hold the success-confirmation state for ~6s before the upload
-      // button reverts to "Opnieuw" affordance. Sandra-grade users no longer
-      // misread the morph as failure.
-      setJustSubmitted(true);
-      setTimeout(()=>setJustSubmitted(false),6000);
-    };
-    r.onerror=()=>{setProcessing(false);setUploadError('Bestand kon niet gelezen worden. Probeer opnieuw.');};
-    r.readAsDataURL(f);
+    // V24: auto-approve when GPS distance is within AUTO_APPROVE_RADIUS (100m since V40).
+    // Distant or no-GPS submissions still go to 'pending' for a spot-check.
+    const reviewRow=(!OFFLINE&&sb&&myTeam&&isMedia)?{
+      team_id:myTeam.id,
+      team_name:myTeam.name,
+      team_emoji:myTeam.emoji,
+      team_color:myTeam.color,
+      location_id:locId,
+      location_name:loc?.n||'',
+      challenge_idx:typeof chIdx==='number'?chIdx:-99,
+      challenge_title:ch.ti,
+      challenge_type:ch.t,
+      gps_distance:dist!=null?Math.round(dist):null,
+      points_awarded:ch.p,
+      status:(dist!=null&&dist<=AUTO_APPROVE_RADIUS)?'approved':'pending',
+    }:null;
+
+    let result;
+    try{
+      result=await submitMedia(sb,{
+        file:f,
+        kind:'challenge',
+        prefix:`t${myTeam?.id||0}_l${locId}_c${typeof chIdx==='number'?chIdx:'x'}`,
+        reviewRow,
+      });
+    }catch(err){
+      result={ok:false,error:err,url:null,queued:false};
+    }
+    setProcessing(false);
+
+    // ok=false means there was no file at all — the only outcome where nothing
+    // was stored. Everything else either uploaded or is queued on this phone.
+    if(!result||!result.ok){
+      const msg=String(result&&result.error&&result.error.message||'onbekende fout');
+      setUploadError('Er ging iets mis met het bestand — probeer opnieuw. ('+msg+')');
+      try{if(navigator.vibrate)navigator.vibrate([60,40,60]);}catch(e2){}
+      return;
+    }
+
+    if(result.queued){
+      // Not a failure: the media is on the phone and the score lands with it.
+      // Say so plainly — the old build stayed silent here and players assumed
+      // their video had been submitted.
+      setUploadError(String(result.error&&result.error.message
+        ||'Bewaard op je telefoon — gaat automatisch door zodra je weer verbinding hebt.'));
+    }
+
+    // The challenge completes either way. The media is never lost, so holding
+    // the points back (V41.6 behaviour) would now only punish a bad signal.
+    onComplete(locId,chIdx,ch.p,result.url||null);
+    // V37 P1: hold the success-confirmation state for ~6s before the upload
+    // button reverts to "Opnieuw" affordance.
+    setJustSubmitted(true);
+    setTimeout(()=>setJustSubmitted(false),6000);
   };
 
   // V7: one shot. Correct → full points. Wrong → 0 pts, challenge marked done.
@@ -8289,8 +8650,8 @@ function ChallengeAction({ch,locId,chIdx,onComplete,dist,isAdmin,loc,myTeam,conf
       {!isAdmin&&isMedia&&dist!=null&&dist<=gateRadius&&(
         <div style={{fontSize:11,color:'var(--success)',marginTop:6,textAlign:'center'}}>✓ Je bent op locatie ({Math.round(dist)}m)</div>
       )}
-      {preview&&(isVideoData(preview)
-        ?<video src={preview} className="photo-preview" controls muted/>
+      {preview&&((previewIsVideo||isVideoData(preview))
+        ?<video src={preview} className="photo-preview" controls muted playsInline/>
         :<img src={preview} className="photo-preview" alt="preview"/>)}
       {isAdmin&&dist!=null&&dist>gateRadius&&(
         <div style={{fontSize:11,color:'var(--video)',marginTop:6,textAlign:'center'}}>⚠️ Admin override · normaal {Math.round(dist)}m te ver</div>
@@ -8570,27 +8931,48 @@ function JorikMissions({onClose,onComplete,done,runningCounts,jorikInTeam,pos,ba
     return()=>window.removeEventListener('keydown',onKey);
   },[onClose]);
 
-  const handleFile=(m,file)=>{
+  // V57 — this path was the single biggest source of lost footage. It read the
+  // file as base64 and handed it straight to addActivity, which deleted every
+  // payload over 600 kB before insert. A Jorik-mission video is always over
+  // 600 kB, so ALL of it was discarded on the phone — silently, and exactly the
+  // material the wedding edit was collected for. It now goes through Storage
+  // like every other capture, with the feed line back-filled once it lands.
+  // V57: per-mission upload lock — the await window is long for video.
+  const[uploadingIds,setUploadingIds]=useState(()=>new Set());
+
+  const handleFile=async(m,file)=>{
     if(!file)return;
     // V22: running missions can be uploaded to until count reaches target. Block here as a
-    // safety net so re-clicks during the FileReader window can't double-fire.
+    // safety net so re-clicks during the async window can't double-fire.
     if(doneSet.has(m.id))return;
     if(m.running&&m.tradeTarget>0&&(runMap[m.id]||0)>=m.tradeTarget)return;
-    // V41.5: no size cap. All Jorik-mission media (photo + video) reaches the
-    // wedding-edit dataset regardless of file size. Pre-V41.5 the 5MB cap silently
-    // dropped iPhone clips. Photos still get compressed via compressPhotoAdaptive
-    // (smaller payload, same legibility); videos pass through raw.
-    const r=new FileReader();
-    r.onload=async(ev)=>{
-      const raw=ev.target.result;
-      let shareable=raw;
-      if(m.media!=='video'){
-        // V20: adaptive tiered compression for photos only
-        shareable=await compressPhotoAdaptive(raw);
-      }
-      onComplete&&onComplete(m.id,m.pts,shareable);
-    };
-    r.readAsDataURL(file);
+    if(uploadingIds.has(m.id))return;
+    setUploadingIds(prev=>new Set([...prev,m.id]));
+    const clientId=newClientId();
+    let result=null;
+    try{
+      result=await submitMedia(sb,{
+        file,
+        kind:'jorik',
+        prefix:`jorik_${m.id}`,
+        clientId,
+        // The feed line is inserted immediately by addActivity so the player
+        // sees it right away; the pipeline backfills `photo` when the upload
+        // lands, including after a reload.
+        patch:{table:'activity_feed',column:'photo',clientId:clientId+'_a'},
+      });
+    }catch(err){
+      result={ok:false,error:err,url:null,queued:false};
+    }
+    setUploadingIds(prev=>{const n=new Set(prev);n.delete(m.id);return n;});
+    if(!result||!result.ok){
+      try{const setToast=window.__ssrSetToast;if(setToast)setToast('❌ Het bestand kon niet gelezen worden — probeer opnieuw.');}catch(_){}
+      return;
+    }
+    if(result.queued){
+      try{const setToast=window.__ssrSetToast;if(setToast)setToast('📼 Opgeslagen op je telefoon — de video wordt vanzelf geüpload zodra je weer bereik hebt.');}catch(_){}
+    }
+    onComplete&&onComplete(m.id,m.pts,result.url||null,clientId);
   };
 
   return(

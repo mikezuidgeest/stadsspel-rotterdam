@@ -3,3 +3,4 @@
 # zeker niet in een publieke.
 archief/export-*/
 __pycache__/
+node_modules/

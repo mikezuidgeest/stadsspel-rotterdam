@@ -1,0 +1,12 @@
+{
+  "name": "stadsspel-rotterdam",
+  "version": "57.0.0",
+  "private": true,
+  "description": "Stadsspel Rotterdam — statische app (index.html) + testharnas voor de media-pipeline.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5"
+  }
+}

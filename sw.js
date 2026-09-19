@@ -21,7 +21,7 @@
 //
 // Scope: this file is at repo root, so it covers the deployed site on GitHub Pages.
 
-const CACHE_NAME = 'stadsspel-v53';
+const CACHE_NAME = 'stadsspel-v57';
 const APP_SHELL_URLS = ['./', './index.html', './offline.html'];
 
 // Static CDN hosts whose assets are safe to cache (libraries + fonts — never user data).
