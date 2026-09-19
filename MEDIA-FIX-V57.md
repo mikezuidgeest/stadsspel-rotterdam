@@ -168,10 +168,11 @@ zonder media zijn blijven staan — dat is de omvang van wat er destijds is misg
 
 ---
 
-## Bekende beperking
+## Die ene beperking is inmiddels ook gesloten
 
-Bij een opname zonder verbinding wordt de score lokaal opgeteld terwijl de
-`increment_team_score`-RPC faalt; de telefoon loopt dan voor op de server tot de
-volgende geslaagde sync. Dat gedrag is ongewijzigd (het gold al voor quizzen) en
-staat los van de media-fix. De media zelf is veilig. Wil je dat ook dichtgezet
-hebben, dan is dat een aparte klus: dezelfde wachtrij, maar dan voor score-delta's.
+Bij een opname zonder verbinding werd de score lokaal opgeteld terwijl de
+`increment_team_score`-RPC faalde; de telefoon liep dan voor op de server tot de
+volgende sync het lokale getal overschreef. Dezelfde klasse fout, andere
+schrijfactie. **V58 doet daar hetzelfde als V57 voor media** — zie
+`SCORE-QUEUE-V58.md` en `SUPABASE-SCORE-QUEUE-V58.sql`. Het lastige deel daar was
+exactly-once: een delta opnieuw versturen mag niet dubbel tellen.

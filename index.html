@@ -1527,7 +1527,11 @@ async function uploadMedia(sb,blob,pathPrefix,contentType){
 // instantly — the reason no queue existed before).
 const QUEUE_DB_NAME='ssr_media_queue';
 const QUEUE_STORE='pending';
-const QUEUE_DB_VERSION=1;
+// V58 bumped this to 2 to add the 'writes' store (score deltas + completed
+// challenges). Both stores live in one database so a single open/upgrade covers
+// them; a phone still carrying a v1 database upgrades in place without losing
+// anything that was queued.
+const QUEUE_DB_VERSION=2;
 
 let queueDbPromise=null;
 function queueOpen(){
@@ -1540,6 +1544,9 @@ function queueOpen(){
         const db=req.result;
         if(!db.objectStoreNames.contains(QUEUE_STORE)){
           db.createObjectStore(QUEUE_STORE,{keyPath:'id'});
+        }
+        if(!db.objectStoreNames.contains('writes')){
+          db.createObjectStore('writes',{keyPath:'id'});
         }
       };
       req.onsuccess=()=>resolve(req.result);
@@ -1777,6 +1784,243 @@ function startMediaQueueWorker(sb,intervalMs=45000){
 }
 
 // ══ MEDIA-PIPELINE-END ══
+
+// ═══════════════════════════════════════════
+// V58: WRITE QUEUE — punten en voltooiingen overleven een dode hoek
+// ═══════════════════════════════════════════
+// V57 maakte media onverliesbaar. Dit doet hetzelfde voor de twee schrijfacties
+// waarvan het verlies de stand echt corrumpeert:
+//
+//   1. de score-delta (`increment_team_score`), en
+//   2. de rij in `completed_challenges`.
+//
+// Wat er eerder gebeurde: beide waren fire-and-forget. Bij een 4G-dip telde de
+// telefoon de punten lokaal op, faalde de RPC, en liep dat toestel vanaf dat
+// moment vóór op de server — tot de volgende realtime-sync het lokale getal
+// overschreef en de punten dus stilletjes verdwenen. De opdracht stond intussen
+// wél als voltooid op het scherm. Precies dezelfde klasse fout als het
+// media-verlies: lokaal geslaagd, server weet van niets, niemand die het ziet.
+//
+// HET LASTIGE DEEL: een score-delta opnieuw versturen is niet vanzelf veilig.
+// `increment_team_score` is niet idempotent — twee keer afgevuurd telt twee keer.
+// Daarom schrijft V58 elke delta met een door de client gegenereerde sleutel via
+// `increment_team_score_idem` (SUPABASE-SCORE-QUEUE-V58.sql): de eerste keer telt
+// hij, elke herhaling geeft alleen de huidige stand terug. Exactly-once, ook als
+// de telefoon crasht tussen versturen en antwoord.
+//
+// BEWUST NIET IN DE WACHTRIJ: `challenge_first_finder`. Dat is een race — wie het
+// eerst is, wint. Een insert die twintig minuten later alsnog uit een dode hoek
+// komt zou "eerste" toekennen aan een team dat dat niet was. Daar hoort de
+// bestaande ene-retry-na-600ms bij, niet oneindig opnieuw proberen.
+//
+// ══ WRITE-QUEUE-START ══ (delimiters used by test/write-queue.test.mjs)
+
+const WRITE_STORE='writes';
+const WRITE_ATTEMPT_BACKOFF_MS=[0,1000,3000,7000];
+
+// Fouten die een definitief oordeel zijn. Opnieuw proberen verandert daar niets
+// aan, dus gaat het item uit de rij — het is afgehandeld, niet mislukt.
+//   23505 unique_violation  → stond er al (teammate was ons voor, of een replay)
+//   23514 check_violation   → de wp:1-geheimhoudingstrigger weigert de rij
+//   42P01 / PGRST205        → tabel bestaat niet (oud schema)
+const TERMINAL_CODES=['23505','23514','42P01','PGRST205'];
+
+function isTerminalError(err){
+  if(!err)return false;
+  const code=String(err.code||'');
+  if(TERMINAL_CODES.indexOf(code)>=0)return true;
+  return /duplicate key|already exists/i.test(String(err.message||''));
+}
+
+function isNetworkError(err){
+  if(!err)return false;
+  return /fetch|network|timeout|failed to|econn|socket/i.test(String(err.message||err));
+}
+
+const writeListeners=new Set();
+function notifyWrites(count){
+  writeListeners.forEach((fn)=>{try{fn(count);}catch(e){}});
+}
+
+function writeTx(mode,fn){
+  return queueOpen().then((db)=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(WRITE_STORE,mode);
+    const store=tx.objectStore(WRITE_STORE);
+    let result;
+    try{result=fn(store);}catch(err){reject(err);return;}
+    tx.oncomplete=()=>resolve(result&&result.__req?result.__req.result:result);
+    tx.onerror=()=>reject(tx.error||new Error('indexedDB transactie mislukt'));
+    tx.onabort=()=>reject(tx.error||new Error('indexedDB transactie afgebroken'));
+  }));
+}
+
+const WriteQueue={
+  onChange(fn){writeListeners.add(fn);return()=>writeListeners.delete(fn);},
+  async add(record){
+    const rec={attempts:0,createdAt:Date.now(),...record};
+    if(!rec.id)rec.id=newClientId();
+    await writeTx('readwrite',(store)=>({__req:store.put(rec)}));
+    notifyWrites(await WriteQueue.count());
+    mediaLog('write queued',rec.id,rec.kind);
+    return rec.id;
+  },
+  async all(){
+    const rows=await writeTx('readonly',(store)=>({__req:store.getAll()}));
+    // Op volgorde van ontstaan: punten horen te landen in de volgorde waarin ze
+    // zijn verdiend, anders leest de feed als een onbegrijpelijke sprong.
+    return(rows||[]).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  },
+  async update(rec){await writeTx('readwrite',(store)=>({__req:store.put(rec)}));},
+  async remove(id){
+    await writeTx('readwrite',(store)=>({__req:store.delete(id)}));
+    notifyWrites(await WriteQueue.count());
+  },
+  async count(){return(await writeTx('readonly',(store)=>({__req:store.count()})))||0;},
+};
+
+// De app registreert hier één keer een functie die de lokale stand bijtrekt naar
+// wat de server teruggeeft. Zo komt een score die pas een kwartier later landt
+// alsnog goed op het scherm, zonder dat de wachtrij iets van React hoeft te weten.
+let scoreReconciler=null;
+function setScoreReconciler(fn){scoreReconciler=fn;}
+function reconcileScore(teamId,score){
+  if(typeof score!=='number'||!scoreReconciler)return;
+  try{scoreReconciler(teamId,score);}catch(e){}
+}
+
+// ── Eén schrijfactie uitvoeren ───────────────────────────────────────────────
+// {ok:true}            → klaar, uit de rij
+// {ok:false, retry}    → blijft staan
+async function runWrite(sb,rec){
+  if(!sb)return{ok:false,retry:true,error:new Error('geen verbinding')};
+
+  if(rec.kind==='score'){
+    // Idempotente variant eerst. Ontbreekt die (patch niet gedraaid), dan valt
+    // hij terug op de oude RPC — die is niet exactly-once, dus dan proberen we
+    // het bewust maar één keer en laten we het daarbij. Liever een delta die
+    // een keer mist dan een die dubbel telt.
+    try{
+      const{data,error}=await sb.rpc('increment_team_score_idem',
+        {p_team_id:rec.teamId,p_delta:rec.delta,p_client_id:rec.id});
+      if(!error){
+        reconcileScore(rec.teamId,typeof data==='number'?data:null);
+        return{ok:true};
+      }
+      const missing=error.code==='42883'||error.code==='PGRST202'
+        ||/does not exist|could not find|not found/i.test(String(error.message||''));
+      if(!missing)return{ok:false,retry:!isTerminalError(error),error};
+
+      if(rec.legacyTried){
+        // De oude RPC is al een keer gedraaid; de uitkomst is onbekend. Nog eens
+        // sturen kan dubbel tellen, dus we stoppen ermee en zeggen waarom.
+        mediaLog('score delta opgegeven — geen idempotente RPC',rec.id);
+        return{ok:true,gaveUp:true};
+      }
+      rec.legacyTried=true;
+      await WriteQueue.update(rec);
+      const legacy=await sb.rpc('increment_team_score',{p_team_id:rec.teamId,p_delta:rec.delta});
+      if(legacy.error)return{ok:false,retry:isNetworkError(legacy.error),error:legacy.error};
+      reconcileScore(rec.teamId,typeof legacy.data==='number'?legacy.data:null);
+      return{ok:true};
+    }catch(err){
+      return{ok:false,retry:true,error:err};
+    }
+  }
+
+  if(rec.kind==='insert'){
+    try{
+      const{error}=await sb.from(rec.table).insert(rec.row);
+      if(!error)return{ok:true};
+      if(isTerminalError(error))return{ok:true,terminal:error.code};
+      return{ok:false,retry:true,error};
+    }catch(err){
+      return{ok:false,retry:true,error:err};
+    }
+  }
+
+  mediaLog('onbekend wachtrij-item, weggegooid',rec.kind);
+  return{ok:true};
+}
+
+// ── Flush ────────────────────────────────────────────────────────────────────
+let flushingWrites=false;
+
+async function flushWriteQueue(sb){
+  const client=sb||flushSb;
+  if(!client||flushingWrites)return{applied:0,remaining:-1};
+  if(typeof navigator!=='undefined'&&navigator.onLine===false)return{applied:0,remaining:-1};
+  flushingWrites=true;
+  let applied=0;
+  try{
+    for(const rec of await WriteQueue.all()){
+      const res=await runWrite(client,rec);
+      if(res.ok){
+        await WriteQueue.remove(rec.id);
+        applied++;
+        continue;
+      }
+      rec.attempts=(rec.attempts||0)+1;
+      rec.lastError=String(res.error&&res.error.message||res.error||'onbekend');
+      await WriteQueue.update(rec);
+      // Eén dode verbinding betekent dat de rest ook faalt; stop deze ronde
+      // zodat de volgorde intact blijft en we geen batterij verstoken.
+      if(isNetworkError(res.error))break;
+    }
+    return{applied,remaining:await WriteQueue.count()};
+  }finally{
+    flushingWrites=false;
+  }
+}
+
+// ── Entry points ─────────────────────────────────────────────────────────────
+// Probeer direct; lukt het niet, dan in de rij. Altijd exactly-once dankzij de
+// client-side sleutel, dus een replay na een crash kan nooit dubbel tellen.
+async function submitScoreDelta(sb,teamId,delta){
+  if(!teamId||!Number.isFinite(delta)||delta===0)return{ok:true,queued:false};
+  const rec={id:newClientId(),kind:'score',teamId,delta};
+  if(!sb||(typeof navigator!=='undefined'&&navigator.onLine===false)){
+    await WriteQueue.add(rec);
+    return{ok:true,queued:true};
+  }
+  const res=await runWrite(sb,rec);
+  if(res.ok)return{ok:true,queued:false};
+  await WriteQueue.add({...rec,attempts:1,
+    lastError:String(res.error&&res.error.message||res.error||'onbekend')});
+  return{ok:true,queued:true};
+}
+
+async function submitInsert(sb,table,row,opts){
+  const{onTerminal=null}=opts||{};
+  const rec={id:newClientId(),kind:'insert',table,row};
+  if(!sb||(typeof navigator!=='undefined'&&navigator.onLine===false)){
+    await WriteQueue.add(rec);
+    return{ok:true,queued:true};
+  }
+  const res=await runWrite(sb,rec);
+  if(res.ok){
+    if(res.terminal&&onTerminal)try{onTerminal(res.terminal);}catch(e){}
+    return{ok:true,queued:false,terminal:res.terminal||null};
+  }
+  await WriteQueue.add({...rec,attempts:1,
+    lastError:String(res.error&&res.error.message||res.error||'onbekend')});
+  return{ok:true,queued:true};
+}
+
+function startWriteQueueWorker(sb,intervalMs=30000){
+  flushSb=flushSb||sb;
+  const kick=()=>{flushWriteQueue(sb).catch(()=>{});};
+  try{
+    if(typeof window!=='undefined'){
+      window.addEventListener('online',kick);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden)kick();});
+    }
+  }catch(e){}
+  const timer=setInterval(kick,intervalMs);
+  kick();
+  return()=>{clearInterval(timer);};
+}
+
+// ══ WRITE-QUEUE-END ══
 
 // Detect whether a media value is a video.
 // V42 P1-1 fix: since V41.11, uploads land in Supabase Storage and come back as
@@ -2449,15 +2693,32 @@ function App(){
     const poll=setInterval(()=>{MediaQueue.count().then(setPendingUploads).catch(()=>{});},5000);
     return()=>{off();stop();clearInterval(poll);};
   },[]);
+
+  // V58 — dezelfde behandeling voor punten en voltooiingen. De reconciler trekt
+  // de lokale stand bij naar wat de server teruggeeft zodra een uitgestelde
+  // delta alsnog landt, zodat een score die een kwartier in de wachtrij stond
+  // niet blijft hangen op het optimistische getal van dit toestel.
+  const[pendingWrites,setPendingWrites]=useState(0);
+  useEffect(()=>{
+    if(OFFLINE||!sb)return;
+    setScoreReconciler((teamId,score)=>{
+      setScores(prev=>(prev[teamId]===score?prev:{...prev,[teamId]:score}));
+    });
+    const off=WriteQueue.onChange(setPendingWrites);
+    const stop=startWriteQueueWorker(sb);
+    WriteQueue.count().then(setPendingWrites).catch(()=>{});
+    const poll=setInterval(()=>{WriteQueue.count().then(setPendingWrites).catch(()=>{});},5000);
+    return()=>{off();stop();clearInterval(poll);setScoreReconciler(null);};
+  },[]);
   // Last line of defence: warn before the tab closes with media still queued.
   // A player who walks home and closes the app would otherwise only find out
   // the next time they open it — if ever.
   useEffect(()=>{
-    if(!pendingUploads)return;
+    if(!pendingUploads&&!pendingWrites)return;
     const warn=(e)=>{e.preventDefault();e.returnValue='';return'';};
     window.addEventListener('beforeunload',warn);
     return()=>window.removeEventListener('beforeunload',warn);
-  },[pendingUploads]);
+  },[pendingUploads,pendingWrites]);
 
   // V41.10 — wedding-mission 4/4 bonus award. When all 4 round-ticks land in
   // completed[-1], INSERT a sentinel bonus row (chIdx=0). UNIQUE constraint on
@@ -3247,26 +3508,24 @@ function App(){
   // - Calls the atomic Postgres RPC (supabase-v20-schema.sql) for the canonical value
   // - Reconciles local state to server return on success
   // - Falls back to legacy direct-update if the RPC isn't deployed yet (graceful)
+  // V20 P0: atomic score delta. Replaces 6 client-side R-M-W call sites that
+  // lost updates under concurrent teammate completions.
+  // V58: en nu ook onverliesbaar. Was fire-and-forget: faalde de RPC (dode hoek
+  // tussen twee kroegen), dan telde de telefoon de punten lokaal op, wist de
+  // server van niets, en overschreef de eerstvolgende realtime-sync het lokale
+  // getal — de punten waren weg zonder dat iemand het zag. Mislukt de RPC nu,
+  // dan gaat de delta de wachtrij in met een client-sleutel, zodat het opnieuw
+  // versturen exactly-once blijft (increment_team_score_idem).
   const applyScoreDelta=(teamId,delta)=>{
     if(!teamId||!Number.isFinite(delta))return;
-    // Optimistic local bump (covers OFFLINE mode too)
+    // Optimistische lokale bump (dekt ook OFFLINE-modus)
     setScores(prev=>({...prev,[teamId]:Math.max(0,(prev[teamId]||0)+delta)}));
     if(OFFLINE||!sb)return;
-    sb.rpc('increment_team_score',{p_team_id:teamId,p_delta:delta})
-      .then(({data,error})=>{
-        if(error){
-          // Fallback for Supabase projects that haven't run v20 migration yet
-          console.warn('increment_team_score RPC missing — using legacy R-M-W',error.message||error);
-          const fallback=(scores[teamId]||0)+delta;
-          sb.from('teams').update({score:Math.max(0,fallback)}).eq('id',teamId).then(()=>{},()=>{});
-          return;
-        }
-        if(typeof data==='number'){
-          // Reconcile local state to the canonical server value
-          setScores(prev=>({...prev,[teamId]:data}));
-        }
-      })
-      .catch(e=>console.warn('score delta RPC threw',e));
+    submitScoreDelta(sb,teamId,delta).then((res)=>{
+      if(res&&res.queued){
+        mediaLog('score delta in de wachtrij',teamId,delta);
+      }
+    }).catch(e=>console.warn('score delta queue threw',e));
   };
 
   // V19+ Jorik-specific missions (only team holding Jorik can do these)
@@ -3375,16 +3634,22 @@ function App(){
       // No DB to dedup against (demo/offline build or no team yet) — fall back to local award.
       applyJorikAward();return;
     }
-    sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:`jorik_${id}`,location_id:-2,challenge_type:'jorik',points_earned:awardedPts}).then(({error:e})=>{
-      if(!e){applyJorikAward();return;}
-      // 23505 = a teammate on another device already scored this Jorik mission for the team.
-      if(e.code==='23505'||String(e.message||'').includes('duplicate')){
+    // V58: dezelfde claim, maar via de schrijfwachtrij. Online verandert er niets
+    // — de insert draait meteen en blijft de dedup-poort. Lukt hij niet, dan
+    // falen we nog steeds OPEN (een dode hoek mag Jorik zijn punten niet kosten,
+    // precies zoals V56 het deed) én blijft de claim in de rij staan, zodat de
+    // server het alsnog registreert in plaats van er nooit van te horen.
+    submitInsert(sb,'completed_challenges',
+      {team_id:myTeam.id,challenge_id:`jorik_${id}`,location_id:-2,challenge_type:'jorik',points_earned:awardedPts}
+    ).then((res)=>{
+      // 23505 = een teamgenoot op een ander toestel scoorde deze Jorik-missie al.
+      if(res&&res.terminal==='23505'){
         try{const setToast=window.__ssrSetToast;if(setToast)setToast('✅ Deze Jorik-missie heeft je team al gedaan — punten staan al genoteerd');}catch(_){}
         return;
       }
-      // Any other error (missing table / transient blip) — fail OPEN so a network hiccup
-      // never robs Jorik of his points; worst case reverts to the pre-V56 behaviour.
-      console.warn('jorik completed_challenges claim failed — awarding anyway',e);
+      applyJorikAward();
+    }).catch((e)=>{
+      console.warn('jorik claim queue threw — awarding anyway',e);
       applyJorikAward();
     });
   };
@@ -3497,23 +3762,29 @@ function App(){
       // toast NEVER fired. Now we destructure {data, error} from the resolved value and
       // branch in the same .then. Real errors are now handled; previously they were silently
       // swallowed by the unused second callback.
-      sb.from('completed_challenges').insert({team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts}).then(({data:_data,error:e})=>{
-        if(!e)return;
-        // 23505 = unique_violation. The teammate-race OR re-submit-after-refresh case.
-        if(e.code==='23505'||String(e.message||'').includes('duplicate')){
-          try{const setToast=window.__ssrSetToast;if(setToast)setToast('✅ Deze missie heb je al gedaan — punten staan al genoteerd');}catch(_){}
-          return;
-        }
-        // 23514 = check_violation, surfaced by the V40 wp:1 secrecy trigger.
-        // Wording softened (no "wp:1" literal in user-facing text) and operational tail
-        // ("wacht op de volgende bar break") removed per UX review — that tail tells the
-        // Jorik-holder that there IS a wedding pipeline, which is itself a spoiler.
-        if(e.code==='23514'||String(e.message||'').toLowerCase().includes('secrecy')){
-          try{const setToast=window.__ssrSetToast;if(setToast)setToast('🤫 Deze missie is nu geheim — bewaar \'m voor later.');}catch(_){}
-          return;
-        }
-        console.warn('completed_challenges insert failed',e);
-      });
+      // V58: via de schrijfwachtrij. De unique constraint op
+      // (team_id, challenge_id) maakt deze insert al idempotent, dus opnieuw
+      // proberen is gratis — en zonder wachtrij verdween de rij bij een dode
+      // hoek, waarna de server niet wist dat de opdracht gedaan was terwijl het
+      // scherm een vinkje toonde. De toasts hangen nu aan de terminale codes,
+      // die de wachtrij als "afgehandeld" teruggeeft in plaats van als fout.
+      submitInsert(sb,'completed_challenges',
+        {team_id:myTeam.id,challenge_id:key,location_id:locId,challenge_type:loc.ch[chIdx]?.t,points_earned:totalPts},
+        {onTerminal:(code)=>{
+          // 23505 = unique_violation. De teammate-race OF het geval
+          // opnieuw-inleveren-na-refresh.
+          if(code==='23505'){
+            try{const setToast=window.__ssrSetToast;if(setToast)setToast('✅ Deze missie heb je al gedaan — punten staan al genoteerd');}catch(_){}
+            return;
+          }
+          // 23514 = check_violation, van de V40 wp:1-geheimhoudingstrigger.
+          // Bewust vaag geformuleerd: verklappen dát er een bruiloftspijplijn is,
+          // is zelf al een spoiler.
+          if(code==='23514'){
+            try{const setToast=window.__ssrSetToast;if(setToast)setToast('🤫 Deze missie is nu geheim — bewaar \'m voor later.');}catch(_){}
+          }
+        }}
+      ).catch((e)=>console.warn('completed_challenges queue threw',e));
 
       // V20: FIRST_BONUS honest race. One winner per challenge, period. If the
       // insert into challenge_first_finder succeeds, this team was first and
@@ -5375,16 +5646,19 @@ function App(){
       {/* V57 — pending-upload chip. Sits just above the tab bar so it is visible
           on every screen. Tapping it forces a flush instead of waiting for the
           45s timer, which is what an anxious player will do at the dinner table. */}
-      {pendingUploads>0&&(
+      {(pendingUploads>0||pendingWrites>0)&&(
         <div
-          onClick={()=>{flushMediaQueue(sb).catch(()=>{});}}
+          onClick={()=>{flushMediaQueue(sb).catch(()=>{});flushWriteQueue(sb).catch(()=>{});}}
           style={{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:'calc(var(--tab-h, 64px) + 12px)',zIndex:60,
                   display:'flex',alignItems:'center',gap:8,padding:'8px 14px',borderRadius:999,cursor:'pointer',
                   background:'rgba(26,19,16,0.92)',backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',
                   border:'1px solid rgba(228,178,92,0.45)',color:'#e4b25c',fontSize:13,fontWeight:600,
                   boxShadow:'0 6px 20px rgba(0,0,0,0.45)'}}>
           <span style={{fontSize:15}}>📤</span>
-          <span>{pendingUploads} {pendingUploads===1?'foto/video wacht':"foto's/video's wachten"} op upload</span>
+          <span>{[
+            pendingUploads>0?`${pendingUploads} ${pendingUploads===1?'foto/video':"foto's/video's"}`:null,
+            pendingWrites>0?`${pendingWrites} ${pendingWrites===1?'punt-update':'punt-updates'}`:null,
+          ].filter(Boolean).join(' · ')} wacht op verbinding</span>
         </div>
       )}
 
