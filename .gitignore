@@ -1,0 +1,5 @@
+# Archief-exports bevatten foto's en video's van de gasten plus alle
+# spelgegevens. Die horen op een privéschijf, niet in een git-repo —
+# zeker niet in een publieke.
+archief/export-*/
+__pycache__/
