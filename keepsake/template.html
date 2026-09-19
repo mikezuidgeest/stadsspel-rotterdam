@@ -144,7 +144,9 @@
 (function(){
   'use strict';
   var DATA = JSON.parse(document.getElementById('data').textContent);
-  var VIDEO = /\.(mp4|m4v|mov|qt|webm|ogv)$/i;
+  // Ook de kapotte extensies uit de bucket van 6 juni (.quicktim enz.),
+  // zodat die niet als foto in een <img> belanden.
+  var VIDEO = /\.(mp4|m4v|mov|qt|webm|ogv|quicktim\w*|xm4v|3gpp?|mpeg4?)(?:[?#]|$)/i;
   var $ = function(id){ return document.getElementById(id); };
 
   function esc(s){

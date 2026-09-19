@@ -117,8 +117,13 @@ WHERE points > 0;
 -- ╚══════════════════════════════════════════════════════════════════════════╝
 
 SELECT 'inzendingen met media'  AS onderdeel, COUNT(*) AS aantal FROM photo_reviews WHERE photo_url IS NOT NULL
+-- LET OP de extensielijst: de uploadcode van 6 juni kapte het mime-type af op
+-- 8 tekens, dus elke iPhone-video kreeg ".quicktim". Zonder die term hierin telt
+-- je videomateriaal als foto's mee.
 UNION ALL SELECT 'waarvan video', COUNT(*) FROM photo_reviews
-  WHERE photo_url ~* '\.(mp4|m4v|mov|qt|webm|ogv)($|[?#])'
+  WHERE photo_url ~* '\.(mp4|m4v|mov|qt|webm|ogv|quicktim\w*|xm4v|3gpp?)($|[?#])'
+UNION ALL SELECT '  waarvan met een onbruikbare naam (.quicktim e.d.)', COUNT(*) FROM photo_reviews
+  WHERE photo_url ~* '\.(quicktim\w*|xm4v|3gpp)($|[?#])'
 UNION ALL SELECT 'feedregels met media', COUNT(*) FROM activity_feed WHERE photo IS NOT NULL
 UNION ALL SELECT 'bruiloftstakes (location_id -1)', COUNT(*) FROM photo_reviews WHERE location_id = -1;
 

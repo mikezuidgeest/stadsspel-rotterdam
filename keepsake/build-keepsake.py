@@ -35,7 +35,8 @@ REPO = os.path.dirname(HERE)
 TABLES = ["teams", "activity_feed", "photo_reviews", "completed_challenges",
           "team_members", "game_state", "feed_reactions", "challenge_first_finder"]
 
-VIDEO_EXT = re.compile(r"\.(mp4|m4v|mov|qt|webm|ogv)$", re.I)
+# Ook de kapotte extensies uit de bucket van 6 juni (.quicktim enz.).
+VIDEO_EXT = re.compile(r"\.(mp4|m4v|mov|qt|webm|ogv|quicktim\w*|xm4v|3gpp?|mpeg4?)$", re.I)
 
 
 def newest_export():

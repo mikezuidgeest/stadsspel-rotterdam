@@ -159,6 +159,67 @@ def safe_name(text, limit=90):
     return re.sub(r"[^A-Za-z0-9._-]", "_", text)[:limit] or "media"
 
 
+# ── Het echte bestandstype uit de eerste bytes lezen ────────────────────────
+# Nodig omdat de uploadcode van 6 juni de extensie afleidde met .slice(0,8):
+# "video/quicktime" werd ".quicktim", en daar opent geen enkel besturingssysteem
+# iets mee. De bytes zijn prima; alleen de naam klopt niet. We vertrouwen daarom
+# niet op de naam in de bucket maar op wat er werkelijk in het bestand staat.
+ISO_BRANDS = {
+    b"qt  ": "mov",
+    b"heic": "heic", b"heix": "heic", b"heim": "heic", b"heis": "heic",
+    b"hevc": "heic", b"hevx": "heic", b"hevm": "heic", b"hevs": "heic",
+    b"mif1": "heic", b"msf1": "heic",
+    b"M4V ": "m4v", b"M4A ": "m4a", b"M4P ": "m4p",
+}
+
+
+def sniff_ext(head):
+    """Geeft de extensie die bij de inhoud hoort, of None als niets past."""
+    if len(head) < 12:
+        return None
+    if head[:3] == b"\xff\xd8\xff":
+        return "jpg"
+    if head[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png"
+    if head[:3] == b"GIF":
+        return "gif"
+    if head[:4] == b"RIFF":
+        sub = head[8:12]
+        if sub == b"WEBP":
+            return "webp"
+        if sub == b"AVI ":
+            return "avi"
+        if sub == b"WAVE":
+            return "wav"
+    if head[:4] == b"\x1aE\xdf\xa3":
+        return "webm"
+    if head[4:8] == b"ftyp":
+        brand = head[8:12]
+        if brand in ISO_BRANDS:
+            return ISO_BRANDS[brand]
+        if brand[:2] == b"3g":
+            return "3gp"
+        return "mp4"
+    if head[:4] == b"OggS":
+        return "ogv"
+    if head[:4] == b"%PDF":
+        return "pdf"
+    return None
+
+
+def correct_name(name, head):
+    """(nieuwe naam, gewijzigd?, herkend type) op basis van de eerste bytes."""
+    real = sniff_ext(head)
+    if not real:
+        return name, False, None
+    stem, _, cur = name.rpartition(".")
+    if not stem:
+        stem, cur = name, ""
+    if cur.lower() == real or (real == "jpg" and cur.lower() == "jpeg"):
+        return name, False, real
+    return f"{stem}.{real}", True, real
+
+
 def file_name_from_url(url):
     """
     In een platte bucket is de bestandsnaam de identiteit, niet de URL. De
@@ -215,18 +276,32 @@ def list_bucket():
     return names
 
 
-def download(url, dest):
-    if os.path.exists(dest) and os.path.getsize(dest) > 0:
-        return True, "overgeslagen (bestond al)"
+def download(url, media_dir, filename):
+    """
+    Haalt het bestand op en slaat het op onder de extensie die bij de INHOUD
+    hoort, niet onder de naam die in de bucket staat.
+    Geeft (gelukt, opgeslagen naam, opmerking) terug.
+    """
     try:
-        raw, headers = request(url)
+        raw, _headers = request(url)
     except Exception as e:
-        return False, str(e)
+        return False, None, str(e)
+    if not raw:
+        return False, None, "leeg bestand (0 bytes)"
+
+    final, changed, real = correct_name(filename, raw[:16])
+    dest = os.path.join(media_dir, final)
+    if os.path.exists(dest) and os.path.getsize(dest) == len(raw):
+        return True, final, "overgeslagen (bestond al)"
     tmp = dest + ".part"
     with open(tmp, "wb") as fh:
         fh.write(raw)
     os.replace(tmp, dest)
-    return True, headers.get("Content-Type", "")
+    if changed:
+        log(f"  ~ {filename}  ->  {final}")
+    elif real is None:
+        log(f"  ? {filename}: type niet herkend")
+    return True, final, (real or "type onbekend")
 
 
 def main():
@@ -268,20 +343,38 @@ def main():
                                 "refs": ["bucket-listing"]}
         log(f"  bucket '{STORAGE_BUCKET}': {len(bucket_files)} bestanden")
 
-    media_index, ok_count = [], 0
+    media_index, ok_count, renamed, unknown = [], 0, 0, 0
+    media_dir = os.path.join(out_dir, "media")
     for key, entry in sorted(remote.items()):
         filename = safe_name(key)
-        dest = os.path.join(out_dir, "media", filename)
-        good, note = download(entry["url"], dest)
-        media_index.append({"bron": "storage", "url": entry["url"],
-                            "bestand": f"media/{filename}" if good else None,
-                            "gebruikt_in": entry["refs"], "ok": good, "opmerking": note})
+        good, final, note = download(entry["url"], media_dir, filename)
         if good:
             ok_count += 1
+            if final != filename:
+                renamed += 1
+            if note == "type onbekend":
+                unknown += 1
         else:
             errors.append(f"download {entry['url']}: {note}")
             log(f"  !! {filename}: {note}")
+        media_index.append({"bron": "storage", "url": entry["url"],
+                            "bestand": f"media/{final}" if good else None,
+                            "bucket_naam": filename, "hernoemd": bool(good and final != filename),
+                            "gebruikt_in": entry["refs"], "ok": good, "opmerking": note})
     log(f"  ok storage-bestanden: {ok_count}/{len(remote)} binnen")
+    if renamed:
+        log(f"  {renamed} bestand(en) hernoemd naar de juiste extensie "
+            f'(de upload van 6 juni gaf o.a. ".quicktim" i.p.v. ".mov")')
+    if unknown:
+        log(f"  {unknown} bestand(en) met onherkenbare inhoud — "
+            f"die zijn waarschijnlijk beschadigd")
+    # Wezen: in de bucket, maar door geen enkele tabelrij genoemd. Dat is media
+    # waarvan de upload slaagde maar de bijbehorende rij niet is weggeschreven.
+    # In de app was dit onzichtbaar — hier komt het wel mee.
+    orphans = sum(1 for e in remote.values() if e["refs"] == ["bucket-listing"])
+    if orphans:
+        log(f"  {orphans} bestand(en) stonden alleen in de bucket, bij geen enkele "
+            f"opdracht — teruggevonden materiaal dat de app nooit toonde")
 
     inline_ok = 0
     for table, row_id, field, data_url in inline:
@@ -313,6 +406,9 @@ def main():
         "bucket_listing_gelukt": bucket_files is not None,
         "rijen_per_tabel": counts,
         "media_totaal": len(media_index),
+        "media_hernoemd": renamed,
+        "media_onherkenbaar": unknown,
+        "media_alleen_in_bucket": orphans,
         "media_uit_storage": len(remote),
         "media_inline": len(inline),
         "fouten": errors,

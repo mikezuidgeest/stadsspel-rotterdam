@@ -2035,7 +2035,13 @@ function startWriteQueueWorker(sb,intervalMs=30000){
 function isVideoData(d){
   if(typeof d!=='string')return false;
   if(d.startsWith('data:video'))return true;
-  return /\.(mp4|m4v|mov|qt|webm|ogv|quicktime)(?:[?#]|$)/i.test(d);
+  // V59: ook de kapotte namen uit de bucket. De uploadcode van vóór V57 leidde
+  // de extensie af met .slice(0,8), dus "video/quicktime" werd ".quicktim" —
+  // en de V42-fix zocht naar "quicktime", precies één letter te lang. Elke
+  // iPhone-video van 6 juni werd daardoor als FOTO geclassificeerd en in een
+  // <img> gerenderd: een kapot plaatje in de feed, de reviewwachtrij, de
+  // finale-fotogrid en de "Video-regisseur"-award.
+  return /\.(mp4|m4v|mov|qt|webm|ogv|quicktim\w*|xm4v|3gpp?|mpeg4?)(?:[?#]|$)/i.test(d);
 }
 
 // V23 (#48): stable winner ranking with tiebreakers.

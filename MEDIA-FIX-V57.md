@@ -177,3 +177,68 @@ volgende sync het lokale getal overschreef. Dezelfde klasse fout, andere
 schrijfactie. **V58 doet daar hetzelfde als V57 voor media** — zie
 `SCORE-QUEUE-V58.md` en `SUPABASE-SCORE-QUEUE-V58.sql`. Het lastige deel daar was
 exactly-once: een delta opnieuw versturen mag niet dubbel tellen.
+
+---
+
+## V59 — de vijfde oorzaak: bestandsnamen die nergens mee openen
+
+Gevonden nadat Mike het archief had gedownload: *"veel bestanden die ik niet kan
+openen of bekijken."* Dit is een andere bug dan de vier hierboven — hier is niets
+verloren gegaan, de bytes staan gewoon in de bucket. Alleen klopt de naam niet.
+
+`uploadMediaToStorage` leidde de extensie af uit het mime-type:
+
+```js
+const ext=(mt.split('/')[1]||'bin').replace(/\+.*$/,'').replace(/[^a-z0-9]/gi,'').slice(0,8)||'bin';
+```
+
+Die `.slice(0,8)` kapt af op acht tekens. Voor het standaard videoformaat van
+elke iPhone, `video/quicktime`, levert dat **`.quicktim`** op:
+
+| mime-type | werd | bruikbaar? |
+|---|---|---|
+| `video/quicktime` | `.quicktim` | nee — geen enkel OS kent die extensie |
+| `video/x-m4v` | `.xm4v` | nee |
+| `video/3gpp` | `.3gpp` | nee |
+| `video/mp4` | `.mp4` | ja |
+| `image/jpeg` | `.jpeg` | ja |
+
+En het bleef niet bij de bestandsnaam. `isVideoData()` — de functie die bepaalt
+of iets als `<video>` of als `<img>` wordt gerenderd — zocht naar `quicktime`,
+precies één letter te lang voor `quicktim`. Het V42-commentaar in de code claimt
+dat die classificatie toen is gerepareerd; voor iPhone-video is dat nooit waar
+geweest. Elke clip van 6 juni werd als foto behandeld en in een `<img>` gezet:
+een kapot plaatje in de feed, in de reviewwachtrij, in de finale-fotogrid en in
+de "Video-regisseur"-award.
+
+Dezelfde blinde vlek zat in `keepsake/build-keepsake.py`, in de
+keepsake-template en in de videotelling van `SUPABASE-DIAGNOSE.sql` — die telde
+je iPhone-video's dus als foto's mee.
+
+### Wat er nu gebeurt
+
+De exporters vertrouwen de naam in de bucket niet meer. Ze lezen de eerste 16
+bytes van elk bestand en bepalen daaruit het echte type (JPEG, PNG, GIF, WebP,
+ISO-BMFF met merkherkenning voor MOV/MP4/M4V/HEIC/3GP, Matroska/WebM, AVI, Ogg),
+en slaan het op onder de extensie die daarbij hoort. `a_1770_1.quicktim` wordt
+`a_1770_1.mov` en opent gewoon.
+
+Daarnaast:
+
+- een bestand van 0 bytes wordt als fout gemeld in plaats van stil opgeslagen;
+- inhoud die nergens op lijkt wordt geteld als "waarschijnlijk beschadigd";
+- `isVideoData()`, de keepsake en de diagnose herkennen nu ook de kapotte namen,
+  zodat oude bestanden in de bucket alsnog als video worden weergegeven;
+- de export meldt hoeveel bestanden alleen in de bucket stonden en door geen
+  enkele tabelrij worden genoemd — media waarvan de upload slaagde maar de rij
+  niet, die in de app altijd onzichtbaar is geweest.
+
+### Wat je moet doen
+
+**Draai de export opnieuw.** Dezelfde knop in `archief/export-in-browser.html`.
+Je krijgt dezelfde bestanden terug, maar met namen die wél openen, plus een
+regel in het logboek die zegt hoeveel er zijn hernoemd.
+
+Ik heb met opzet géén losse reparatietool gemaakt die je bestaande map
+hernoemt: zo'n tool verwijdert bestanden en dat risico is niet nodig als één
+klik hetzelfde oplevert.
