@@ -106,6 +106,10 @@ public — maar doe dan in elk geval het Supabase-deel.
 
 ## 5. Volgorde (zo gaat er niets verloren)
 
+0. **Eerst inzamelen.** Een deel van het materiaal van 6 juni heeft de server
+   nooit bereikt en staat alleen nog in de camerarollen van de gasten. Zet
+   `inzenden.html` online en deel die link in de groepsapp vóórdat je het domein
+   opzegt — daarna is de link dood. Zie `INZENDEN.md`.
 1. **Supabase wakker maken.** app.supabase.com → project `kybcndicweuxjxkfzxud` →
    *Resume* als het gepauzeerd is. Zonder dit levert de export niets op.
 2. **Exporteren.** Twee smaken, zelfde resultaat:
