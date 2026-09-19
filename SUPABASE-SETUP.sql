@@ -171,10 +171,13 @@ SELECT * FROM (
                      FROM storage.buckets WHERE id='media'), 'ONTBREEKT')
 ) t ORDER BY n;
 
--- Hoeveel is er destijds misgegaan? Dit telt wat V57 in het vervolg voorkomt.
+-- Ruwe indicatie van wat er destijds is misgegaan. LET OP: dit is met opzet
+-- grofmazig en telt te weinig — het mist de "Jorik ruil"-regels, en een
+-- inzending die het tabblad heeft gesloopt kreeg helemaal geen rij en is hier
+-- dus onzichtbaar. Draai SUPABASE-DIAGNOSE.sql voor het echte beeld.
 SELECT 'inzendingen zonder media' AS meting, COUNT(*) AS aantal FROM photo_reviews WHERE photo_url IS NULL
 UNION ALL
-SELECT 'Jorik-feedregels zonder media', COUNT(*) FROM activity_feed
+SELECT 'Jorik-feedregels zonder media (ondergrens)', COUNT(*) FROM activity_feed
  WHERE photo IS NULL AND message ILIKE '%Jorik-missie%';
 
 
