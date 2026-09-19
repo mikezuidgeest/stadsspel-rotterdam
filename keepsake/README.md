@@ -18,6 +18,10 @@ python3 archief/export-archief.py                # 1. data + media uit Supabase
 python3 keepsake/build-keepsake.py               # 2. pakt de nieuwste export
 ```
 
+Geen zin in een terminal voor stap 1? Open `archief/export-in-browser.html` in
+Chrome of Edge en klik op de knop. Dat levert exact dezelfde mapstructuur op, dus
+stap 2 werkt er ongewijzigd op — dat is getest.
+
 Of expliciet:
 
 ```bash

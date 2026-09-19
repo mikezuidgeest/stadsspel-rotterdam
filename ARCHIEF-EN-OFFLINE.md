@@ -108,7 +108,14 @@ public — maar doe dan in elk geval het Supabase-deel.
 
 1. **Supabase wakker maken.** app.supabase.com → project `kybcndicweuxjxkfzxud` →
    *Resume* als het gepauzeerd is. Zonder dit levert de export niets op.
-2. **Exporteren:**
+2. **Exporteren.** Twee smaken, zelfde resultaat:
+
+   **Zonder terminal** — open `archief/export-in-browser.html` (dubbelklik het
+   bestand) en klik op de knop. In Chrome of Edge kies je een map en worden de
+   bestanden daar rechtstreeks in geschreven; in Safari en Firefox krijg je één
+   zip-bestand.
+
+   **Met terminal:**
    ```bash
    python3 archief/export-archief.py
    ```

@@ -159,12 +159,25 @@ def safe_name(text, limit=90):
     return re.sub(r"[^A-Za-z0-9._-]", "_", text)[:limit] or "media"
 
 
+def file_name_from_url(url):
+    """
+    In een platte bucket is de bestandsnaam de identiteit, niet de URL. De
+    bucket-listing bouwt zijn URL zelf op (met quote()) terwijl de tabelrij de
+    opgeslagen URL draagt; wijkt de codering ook maar een teken af, dan zou
+    ontdubbelen op URL hetzelfde bestand twee keer binnenhalen.
+    """
+    last = url.split("/")[-1].split("?")[0].split("#")[0]
+    return urllib.parse.unquote(last)
+
+
 def collect_media(all_rows):
     """
     Vindt alle media in de tabelrijen. Twee soorten, want de app schrijft
     beide (Storage-URL bij succes, inline base64 als fallback):
       - remote: https://<project>.supabase.co/storage/v1/object/public/media/...
       - inline: data:image/jpeg;base64,...
+
+    remote is gesleuteld op bestandsnaam -> {"url": ..., "refs": [...]}.
     """
     remote, inline = {}, []
     for table, rows in all_rows.items():
@@ -174,7 +187,9 @@ def collect_media(all_rows):
                 if val.startswith("data:") and DATA_URL_RE.match(val):
                     inline.append((table, row_id, field, val))
                 elif "/storage/v1/object/" in val and val.startswith("http"):
-                    remote.setdefault(val, []).append(f"{table}#{row_id}.{field}")
+                    key = file_name_from_url(val)
+                    entry = remote.setdefault(key, {"url": val, "refs": []})
+                    entry["refs"].append(f"{table}#{row_id}.{field}")
     return remote, inline
 
 
@@ -245,20 +260,26 @@ def main():
     if bucket_files is not None:
         base = f"{SUPABASE_URL}/storage/v1/object/public/{STORAGE_BUCKET}/"
         for name in bucket_files:
-            remote.setdefault(base + urllib.parse.quote(name), []).append("bucket-listing")
+            if name in remote:
+                # Al bekend uit een tabelrij — alleen de herkomst aanvullen.
+                remote[name]["refs"].append("bucket-listing")
+            else:
+                remote[name] = {"url": base + urllib.parse.quote(name),
+                                "refs": ["bucket-listing"]}
         log(f"  bucket '{STORAGE_BUCKET}': {len(bucket_files)} bestanden")
 
     media_index, ok_count = [], 0
-    for url, refs in sorted(remote.items()):
-        filename = safe_name(urllib.parse.unquote(url.rsplit("/", 1)[-1]))
+    for key, entry in sorted(remote.items()):
+        filename = safe_name(key)
         dest = os.path.join(out_dir, "media", filename)
-        good, note = download(url, dest)
-        media_index.append({"bron": "storage", "url": url, "bestand": f"media/{filename}",
-                            "gebruikt_in": refs, "ok": good, "opmerking": note})
+        good, note = download(entry["url"], dest)
+        media_index.append({"bron": "storage", "url": entry["url"],
+                            "bestand": f"media/{filename}" if good else None,
+                            "gebruikt_in": entry["refs"], "ok": good, "opmerking": note})
         if good:
             ok_count += 1
         else:
-            errors.append(f"download {url}: {note}")
+            errors.append(f"download {entry['url']}: {note}")
             log(f"  !! {filename}: {note}")
     log(f"  ok storage-bestanden: {ok_count}/{len(remote)} binnen")
 

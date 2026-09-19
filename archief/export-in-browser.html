@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stadsspel — archief ophalen</title>
+<style>
+  :root{--bg:#1a1310;--card:#2a1f19;--line:rgba(228,178,92,.2);--gold:#e4b25c;
+        --text:#f5f1e8;--muted:#a2958a;--ok:#7ddf9a;--err:#ff8a8a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);line-height:1.6;padding:24px 16px 64px;
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:660px;margin:0 auto}
+  h1{font-size:23px;color:var(--gold);margin:0 0 6px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:26px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  button{font:inherit;font-size:15px;font-weight:600;padding:14px 26px;border-radius:28px;border:none;
+         background:linear-gradient(135deg,#e4b25c,#d49a3e);color:#1a1310;cursor:pointer;width:100%}
+  button:disabled{opacity:.45;cursor:default}
+  button.alt{background:none;border:1px solid var(--line);color:var(--muted);margin-top:10px;font-weight:500}
+  .bar{height:7px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;margin:16px 0 8px}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#e4b25c,#7ddf9a);transition:width .2s}
+  #status{font-size:13px;color:var(--muted);min-height:20px}
+  #log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted);
+       background:rgba(0,0,0,.28);border-radius:9px;padding:12px;margin-top:14px;max-height:260px;
+       overflow:auto;white-space:pre-wrap;display:none}
+  .ok{color:var(--ok)} .err{color:var(--err)} .gold{color:var(--gold)}
+  ol{padding-left:20px;margin:10px 0 0} li{margin-bottom:7px;font-size:14px}
+  code{background:rgba(0,0,0,.3);padding:1px 6px;border-radius:5px;font-size:12.5px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Archief ophalen</h1>
+  <div class="sub">Haalt alle tabellen, foto's en video's uit Supabase naar je eigen schijf.
+    Geen terminal, geen installatie.</div>
+
+  <div class="card">
+    <div id="intro">
+      <b>Voor je begint:</b>
+      <ol>
+        <li>Het Supabase-project moet wakker zijn. Staat het op pauze, klik dan eerst
+          <i>Resume</i> in het dashboard.</li>
+        <li>Gebruik <b>Chrome of Edge</b> als het kan — dan schrijft deze pagina de
+          bestanden rechtstreeks in een map die jij kiest. In Safari en Firefox krijg je
+          in plaats daarvan één zip-bestand.</li>
+        <li>Blijf op dit tabblad tot het klaar is.</li>
+      </ol>
+    </div>
+    <div class="bar"><i id="bar"></i></div>
+    <div id="status">Klaar om te beginnen.</div>
+    <button id="go">Archief ophalen</button>
+    <button id="zip" class="alt">Liever één zip-bestand</button>
+    <div id="log"></div>
+    <div class="note">De sleutel in deze pagina is dezelfde publieke anon-key die ook in
+      de speel-app zit — hij geeft geen extra toegang.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// Zelfde waarden als in index.html.
+var SUPABASE_URL='https://kybcndicweuxjxkfzxud.supabase.co';
+var SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5YmNuZGljd2V1eGp4a2Z6eHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDM3ODYsImV4cCI6MjA5MTY3OTc4Nn0.utTzURErYUiGgOpvlq1goKToUl8i4CavVicEFp-MrDk';
+var BUCKET='media';
+var PAGE=1000;
+
+// Dezelfde acht tabellen als archief/export-archief.py.
+var TABLES=['teams','team_members','game_state','activity_feed',
+            'completed_challenges','photo_reviews','feed_reactions','challenge_first_finder'];
+
+var MIME_EXT={'image/jpeg':'jpg','image/jpg':'jpg','image/png':'png','image/webp':'webp',
+              'image/heic':'heic','image/gif':'gif','video/mp4':'mp4','video/quicktime':'mov',
+              'video/webm':'webm'};
+
+var $=function(id){return document.getElementById(id);};
+var errors=[];
+
+function log(msg,cls){
+  var el=$('log'); el.style.display='block';
+  var line=document.createElement('div');
+  if(cls)line.className=cls;
+  line.textContent=msg;
+  el.appendChild(line); el.scrollTop=el.scrollHeight;
+}
+function status(msg){ $('status').textContent=msg; }
+function progress(done,total){ $('bar').style.width=(total?Math.round(done/total*100):0)+'%'; }
+
+function headers(extra){
+  var h={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
+  if(extra)for(var k in extra)h[k]=extra[k];
+  return h;
+}
+
+// ── Tabellen ────────────────────────────────────────────────────────────────
+async function fetchTable(name){
+  var rows=[],offset=0;
+  for(;;){
+    var res=await fetch(SUPABASE_URL+'/rest/v1/'+name+'?select=*',
+      {headers:headers({Range:offset+'-'+(offset+PAGE-1)})});
+    if(!res.ok){
+      var body=await res.text();
+      errors.push('tabel '+name+': HTTP '+res.status+' '+body.slice(0,200));
+      log('  !! '+name+': HTTP '+res.status,'err');
+      return rows;
+    }
+    var batch=await res.json();
+    rows=rows.concat(batch);
+    if(batch.length<PAGE)break;
+    offset+=PAGE;
+  }
+  return rows;
+}
+
+function toCsv(rows){
+  if(!rows.length)return '';
+  var cols=[];
+  rows.forEach(function(r){ for(var k in r) if(cols.indexOf(k)<0) cols.push(k); });
+  var esc=function(v){
+    if(v===null||v===undefined)return '';
+    if(typeof v==='string'&&v.indexOf('data:')===0)
+      return '"<inline media, '+v.length+' bytes — zie media/>"';
+    var s=(typeof v==='object')?JSON.stringify(v):String(v);
+    return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+  };
+  return cols.join(',')+'\n'+rows.map(function(r){
+    return cols.map(function(c){return esc(r[c]);}).join(',');
+  }).join('\n')+'\n';
+}
+
+// ── Media vinden ────────────────────────────────────────────────────────────
+function walkStrings(node,path,out){
+  if(typeof node==='string'){ out.push([path,node]); return out; }
+  if(node&&typeof node==='object'){
+    if(Array.isArray(node)) node.forEach(function(v,i){walkStrings(v,path+'['+i+']',out);});
+    else for(var k in node) walkStrings(node[k],path?path+'.'+k:k,out);
+  }
+  return out;
+}
+
+// In een platte bucket is de bestandsnaam de identiteit, niet de URL: de
+// bucket-listing bouwt zijn URL zelf op (met encodeURIComponent) terwijl de
+// tabelrij de opgeslagen URL draagt. Wijkt de codering ook maar één teken af,
+// dan zou ontdubbelen op URL hetzelfde bestand twee keer binnenhalen.
+function fileNameFromUrl(url){
+  var last=url.split('/').pop().split('?')[0].split('#')[0];
+  try{ last=decodeURIComponent(last); }catch(e){}
+  return last;
+}
+
+function collectMedia(all){
+  var remote={},inline=[];
+  Object.keys(all).forEach(function(table){
+    all[table].forEach(function(row,idx){
+      var id=(row.id!==undefined?row.id:idx);
+      walkStrings(row,'',[]).forEach(function(pair){
+        var field=pair[0],val=pair[1];
+        if(val.indexOf('data:')===0&&/^data:[\w.+-]+\/[\w.+-]+;base64,/i.test(val)){
+          inline.push({table:table,id:id,field:field,data:val});
+        }else if(val.indexOf('http')===0&&val.indexOf('/storage/v1/object/')>=0){
+          var key=fileNameFromUrl(val);
+          if(!remote[key])remote[key]={url:val,refs:[]};
+          remote[key].refs.push(table+'#'+id+'.'+field);
+        }
+      });
+    });
+  });
+  return {remote:remote,inline:inline};
+}
+
+async function listBucket(){
+  var names=[],offset=0;
+  for(;;){
+    var res=await fetch(SUPABASE_URL+'/storage/v1/object/list/'+BUCKET,{
+      method:'POST',headers:headers({'Content-Type':'application/json'}),
+      body:JSON.stringify({prefix:'',limit:PAGE,offset:offset,sortBy:{column:'name',order:'asc'}})
+    });
+    if(!res.ok){ log('  -- bucket-listing niet beschikbaar (HTTP '+res.status+'); '+
+                     'val terug op de URL\'s uit de tabellen'); return null; }
+    var batch=await res.json();
+    batch.forEach(function(o){ if(o&&o.name)names.push(o.name); });
+    if(batch.length<PAGE)break;
+    offset+=PAGE;
+  }
+  return names;
+}
+
+function safeName(s){ return String(s).replace(/[^A-Za-z0-9._-]/g,'_').slice(0,90)||'media'; }
+
+function dataUrlToBlob(dataUrl){
+  var comma=dataUrl.indexOf(','),meta=dataUrl.slice(5,comma);
+  var mime=meta.split(';')[0]||'application/octet-stream';
+  var bin=atob(dataUrl.slice(comma+1));
+  var arr=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return {blob:new Blob([arr],{type:mime}),mime:mime};
+}
+
+// ── Twee manieren om weg te schrijven ───────────────────────────────────────
+// A. Map op schijf (Chrome/Edge): stromend, dus een video van 200 MB kost geen
+//    geheugen. B. Zip in het geheugen (Safari/Firefox): één bestand, maar alles
+//    moet er tegelijk in passen.
+function DirSink(root){
+  this.root=root;
+  this.put=async function(path,blob){
+    var parts=path.split('/'),dir=root;
+    for(var i=0;i<parts.length-1;i++) dir=await dir.getDirectoryHandle(parts[i],{create:true});
+    var fh=await dir.getFileHandle(parts[parts.length-1],{create:true});
+    var w=await fh.createWritable();
+    await w.write(blob); await w.close();
+  };
+  this.finish=async function(){ return null; };
+}
+
+function ZipSink(){
+  var files=[];
+  this.put=async function(path,blob){
+    files.push({path:path,data:new Uint8Array(await blob.arrayBuffer())});
+  };
+  this.finish=async function(){ return buildZip(files); };
+}
+
+// Minimale zip-schrijver, methode "store" (geen compressie — media is al
+// gecomprimeerd, en zo hebben we geen externe bibliotheek nodig).
+var CRC_TABLE=(function(){
+  var t=new Uint32Array(256);
+  for(var n=0;n<256;n++){ var c=n;
+    for(var k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);
+    t[n]=c>>>0; }
+  return t;
+})();
+function crc32(buf){
+  var c=0xFFFFFFFF;
+  for(var i=0;i<buf.length;i++) c=CRC_TABLE[(c^buf[i])&0xFF]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;
+}
+function buildZip(files){
+  var enc=new TextEncoder(),chunks=[],central=[],offset=0;
+  function u32(v){ return new Uint8Array([v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255]); }
+  function u16(v){ return new Uint8Array([v&255,(v>>>8)&255]); }
+  files.forEach(function(f){
+    var name=enc.encode(f.path),crc=crc32(f.data),size=f.data.length;
+    var local=[u32(0x04034b50),u16(20),u16(0),u16(0),u16(0),u16(0),
+               u32(crc),u32(size),u32(size),u16(name.length),u16(0),name];
+    local.forEach(function(p){chunks.push(p);});
+    chunks.push(f.data);
+    central.push([u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),
+                  u32(crc),u32(size),u32(size),u16(name.length),u16(0),u16(0),
+                  u16(0),u16(0),u32(0),u32(offset),name]);
+    offset+=30+name.length+size;
+  });
+  var cdStart=offset,cdSize=0;
+  central.forEach(function(rec){
+    rec.forEach(function(p){chunks.push(p);cdSize+=p.length;});
+  });
+  chunks.push(u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),
+              u32(cdSize),u32(cdStart),u16(0));
+  return new Blob(chunks,{type:'application/zip'});
+}
+
+// ── De export ───────────────────────────────────────────────────────────────
+async function run(useZip){
+  $('go').disabled=true; $('zip').disabled=true; $('intro').style.display='none';
+  errors=[];
+  var sink;
+  try{
+    if(!useZip&&window.showDirectoryPicker){
+      status('Kies een map om het archief in te zetten…');
+      sink=new DirSink(await window.showDirectoryPicker({mode:'readwrite'}));
+      log('Map gekozen. Bestanden worden er rechtstreeks in geschreven.','gold');
+    }else{
+      sink=new ZipSink();
+      log('Alles wordt verzameld in één zip-bestand.','gold');
+    }
+  }catch(e){
+    status('Geannuleerd.'); $('go').disabled=false; $('zip').disabled=false; return;
+  }
+
+  try{
+    // 1. Tabellen
+    status('Tabellen ophalen…');
+    var all={},counts={};
+    for(var i=0;i<TABLES.length;i++){
+      var t=TABLES[i];
+      var rows=await fetchTable(t);
+      all[t]=rows; counts[t]=rows.length;
+      await sink.put('tabellen/'+t+'.json',
+        new Blob([JSON.stringify(rows,null,2)],{type:'application/json'}));
+      if(rows.length) await sink.put('tabellen/'+t+'.csv',
+        new Blob([toCsv(rows)],{type:'text/csv'}));
+      log('  ok '+t+': '+rows.length+' rijen','ok');
+      progress(i+1,TABLES.length*4);
+    }
+
+    // 2. Media
+    status('Media zoeken…');
+    var found=collectMedia(all);
+    var remote=found.remote,inline=found.inline;
+
+    var bucket=await listBucket();
+    if(bucket){
+      var base=SUPABASE_URL+'/storage/v1/object/public/'+BUCKET+'/';
+      bucket.forEach(function(n){
+        // Al bekend uit een tabelrij? Dan alleen de herkomst aanvullen —
+        // niet nog een keer downloaden.
+        if(remote[n]){ remote[n].refs.push('bucket-listing'); return; }
+        remote[n]={url:base+encodeURIComponent(n),refs:['bucket-listing']};
+      });
+      log('  bucket "'+BUCKET+'": '+bucket.length+' bestanden');
+    }
+
+    var keys=Object.keys(remote).sort();
+    var total=keys.length+inline.length,done=0,ok=0;
+    var index=[];
+    status('Media downloaden (0/'+total+')…');
+
+    for(var u=0;u<keys.length;u++){
+      var entry=remote[keys[u]],url=entry.url;
+      var fname=safeName(keys[u]);
+      try{
+        var r=await fetch(url);
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        await sink.put('media/'+fname,await r.blob());
+        ok++;
+        index.push({bron:'storage',url:url,bestand:'media/'+fname,
+                    gebruikt_in:entry.refs,ok:true,opmerking:''});
+      }catch(e){
+        errors.push('download '+url+': '+e.message);
+        log('  !! '+fname+': '+e.message,'err');
+        index.push({bron:'storage',url:url,bestand:null,
+                    gebruikt_in:entry.refs,ok:false,opmerking:String(e.message)});
+      }
+      done++; progress(TABLES.length*3+done,TABLES.length*3+total);
+      status('Media downloaden ('+done+'/'+total+')…');
+    }
+
+    for(var k=0;k<inline.length;k++){
+      var it=inline[k];
+      try{
+        var conv=dataUrlToBlob(it.data);
+        var ext=MIME_EXT[conv.mime]||(conv.mime.split('/')[1]||'bin');
+        var nm=safeName('inline_'+it.table+'_'+it.id+'_'+it.field+'.'+ext);
+        await sink.put('media/'+nm,conv.blob);
+        ok++;
+        index.push({bron:'inline-base64',url:null,bestand:'media/'+nm,
+                    gebruikt_in:[it.table+'#'+it.id+'.'+it.field],ok:true,opmerking:conv.mime});
+      }catch(e){
+        errors.push('inline '+it.table+'#'+it.id+': '+e.message);
+        log('  !! inline '+it.table+'#'+it.id+': '+e.message,'err');
+      }
+      done++; status('Media downloaden ('+done+'/'+total+')…');
+    }
+    log('  ok media: '+ok+'/'+total+' binnen',ok===total?'ok':'err');
+
+    // 3. Manifest — zelfde vorm als het Python-script, zodat
+    //    keepsake/build-keepsake.py deze map ongewijzigd kan gebruiken.
+    await sink.put('manifest.json',new Blob([JSON.stringify({
+      gemaakt_op:new Date().toISOString(),
+      supabase_url:SUPABASE_URL, storage_bucket:BUCKET,
+      bucket_listing_gelukt:bucket!==null,
+      rijen_per_tabel:counts,
+      media_totaal:index.length,
+      media_uit_storage:keys.length, media_inline:inline.length,
+      fouten:errors, media:index
+    },null,2)],{type:'application/json'}));
+
+    progress(1,1);
+    var blob=await sink.finish();
+    if(blob){
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download='stadsspel-archief-'+new Date().toISOString().slice(0,10)+'.zip';
+      a.click();
+      setTimeout(function(){URL.revokeObjectURL(a.href);},60000);
+      log('Zip-bestand gedownload.','gold');
+    }
+
+    var rowTotal=Object.keys(counts).reduce(function(s,k){return s+counts[k];},0);
+    status(errors.length
+      ? 'Klaar, met '+errors.length+' fout(en) — zie manifest.json.'
+      : 'Klaar. '+rowTotal+' rijen en '+ok+' mediabestanden opgehaald.');
+    log(errors.length?'LET OP: '+errors.length+' fout(en).':'Geen fouten.',
+        errors.length?'err':'ok');
+
+  }catch(e){
+    log('Afgebroken: '+(e&&e.message||e),'err');
+    status('Er ging iets mis — zie het logboek.');
+  }
+  $('go').disabled=false; $('zip').disabled=false;
+}
+
+$('go').addEventListener('click',function(){run(false);});
+$('zip').addEventListener('click',function(){run(true);});
+if(!window.showDirectoryPicker){
+  $('go').textContent='Archief ophalen (als zip)';
+  $('zip').style.display='none';
+}
+})();
+</script>
+</body>
+</html>
