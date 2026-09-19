@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stadsspel Rotterdam — foto's en video's nasturen</title>
+<style>
+  :root{--bg:#1a1310;--card:#2a1f19;--line:rgba(228,178,92,.2);--gold:#e4b25c;
+        --text:#f5f1e8;--muted:#a2958a;--ok:#7ddf9a;--err:#ff8a8a}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);line-height:1.6;padding:22px 16px 72px;
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:520px;margin:0 auto}
+  .crest{font-size:44px;text-align:center;filter:drop-shadow(0 4px 14px rgba(228,178,92,.3))}
+  h1{font-size:21px;color:var(--gold);margin:12px 0 6px;text-align:center}
+  .sub{color:var(--muted);font-size:14px;text-align:center;margin-bottom:22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  input[type=text],select{width:100%;font:inherit;font-size:16px;padding:12px 14px;margin-bottom:14px;
+    border-radius:11px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--text)}
+  button{font:inherit;font-size:16px;font-weight:600;padding:16px;border-radius:30px;border:none;
+    background:linear-gradient(135deg,#e4b25c,#d49a3e);color:#1a1310;cursor:pointer;width:100%}
+  button:disabled{opacity:.45}
+  button.ghost{background:none;border:1px solid var(--line);color:var(--muted);font-weight:500;margin-top:10px}
+  .drop{border:2px dashed var(--line);border-radius:13px;padding:26px 16px;text-align:center;
+        color:var(--muted);font-size:14px;cursor:pointer}
+  .drop b{color:var(--gold);display:block;font-size:16px;margin-bottom:4px}
+  ul{list-style:none;padding:0;margin:14px 0 0;max-height:320px;overflow:auto}
+  li{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+  li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  li .st{font-size:12px;white-space:nowrap}
+  .bar{height:6px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden;margin:14px 0 6px}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#e4b25c,#7ddf9a);transition:width .25s}
+  .ok{color:var(--ok)} .err{color:var(--err)} .gold{color:var(--gold)} .muted{color:var(--muted)}
+  #msg{font-size:13px;color:var(--muted);min-height:20px;margin-top:6px}
+  .tip{font-size:13px;color:var(--muted);background:rgba(228,178,92,.07);
+       border:1px solid rgba(228,178,92,.22);border-radius:11px;padding:12px 14px;margin-top:14px}
+  .tip b{color:var(--gold)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="crest">📸</div>
+  <h1>Foto's en video's nasturen</h1>
+  <div class="sub">Van 6 juni is een deel van het materiaal nooit aangekomen —
+    een fout in de app. Wat jij nog op je telefoon hebt, kan hier alsnog bij.</div>
+
+  <div class="card">
+    <label for="team">Je team</label>
+    <select id="team"><option value="">— laden… —</option></select>
+
+    <label for="naam">Je naam</label>
+    <input type="text" id="naam" placeholder="Zodat we weten van wie het is" autocomplete="name">
+
+    <div class="drop" id="drop">
+      <b>Kies je foto's en video's</b>
+      Tik hier · je kunt er meerdere tegelijk kiezen
+    </div>
+    <input type="file" id="files" accept="image/*,video/*" multiple style="display:none">
+
+    <div class="tip"><b>Tip:</b> zoek in je fotoalbum op <b>6 juni 2026</b>, tussen
+      14:00 en 19:30. Alles van die middag mag erin — dubbel is geen probleem,
+      ontbreken wel.</div>
+
+    <ul id="lijst"></ul>
+    <div class="bar"><i id="bar"></i></div>
+    <div id="msg"></div>
+    <button id="go" disabled>Versturen</button>
+    <button id="retry" class="ghost" style="display:none">Mislukte opnieuw proberen</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+var SUPABASE_URL='https://kybcndicweuxjxkfzxud.supabase.co';
+var SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5YmNuZGljd2V1eGp4a2Z6eHVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMDM3ODYsImV4cCI6MjA5MTY3OTc4Nn0.utTzURErYUiGgOpvlq1goKToUl8i4CavVicEFp-MrDk';
+var BUCKET='media';
+// Sentinel: nagekomen inzendingen. -1 is de bruiloftsmissie, -2 Jorik-missies,
+// dus -3 is vrij. Zo komt dit materiaal vanzelf mee in archief/export-*.
+var LATE_LOCATION_ID=-3;
+var ATTEMPTS=4, BACKOFF=[0,1500,4000,9000];
+
+var $=function(i){return document.getElementById(i);};
+var items=[], teams=[], bezig=false;
+
+function headers(extra){
+  var h={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY};
+  if(extra)for(var k in extra)h[k]=extra[k];
+  return h;
+}
+function uuid(){
+  try{ if(crypto&&crypto.randomUUID)return crypto.randomUUID(); }catch(e){}
+  return 'cid_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
+}
+
+// ── Het echte type uit de eerste bytes (zie MEDIA-FIX-V57.md, V59) ─────────
+// De naam van het bestand zegt niets betrouwbaars; die van de camera soms wel,
+// maar via WhatsApp of een screenshot-app lang niet altijd. Lees de inhoud.
+var ISO={'qt  ':'mov','heic':'heic','heix':'heic','heim':'heic','heis':'heic',
+         'hevc':'heic','hevx':'heic','mif1':'heic','msf1':'heic',
+         'M4V ':'m4v','M4A ':'m4a'};
+function sniff(b){
+  var t=function(o,n){var s='';for(var i=o;i<o+n&&i<b.length;i++)s+=String.fromCharCode(b[i]);return s;};
+  if(b.length<12)return null;
+  if(b[0]===0xFF&&b[1]===0xD8&&b[2]===0xFF)return 'jpg';
+  if(b[0]===0x89&&t(1,3)==='PNG')return 'png';
+  if(t(0,3)==='GIF')return 'gif';
+  if(t(0,4)==='RIFF'){var s=t(8,4);
+    if(s==='WEBP')return 'webp'; if(s==='AVI ')return 'avi';}
+  if(b[0]===0x1A&&b[1]===0x45&&b[2]===0xDF&&b[3]===0xA3)return 'webm';
+  if(t(4,4)==='ftyp'){var br=t(8,4);
+    if(ISO[br])return ISO[br];
+    if(br.indexOf('3g')===0)return '3gp';
+    return 'mp4';}
+  if(t(0,4)==='OggS')return 'ogv';
+  return null;
+}
+async function extFor(file){
+  try{
+    var head=new Uint8Array(await file.slice(0,16).arrayBuffer());
+    var e=sniff(head);
+    if(e)return e;
+  }catch(err){}
+  var m=(file.name||'').match(/\.([A-Za-z0-9]{1,5})$/);
+  return m?m[1].toLowerCase():'bin';
+}
+
+// De bytes beslissen, niet de naam of file.type. Een clip die via WhatsApp of
+// AirDrop is gelopen heet soms "IMG_4821" zonder extensie en meldt zich als
+// application/octet-stream; die moet alsnog als video worden weggeschreven,
+// anders belandt hij als foto in de tabel en telt hij overal verkeerd mee.
+var VIDEO_EXT={mp4:1,m4v:1,mov:1,qt:1,webm:1,ogv:1,'3gp':1};
+var EXT_MIME={jpg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',
+              heic:'image/heic',mov:'video/quicktime',mp4:'video/mp4',m4v:'video/x-m4v',
+              webm:'video/webm',ogv:'video/ogg','3gp':'video/3gpp',avi:'video/x-msvideo'};
+function extIsVideo(ext){ return !!VIDEO_EXT[ext]; }
+
+// ── Teams ophalen ───────────────────────────────────────────────────────────
+async function laadTeams(){
+  try{
+    var r=await fetch(SUPABASE_URL+'/rest/v1/teams?select=id,name,emoji,color&order=name',
+      {headers:headers()});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    teams=(await r.json()).filter(function(t){return !t.spectator;});
+  }catch(e){ teams=[]; }
+  var sel=$('team');
+  sel.innerHTML='<option value="">Kies je team…</option>'+
+    teams.map(function(t){
+      return '<option value="'+t.id+'">'+(t.emoji||'')+' '+
+             String(t.name||'').replace(/</g,'&lt;')+'</option>';
+    }).join('')+'<option value="onbekend">Weet ik niet meer</option>';
+  if(!teams.length){
+    $('msg').textContent='Teams konden niet geladen worden — je kunt wel gewoon versturen.';
+  }
+}
+
+// ── Lijst ───────────────────────────────────────────────────────────────────
+function render(){
+  $('lijst').innerHTML=items.map(function(it,i){
+    var st=it.status==='klaar'?'<span class="st ok">✓ verstuurd</span>'
+      :it.status==='bezig'?'<span class="st gold">bezig…</span>'
+      :it.status==='fout'?'<span class="st err">✕ '+(it.fout||'mislukt')+'</span>'
+      :'<span class="st muted">wacht</span>';
+    return '<li><span>'+(it.video?'🎬':'🖼️')+'</span>'+
+      '<span class="nm">'+String(it.file.name||'bestand '+(i+1)).replace(/</g,'&lt;')+'</span>'+
+      '<span class="st muted">'+(it.file.size/1048576).toFixed(1)+' MB</span>'+st+'</li>';
+  }).join('');
+  var klaar=items.filter(function(i){return i.status==='klaar';}).length;
+  $('bar').style.width=items.length?Math.round(klaar/items.length*100)+'%':'0';
+  $('go').disabled=bezig||!items.some(function(i){return i.status==='wacht';});
+  $('go').textContent=bezig?'Bezig…':('Versturen ('+
+    items.filter(function(i){return i.status==='wacht';}).length+')');
+  $('retry').style.display=(!bezig&&items.some(function(i){return i.status==='fout';}))?'block':'none';
+}
+
+$('drop').addEventListener('click',function(){$('files').click();});
+$('files').addEventListener('change',async function(e){
+  var gekozen=Array.prototype.slice.call(e.target.files);
+  e.target.value='';
+  for(var i=0;i<gekozen.length;i++){
+    var f=gekozen[i];
+    var ext=await extFor(f);
+    items.push({file:f,ext:ext,video:extIsVideo(ext),status:'wacht',fout:null});
+  }
+  render();
+});
+
+// ── Versturen ───────────────────────────────────────────────────────────────
+// Het bestand gaat als Blob rechtstreeks naar Storage. Geen base64 — dat was
+// precies de fout die op de speeldag hele video's kostte (zie MEDIA-FIX-V57.md).
+async function upload(it){
+  var ext=it.ext||await extFor(it.file);
+  var teamId=$('team').value;
+  var naam=($('naam').value||'').trim().slice(0,60);
+  var prefix=('na_'+(teamId||'x')+'_'+(naam||'anoniem')).replace(/[^A-Za-z0-9_-]/g,'_').slice(0,60);
+  var filename=prefix+'_'+Date.now()+'_'+Math.floor(Math.random()*1e6)+'.'+ext;
+  // Content-type volgt het gesnifte type; file.type is onbetrouwbaar en soms
+  // gewoon application/octet-stream.
+  var ct=EXT_MIME[ext]||it.file.type||'application/octet-stream';
+
+  var laatste=null;
+  for(var a=0;a<ATTEMPTS;a++){
+    if(a)await new Promise(function(r){setTimeout(r,BACKOFF[Math.min(a,BACKOFF.length-1)]);});
+    if(navigator.onLine===false){ laatste=new Error('geen verbinding'); continue; }
+    try{
+      var r=await fetch(SUPABASE_URL+'/storage/v1/object/'+BUCKET+'/'+encodeURIComponent(filename),
+        {method:'POST',headers:headers({'Content-Type':ct,'x-upsert':'false'}),body:it.file});
+      if(r.ok){
+        return SUPABASE_URL+'/storage/v1/object/public/'+BUCKET+'/'+encodeURIComponent(filename);
+      }
+      var tekst=await r.text();
+      laatste=new Error(r.status===413?'bestand te groot voor de server':('HTTP '+r.status));
+      // Een geweigerd bestand wordt bij een herhaling net zo hard geweigerd.
+      if(r.status===413||r.status===400||r.status===403)break;
+    }catch(e){ laatste=e; }
+  }
+  throw laatste||new Error('upload mislukt');
+}
+
+async function verstuur(){
+  if(bezig)return;
+  var naam=($('naam').value||'').trim();
+  if(!naam){ $('msg').textContent='Vul even je naam in, dan weten we van wie het is.'; return; }
+  bezig=true; $('msg').textContent=''; render();
+
+  var teamId=$('team').value;
+  var team=teams.filter(function(t){return String(t.id)===teamId;})[0];
+
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    if(it.status==='klaar')continue;
+    it.status='bezig'; render();
+    try{
+      var url=await upload(it);
+      // Rij erbij zodat het materiaal in de export en de keepsake opduikt.
+      // Mislukt dit, dan staat het bestand er wél — we melden het maar gooien
+      // het niet weg.
+      try{
+        await fetch(SUPABASE_URL+'/rest/v1/photo_reviews',{
+          method:'POST',headers:headers({'Content-Type':'application/json',Prefer:'return=minimal'}),
+          body:JSON.stringify({
+            team_id:team?team.id:null,
+            team_name:team?team.name:(teamId==='onbekend'?'Onbekend team':null),
+            team_emoji:team?team.emoji:'📸', team_color:team?team.color:'#e4b25c',
+            location_id:LATE_LOCATION_ID, location_name:'Nagestuurd door '+naam,
+            challenge_idx:0, challenge_title:'Nagekomen: '+(it.file.name||'zonder naam'),
+            challenge_type:it.video?'video':'photo',
+            gps_distance:null, points_awarded:0,
+            photo_url:url, status:'approved', client_id:uuid()
+          })
+        });
+      }catch(e){ /* bestand staat er; de rij kan later alsnog */ }
+      it.status='klaar'; it.fout=null;
+    }catch(e){
+      it.status='fout'; it.fout=(e&&e.message)||'mislukt';
+    }
+    render();
+  }
+
+  bezig=false;
+  var klaar=items.filter(function(i){return i.status==='klaar';}).length;
+  var stuk=items.filter(function(i){return i.status==='fout';}).length;
+  $('msg').innerHTML=stuk
+    ? '<span class="ok">'+klaar+' verstuurd</span> · <span class="err">'+stuk+
+      ' mislukt — probeer die opnieuw, je raakt ze niet kwijt.</span>'
+    : '<span class="ok">Alles binnen — '+klaar+' bestand(en). Dankjewel!</span>';
+  render();
+}
+
+$('go').addEventListener('click',verstuur);
+$('retry').addEventListener('click',function(){
+  items.forEach(function(i){ if(i.status==='fout')i.status='wacht'; });
+  render(); verstuur();
+});
+window.addEventListener('beforeunload',function(e){
+  if(items.some(function(i){return i.status!=='klaar';})&&items.length){
+    e.preventDefault(); e.returnValue='';
+  }
+});
+
+laadTeams(); render();
+})();
+</script>
+</body>
+</html>
