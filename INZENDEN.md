@@ -78,10 +78,17 @@ inzamelen, dan exporteren, dan pas het domein en de repo opruimen.
 
 ## Let op
 
-- **De bucketlimiet.** Een lange 4K-video kan over de grens van het Supabase-plan
-  gaan; die krijgt dan netjes "bestand te groot voor de server" te zien. Zet de
-  limiet zo hoog als je plan toelaat (`SUPABASE-SETUP.sql`, deel A) vóór je de
-  link deelt.
+- **De bucketlimiet is óók door je abonnement begrensd.** `SUPABASE-SETUP.sql`
+  zet `storage.buckets.file_size_limit` op 500 MB, maar Supabase hanteert
+  daarnaast een harde maximale uploadgrootte per plan — op het gratis plan
+  doorgaans 50 MB. De effectieve grens is de laagste van die twee, en wat in
+  *Storage → media → Configuration* staat is wat geldt. Een SQL-regel kan een
+  planlimiet niet omzeilen; daarvoor moet je upgraden.
+
+  De pagina houdt daar rekening mee: bestanden boven `MAX_MB` (bovenin het
+  bestand, standaard 50) worden bij het kiezen al gemarkeerd, met het advies om
+  ze los via WeTransfer of AirDrop te sturen. Ga je naar een hoger plan, zet dan
+  dat getal mee omhoog.
 - **De pagina schrijft met de publieke anon-key**, net als het spel zelf. Zolang
   de link in de groepsapp staat kan in principe iedereen met die link uploaden.
   Voor een besloten feest is dat prima; haal de pagina weg als je klaar bent met
