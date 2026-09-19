@@ -63,6 +63,8 @@
       14:00 en 19:30. Alles van die middag mag erin — dubbel is geen probleem,
       ontbreken wel.</div>
 
+    <div class="tip" id="waarschuwing" style="display:none;border-color:rgba(255,138,138,.4);background:rgba(255,138,138,.08)"></div>
+
     <ul id="lijst"></ul>
     <div class="bar"><i id="bar"></i></div>
     <div id="msg"></div>
@@ -82,6 +84,12 @@ var BUCKET='media';
 // dus -3 is vrij. Zo komt dit materiaal vanzelf mee in archief/export-*.
 var LATE_LOCATION_ID=-3;
 var ATTEMPTS=4, BACKOFF=[0,1500,4000,9000];
+// Supabase weigert bestanden boven de bucketlimiet met een 413. Die limiet is
+// óók begrensd door het abonnement — op het gratis plan doorgaans 50 MB, hoeveel
+// de bucket-rij zelf ook zegt. We waarschuwen daarom vóór de upload in plaats van
+// iemand tien minuten te laten wachten op een afwijzing. Zit je op een hoger plan?
+// Zet dit getal dan mee omhoog.
+var MAX_MB=50;
 
 var $=function(i){return document.getElementById(i);};
 var items=[], teams=[], bezig=false;
@@ -163,6 +171,7 @@ function render(){
     var st=it.status==='klaar'?'<span class="st ok">✓ verstuurd</span>'
       :it.status==='bezig'?'<span class="st gold">bezig…</span>'
       :it.status==='fout'?'<span class="st err">✕ '+(it.fout||'mislukt')+'</span>'
+      :it.teGroot?'<span class="st err">te groot ('+MAX_MB+' MB max)</span>'
       :'<span class="st muted">wacht</span>';
     return '<li><span>'+(it.video?'🎬':'🖼️')+'</span>'+
       '<span class="nm">'+String(it.file.name||'bestand '+(i+1)).replace(/</g,'&lt;')+'</span>'+
@@ -170,6 +179,11 @@ function render(){
   }).join('');
   var klaar=items.filter(function(i){return i.status==='klaar';}).length;
   $('bar').style.width=items.length?Math.round(klaar/items.length*100)+'%':'0';
+  var groot=items.filter(function(i){return i.teGroot&&i.status!=='klaar';}).length;
+  $('waarschuwing').style.display=groot?'block':'none';
+  if(groot)$('waarschuwing').innerHTML='<b>'+groot+' bestand(en) zijn groter dan '+MAX_MB+
+    ' MB.</b> De server weigert die. We proberen het wel, maar lukt het niet: stuur '+
+    'ze los via WeTransfer of AirDrop naar Mike, of knip de video korter.';
   $('go').disabled=bezig||!items.some(function(i){return i.status==='wacht';});
   $('go').textContent=bezig?'Bezig…':('Versturen ('+
     items.filter(function(i){return i.status==='wacht';}).length+')');
@@ -183,7 +197,8 @@ $('files').addEventListener('change',async function(e){
   for(var i=0;i<gekozen.length;i++){
     var f=gekozen[i];
     var ext=await extFor(f);
-    items.push({file:f,ext:ext,video:extIsVideo(ext),status:'wacht',fout:null});
+    items.push({file:f,ext:ext,video:extIsVideo(ext),status:'wacht',fout:null,
+                teGroot:f.size>MAX_MB*1048576});
   }
   render();
 });
