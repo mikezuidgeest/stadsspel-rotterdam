@@ -24,6 +24,11 @@ als eerste veilig moet stellen, los van welk besluit dan ook over het domein.
 Daarvoor staat nu klaar: **`archief/export-archief.py`** — haalt alle tabellen én
 alle media in één run binnen.
 
+**Let op bij het interpreteren van de export:** een deel van de foto's en video's
+van 6 juni is de server nooit op gegaan — dat lag aan vier bugs in de app, niet
+aan Supabase. Wat de export niet vindt, valt daar dus niet te halen; de
+originelen staan nog wel in de camerarol van de spelers. Zie `MEDIA-FIX-V57.md`.
+
 ---
 
 ## 2. Waar staat wat
@@ -150,14 +155,31 @@ Twee dingen die het bewust dubbel doet:
 
 ---
 
-## 7. Optioneel: een offline keepsake
+## 7. Het offline aandenken
 
-De app draait nu op externe CDN's (unpkg, jsdelivr, Google Fonts) en op een live
-Supabase. Ook met de export in handen is `index.html` op een USB-stick dus niet
-speelbaar. Wil je een versie die over vijf jaar nog opent — één map, dubbelklik,
-eindstand en fotogalerij erin gebakken, zonder internet — dan is dat een losse
-klus: libraries meeleveren en de geëxporteerde data in de pagina bakken. Zeg het
-als je dat wilt, dan bouw ik die.
+De speel-app zelf is geen bewaarvorm: die haalt React, Leaflet en de
+Supabase-client van externe CDN's en praat live met de database. Op een USB-stick
+opent `index.html` een leeg scherm.
+
+Daarom staat er naast de export een tweede stap:
+
+```bash
+python3 keepsake/build-keepsake.py
+```
+
+Die maakt van de nieuwste export één zelfstandige map — `index.html` met alle
+data erin gebakken en `media/` ernaast. Geen internet, geen server, geen
+afhankelijkheden. Drie tabbladen: eindstand, galerij (filterbaar per team, tik
+voor groot met videospeler) en de tijdlijn van de dag.
+
+Bekijken zonder dat Supabase draait:
+
+```bash
+python3 test/keepsake-fixture.py --out /tmp/demo-export
+python3 keepsake/build-keepsake.py --export /tmp/demo-export --out /tmp/demo-keepsake
+```
+
+Details in `keepsake/README.md`.
 
 ---
 

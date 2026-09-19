@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__TITEL__ — aandenken</title>
+<style>
+  :root{
+    --bg:#1a1310; --bg-2:#241a15; --card:#2a1f19; --line:rgba(228,178,92,0.18);
+    --gold:#e4b25c; --gold-dim:#b98f43; --text:#f5f1e8; --muted:#a2958a;
+    --r:14px; --maxw:1080px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text); line-height:1.55;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:0 16px 80px;
+  }
+  .wrap{max-width:var(--maxw);margin:0 auto}
+
+  header{text-align:center;padding:56px 0 32px}
+  header .crest{font-size:56px;line-height:1;filter:drop-shadow(0 4px 16px rgba(228,178,92,.35))}
+  h1{font-size:clamp(26px,6vw,40px);margin:16px 0 6px;color:var(--gold);letter-spacing:-.01em}
+  header .sub{color:var(--muted);font-size:14px}
+
+  nav{position:sticky;top:0;z-index:20;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;
+      padding:10px 0;margin-bottom:24px;background:linear-gradient(180deg,var(--bg) 70%,transparent)}
+  nav button{font:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:999px;cursor:pointer;
+             background:var(--card);color:var(--muted);border:1px solid var(--line)}
+  nav button[aria-selected="true"]{background:var(--gold);color:#1a1310;border-color:var(--gold)}
+
+  section{display:none} section.on{display:block}
+  h2{font-size:19px;margin:0 0 16px;color:var(--gold)}
+
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:28px}
+  @media(min-width:640px){.stats{grid-template-columns:repeat(4,1fr)}}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;text-align:center}
+  .stat b{display:block;font-size:24px;color:var(--gold)}
+  .stat span{font-size:12px;color:var(--muted)}
+
+  ol.board{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+  ol.board li{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+              border-radius:var(--r);padding:12px 16px;border-left-width:4px}
+  ol.board li .rank{font-size:15px;font-weight:700;color:var(--muted);min-width:30px}
+  ol.board li .em{font-size:24px}
+  ol.board li .nm{flex:1;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  ol.board li .pt{font-weight:700;color:var(--gold);white-space:nowrap}
+  ol.board li:first-child{background:linear-gradient(135deg,rgba(228,178,92,.16),var(--card))}
+  ol.board li:first-child .rank{color:var(--gold)}
+
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+  .filters button{font:inherit;font-size:12px;padding:6px 12px;border-radius:999px;cursor:pointer;
+                  background:var(--bg-2);color:var(--muted);border:1px solid var(--line)}
+  .filters button[aria-pressed="true"]{background:var(--gold);color:#1a1310;border-color:var(--gold)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;cursor:pointer;
+        display:flex;flex-direction:column}
+  .tile .ph{position:relative;aspect-ratio:1;background:var(--bg-2);display:flex;align-items:center;justify-content:center}
+  .tile img,.tile video{width:100%;height:100%;object-fit:cover;display:block}
+  .tile .none{font-size:11px;color:var(--muted);text-align:center;padding:12px;line-height:1.4}
+  .tile .badge{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.72);color:#fff;
+               font-size:11px;padding:2px 7px;border-radius:999px}
+  .tile .meta{padding:9px 11px;border-top:1px solid var(--line)}
+  .tile .meta .t{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tile .meta .s{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  ul.feed{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+  ul.feed li{display:flex;gap:11px;background:var(--card);border:1px solid var(--line);
+             border-radius:var(--r);padding:11px 14px;border-left-width:3px}
+  ul.feed .em{font-size:19px;flex-shrink:0}
+  ul.feed .body{flex:1;min-width:0}
+  ul.feed .msg{font-size:13px;word-break:break-word}
+  ul.feed .when{font-size:11px;color:var(--muted);margin-top:2px}
+  ul.feed .pts{font-size:12px;font-weight:700;color:var(--gold);white-space:nowrap}
+  ul.feed a.thumb{flex-shrink:0}
+  ul.feed a.thumb img,ul.feed a.thumb video{width:52px;height:52px;object-fit:cover;border-radius:8px;display:block}
+
+  dialog{border:none;background:rgba(10,7,5,.96);color:var(--text);width:100%;height:100%;max-width:100%;max-height:100%;padding:0}
+  dialog::backdrop{background:rgba(0,0,0,.85)}
+  .lb{display:flex;flex-direction:column;height:100%}
+  .lb .top{display:flex;justify-content:flex-end;padding:12px}
+  .lb .top button{font:inherit;font-size:22px;background:none;border:none;color:var(--text);cursor:pointer;
+                  width:44px;height:44px;border-radius:50%}
+  .lb .frame{flex:1;display:flex;align-items:center;justify-content:center;padding:0 12px;min-height:0}
+  .lb img,.lb video{max-width:100%;max-height:100%;object-fit:contain}
+  .lb .cap{padding:16px;text-align:center;font-size:13px;color:var(--muted)}
+  .lb .cap b{display:block;color:var(--text);font-size:15px;margin-bottom:3px}
+
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);
+         padding:28px;text-align:center;color:var(--muted);font-size:13px}
+  footer{max-width:var(--maxw);margin:48px auto 0;padding-top:20px;border-top:1px solid var(--line);
+         text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="crest">🏆</div>
+    <h1>__TITEL__</h1>
+    <div class="sub">__ONDERTITEL__</div>
+  </header>
+
+  <nav id="nav">
+    <button data-tab="board" aria-selected="true">🏆 Eindstand</button>
+    <button data-tab="gallery" aria-selected="false">📸 Galerij</button>
+    <button data-tab="feed" aria-selected="false">📢 Tijdlijn</button>
+  </nav>
+
+  <section id="board" class="on">
+    <div class="stats" id="stats"></div>
+    <h2>Eindstand</h2>
+    <ol class="board" id="boardList"></ol>
+  </section>
+
+  <section id="gallery">
+    <h2>Alle inzendingen</h2>
+    <div class="filters" id="galleryFilters"></div>
+    <div class="grid" id="galleryGrid"></div>
+  </section>
+
+  <section id="feed">
+    <h2>De dag van minuut tot minuut</h2>
+    <ul class="feed" id="feedList"></ul>
+  </section>
+</div>
+
+<dialog id="lightbox">
+  <div class="lb">
+    <div class="top"><button id="lbClose" aria-label="Sluiten">✕</button></div>
+    <div class="frame" id="lbFrame"></div>
+    <div class="cap" id="lbCap"></div>
+  </div>
+</dialog>
+
+<footer>
+  <div>Offline aandenken · gebouwd uit een archief-export</div>
+  <div id="builtOn"></div>
+</footer>
+
+<script id="data" type="application/json">"__DATA__"</script>
+<script>
+(function(){
+  'use strict';
+  var DATA = JSON.parse(document.getElementById('data').textContent);
+  var VIDEO = /\.(mp4|m4v|mov|qt|webm|ogv)$/i;
+  var $ = function(id){ return document.getElementById(id); };
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function when(iso){
+    if(!iso) return '';
+    var d = new Date(iso);
+    if(isNaN(d)) return '';
+    return d.toLocaleString('nl-NL', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+  }
+  function isVideo(p){ return !!p && VIDEO.test(p); }
+
+  // ── Eindstand ──
+  var s = DATA.stats || {};
+  $('stats').innerHTML = [
+    ['🏅', s.teams || 0, 'teams'],
+    ['📸', s.media || 0, "foto's & video's"],
+    ['🎯', s.shots || 0, 'inzendingen'],
+    ['📢', s.feed || 0, 'gebeurtenissen']
+  ].map(function(r){
+    return '<div class="stat"><b>' + r[0] + ' ' + r[1] + '</b><span>' + r[2] + '</span></div>';
+  }).join('');
+
+  var medals = ['🥇','🥈','🥉'];
+  $('boardList').innerHTML = DATA.teams.length
+    ? DATA.teams.map(function(t, i){
+        return '<li style="border-left-color:' + esc(t.color) + '">' +
+          '<span class="rank">' + (medals[i] || (i + 1) + '.') + '</span>' +
+          '<span class="em">' + esc(t.emoji) + '</span>' +
+          '<span class="nm">' + esc(t.name) + '</span>' +
+          '<span class="pt">' + (t.score || 0) + ' pts</span></li>';
+      }).join('')
+    : '<div class="empty">Geen teams in de export.</div>';
+
+  // ── Galerij ──
+  var filter = null;
+  var teamNames = [];
+  DATA.shots.forEach(function(sh){
+    if(sh.team && teamNames.indexOf(sh.team) < 0) teamNames.push(sh.team);
+  });
+
+  function renderFilters(){
+    $('galleryFilters').innerHTML =
+      '<button data-team="" aria-pressed="' + (filter === null) + '">Alles</button>' +
+      teamNames.map(function(n){
+        return '<button data-team="' + esc(n) + '" aria-pressed="' + (filter === n) + '">' + esc(n) + '</button>';
+      }).join('');
+  }
+
+  function renderGallery(){
+    var rows = DATA.shots.filter(function(sh){ return filter === null || sh.team === filter; });
+    if(!rows.length){ $('galleryGrid').innerHTML = '<div class="empty">Niets gevonden.</div>'; return; }
+    $('galleryGrid').innerHTML = rows.map(function(sh){
+      var i = DATA.shots.indexOf(sh);
+      var inner;
+      if(!sh.media){
+        // Eerlijk tonen wat er op de speeldag is gesneuveld in plaats van de tegel weglaten.
+        inner = '<div class="none">📷<br>media niet<br>doorgekomen</div>';
+      }else if(isVideo(sh.media)){
+        inner = '<video src="' + esc(sh.media) + '" muted playsinline preload="metadata"></video>' +
+                '<span class="badge">▶ video</span>';
+      }else{
+        inner = '<img src="' + esc(sh.media) + '" alt="" loading="lazy">';
+      }
+      return '<div class="tile" data-i="' + i + '"><div class="ph">' + inner + '</div>' +
+        '<div class="meta"><div class="t">' + esc(sh.emoji || '') + ' ' + esc(sh.team || '') + '</div>' +
+        '<div class="s">' + esc(sh.location || sh.title || '') + '</div></div></div>';
+    }).join('');
+  }
+
+  $('galleryFilters').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    filter = b.dataset.team || null;
+    renderFilters(); renderGallery();
+  });
+
+  $('galleryGrid').addEventListener('click', function(e){
+    var t = e.target.closest('.tile'); if(!t) return;
+    open(DATA.shots[+t.dataset.i]);
+  });
+
+  // ── Tijdlijn ──
+  $('feedList').innerHTML = DATA.feed.length
+    ? DATA.feed.map(function(f, i){
+        var thumb = '';
+        if(f.media){
+          thumb = '<a class="thumb" href="' + esc(f.media) + '" data-feed="' + i + '">' +
+            (isVideo(f.media)
+              ? '<video src="' + esc(f.media) + '" muted playsinline preload="metadata"></video>'
+              : '<img src="' + esc(f.media) + '" alt="" loading="lazy">') + '</a>';
+        }
+        return '<li style="border-left-color:' + esc(f.color) + '">' +
+          '<span class="em">' + esc(f.emoji || '•') + '</span>' +
+          '<div class="body"><div class="msg">' + esc(f.message) + '</div>' +
+          '<div class="when">' + esc(when(f.at)) + (f.team ? ' · ' + esc(f.team) : '') + '</div></div>' +
+          (f.points ? '<span class="pts">+' + f.points + '</span>' : '') + thumb + '</li>';
+      }).join('')
+    : '<div class="empty">Geen feed in de export.</div>';
+
+  $('feedList').addEventListener('click', function(e){
+    var a = e.target.closest('a.thumb'); if(!a) return;
+    e.preventDefault();
+    var f = DATA.feed[+a.dataset.feed];
+    open({ media: f.media, team: f.team, emoji: f.emoji, title: f.message, at: f.at, location: '' });
+  });
+
+  // ── Lightbox ──
+  var dlg = $('lightbox');
+  function open(item){
+    if(!item || !item.media) return;
+    $('lbFrame').innerHTML = isVideo(item.media)
+      ? '<video src="' + esc(item.media) + '" controls autoplay playsinline></video>'
+      : '<img src="' + esc(item.media) + '" alt="">';
+    $('lbCap').innerHTML = '<b>' + esc([item.emoji, item.team].filter(Boolean).join(' ')) + '</b>' +
+      esc([item.location, item.title].filter(Boolean).join(' · ')) +
+      (item.at ? '<br>' + esc(when(item.at)) : '');
+    if(dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  }
+  function close(){
+    // Stop de video, anders speelt het geluid door achter de gesloten dialog.
+    $('lbFrame').innerHTML = '';
+    if(dlg.close) dlg.close(); else dlg.removeAttribute('open');
+  }
+  $('lbClose').addEventListener('click', close);
+  dlg.addEventListener('click', function(e){ if(e.target === dlg) close(); });
+  dlg.addEventListener('close', function(){ $('lbFrame').innerHTML = ''; });
+
+  // ── Tabs ──
+  $('nav').addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    [].forEach.call(document.querySelectorAll('#nav button'), function(x){
+      x.setAttribute('aria-selected', String(x === b));
+    });
+    [].forEach.call(document.querySelectorAll('section'), function(sec){
+      sec.classList.toggle('on', sec.id === b.dataset.tab);
+    });
+    window.scrollTo(0, 0);
+  });
+
+  renderFilters();
+  renderGallery();
+  $('builtOn').textContent = 'Gemaakt op ' + when(DATA.gebouwdOp) +
+    (s.zonderMedia ? ' · ' + s.zonderMedia + ' inzendingen zonder media' : '');
+})();
+</script>
+</body>
+</html>
